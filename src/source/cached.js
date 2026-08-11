@@ -34,9 +34,10 @@ export function withCache(db, source, { ttlMs = 30 * MIN } = {}) {
 
   return {
     ...source,
-    home: () => cached('home', () => source.home()),
-    list: (type = 'truyen-moi', page = 1) => cached(`list:${type}:${page}`, () => source.list(type, page)),
-    byCategory: (slug, page = 1) => cached(`cat:${slug}:${page}`, () => source.byCategory(slug, page)),
+    // v2: đổi khoá để bỏ bản cache cũ (trước đây thiếu tham số sắp xếp)
+    home: () => cached('home:v2', () => source.home()),
+    list: (type = 'truyen-moi', page = 1) => cached(`list:v2:${type}:${page}`, () => source.list(type, page)),
+    byCategory: (slug, page = 1) => cached(`cat:v2:${slug}:${page}`, () => source.byCategory(slug, page)),
     categories: () => cached('categories', () => source.categories(), 24 * 60 * MIN),
     // detail / chapter / search giữ nguyên: cần dữ liệu mới nhất
   };

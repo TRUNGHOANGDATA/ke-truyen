@@ -25,10 +25,14 @@ export function createSource({ base, cdnBase, fetchFn = fetch, retries = 2, retr
     pagination: data.params?.pagination || null,
   });
 
+  // Không truyền tham số này thì endpoint thể loại mặc định sắp theo _id
+  // (thứ tự thêm vào DB của nguồn) → ra truyện cũ từ mấy năm trước.
+  const SORT = 'sort_field=updatedAt&sort_type=desc';
+
   return {
     async home() { return listShape(await getJson(`${base}/home`)); },
     async list(type = 'truyen-moi', page = 1) {
-      return listShape(await getJson(`${base}/danh-sach/${type}?page=${page}`));
+      return listShape(await getJson(`${base}/danh-sach/${type}?page=${page}&${SORT}`));
     },
     async search(keyword) {
       return listShape(await getJson(`${base}/tim-kiem?keyword=${encodeURIComponent(keyword)}`));
@@ -38,7 +42,7 @@ export function createSource({ base, cdnBase, fetchFn = fetch, retries = 2, retr
       return (data.items || []).map(c => ({ name: c.name, slug: c.slug }));
     },
     async byCategory(slug, page = 1) {
-      return listShape(await getJson(`${base}/the-loai/${slug}?page=${page}`));
+      return listShape(await getJson(`${base}/the-loai/${slug}?page=${page}&${SORT}`));
     },
     async detail(slug) {
       return mapDetail(await getJson(`${base}/truyen-tranh/${slug}`));

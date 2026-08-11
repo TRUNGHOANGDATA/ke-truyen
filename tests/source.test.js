@@ -44,3 +44,20 @@ test('retries then throws on repeated failure', async () => {
   await assert.rejects(() => src.home());
   assert.equal(calls, 3); // initial + 2 retries
 });
+
+test('list and byCategory ask the source to sort by updatedAt', async () => {
+  const seen = [];
+  const src = createSource({
+    base: 'https://api.test/v1/api', cdnBase: 'https://img.test',
+    fetchFn: async (url) => {
+      seen.push(url);
+      return { ok: true, status: 200, json: async () => ({ status: 'success', data: { items: [] } }) };
+    },
+  });
+  await src.byCategory('manhua', 1);
+  await src.list('truyen-moi', 2);
+  // Thiếu tham số này thì nguồn sắp theo _id -> ra truyện cũ mấy năm trước
+  assert.ok(seen[0].includes('sort_field=updatedAt'), seen[0]);
+  assert.ok(seen[0].includes('sort_type=desc'), seen[0]);
+  assert.ok(seen[1].includes('sort_field=updatedAt'), seen[1]);
+});
