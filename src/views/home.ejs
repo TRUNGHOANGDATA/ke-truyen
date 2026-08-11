@@ -58,7 +58,7 @@
           <span class="cnt" style="margin-left:10px"><%= reading.length %></span></div>
         <% if (reading.length) { %>
         <div class="cgrid">
-          <% reading.forEach(comic => { %><%- include('partials/followed-card', { comic }) %><% }) %>
+          <% reading.forEach(comic => { %><%- include('partials/followed-card', { comic, mode: 'reading' }) %><% }) %>
         </div>
         <% } else { %>
         <div class="emptymsg">Chưa có truyện đang đọc dở. Mở một truyện bất kỳ và đọc — nó sẽ tự xuất hiện ở đây kèm vị trí đã đọc.<br>

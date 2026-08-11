@@ -43,6 +43,11 @@ export function mountApi(app, { source, library, updates, cacheDir }) {
     res.json({ ok: true });
   });
 
+  app.post('/api/clear-progress', (req, res) => {
+    library.clearProgress(req.body.slug);
+    res.json({ ok: true });
+  });
+
   app.post('/api/progress', (req, res) => {
     const { slug, chapter, page } = req.body;
     library.setProgress(slug, chapter, Number(page) || 0);

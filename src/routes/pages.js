@@ -49,7 +49,8 @@ export function mountPages(app) {
 
   app.get('/', async (req, res) => {
     const items = svc().library.listFollowed().map(mapFollowed);
-    const reading = items.filter(c => c.progress);
+    // "Đang đọc dở" độc lập với việc có theo dõi hay không
+    const reading = svc().library.listReading().map(mapFollowed);
     const source = svc().source;
     let recent = [], genres = [], suggested = [], featured = [], whyGenres = [];
     try {
@@ -65,7 +66,8 @@ export function mountPages(app) {
       // ---- Gợi ý dựa trên THỂ LOẠI BẠN ĐỌC ----
       // Chấm điểm thể loại: truyện đang đọc dở nặng hơn truyện chỉ theo dõi.
       const taste = new Map();
-      for (const c of items) {
+      const mine = new Map([...items, ...reading].map(c => [c.slug, c]));
+      for (const c of mine.values()) {
         const weight = c.progress ? 3 : 1;
         for (const g of (c.categories || '').split(', ').filter(Boolean)) {
           taste.set(g, (taste.get(g) || 0) + weight);
@@ -74,7 +76,7 @@ export function mountPages(app) {
       const topTaste = [...taste.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
       whyGenres = topTaste.slice(0, 3).map(([g]) => g);
 
-      const followedSlugs = new Set(items.map(c => c.slug));
+      const followedSlugs = new Set(mine.keys());
       const candidates = new Map();
       for (const lst of cats) {
         for (const c of (lst?.items || [])) {
@@ -174,8 +176,11 @@ export function mountPages(app) {
       const startPage = (progress && progress.chapterName === chapterName) ? progress.imagePage : 0;
       // Thông tin truyện cho dải thể loại trong trang đọc: lấy từ DB nếu đang
       // theo dõi, không thì từ detail vừa tải (chỉ tải khi chưa có mục lục).
-      const row = svcs.library.listFollowed().find(c => c.slug === slug);
+      const row = svcs.library.listTracked().find(c => c.slug === slug);
       if (!detail && !row) detail = await svcs.source.detail(slug);
+      // Ghi truyện vào thư viện (followed=0 nếu chưa theo dõi) để vị trí đọc
+      // còn hiện lại được ở mục "Đang đọc dở".
+      if (detail) svcs.library.remember(detail);
       const name = detail?.name || row?.name || slug;
       const categories = detail
         ? detail.categories

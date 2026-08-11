@@ -15,7 +15,11 @@ export function createLibrary(db) {
       chapter_title=excluded.chapter_title, api_url=excluded.api_url, order_index=excluded.order_index
   `);
 
-  const follow = db.transaction((detail) => {
+  const setFollowed = db.prepare('UPDATE comics SET followed=? WHERE slug=?');
+
+  // Ghi truyện vào thư viện. followed=1 khi bấm "Theo dõi"; followed=0 khi chỉ
+  // mở ra đọc (để còn hiện ở "Đang đọc dở" mà không coi là đang theo dõi).
+  const save = db.transaction((detail, followed) => {
     const latest = detail.chapters.at(-1)?.name ?? null;
     upsertComic.run({
       slug: detail.slug, name: detail.name, thumb_url: detail.thumbUrl,
@@ -23,35 +27,77 @@ export function createLibrary(db) {
       last_chapter_seen: latest, updated_at_source: detail.updatedAt || null,
       followed_at: Date.now(),
     });
+    if (followed !== null) setFollowed.run(followed ? 1 : 0, detail.slug);
     for (const c of detail.chapters) {
       insChapter.run(detail.slug, c.name, c.title || '', c.apiUrl, c.order);
     }
   });
 
+  const decorate = (c) => {
+    const total = db.prepare('SELECT COUNT(*) n FROM chapters WHERE comic_slug=?').get(c.slug).n;
+    const prog = db.prepare('SELECT * FROM reading_progress WHERE comic_slug=?').get(c.slug);
+    let readCount = 0;
+    if (prog) {
+      const ord = db.prepare('SELECT order_index FROM chapters WHERE comic_slug=? AND chapter_name=?')
+        .get(c.slug, prog.chapter_name);
+      readCount = ord ? ord.order_index + 1 : 0;
+    }
+    return { ...c, totalChapters: total, readCount, unread: Math.max(0, total - readCount),
+             progress: prog ? { chapterName: prog.chapter_name, imagePage: prog.image_page } : null };
+  };
+
   return {
-    follow,
+    follow: (detail) => save(detail, true),
+    /** Chỉ ghi nhớ để đọc tiếp, không đánh dấu theo dõi (giữ nguyên nếu đã theo). */
+    remember(detail) {
+      const existing = db.prepare('SELECT followed FROM comics WHERE slug=?').get(detail.slug);
+      save(detail, existing ? null : false);
+    },
     unfollow(slug) {
-      db.prepare('DELETE FROM comics WHERE slug=?').run(slug);
-      delChapters.run(slug);
+      const prog = db.prepare('SELECT 1 FROM reading_progress WHERE comic_slug=?').get(slug);
+      if (prog) {
+        setFollowed.run(0, slug); // còn đang đọc dở thì giữ lại lịch sử đọc
+      } else {
+        db.prepare('DELETE FROM comics WHERE slug=?').run(slug);
+        delChapters.run(slug);
+      }
+    },
+    /** Xoá khỏi "Đang đọc dở". Không theo dõi nữa thì bỏ hẳn khỏi thư viện. */
+    clearProgress(slug) {
       db.prepare('DELETE FROM reading_progress WHERE comic_slug=?').run(slug);
+      const row = db.prepare('SELECT followed FROM comics WHERE slug=?').get(slug);
+      if (row && !row.followed) {
+        db.prepare('DELETE FROM comics WHERE slug=?').run(slug);
+        delChapters.run(slug);
+      }
     },
     isFollowed(slug) {
+      const row = db.prepare('SELECT followed FROM comics WHERE slug=?').get(slug);
+      return !!(row && row.followed);
+    },
+    inLibrary(slug) {
       return !!db.prepare('SELECT 1 FROM comics WHERE slug=?').get(slug);
     },
+    /** Truyện đang đọc dở — không phụ thuộc việc có theo dõi hay không. */
+    listReading() {
+      return db.prepare(`
+        SELECT c.* FROM comics c
+        JOIN reading_progress p ON p.comic_slug = c.slug
+        ORDER BY p.updated_at DESC
+      `).all().map(decorate);
+    },
+    /** Truyện cần kiểm tra chương mới: đang theo dõi HOẶC đang đọc dở. */
+    listTracked() {
+      return db.prepare(`
+        SELECT c.* FROM comics c
+        WHERE c.followed = 1
+           OR EXISTS (SELECT 1 FROM reading_progress p WHERE p.comic_slug = c.slug)
+        ORDER BY c.followed_at DESC
+      `).all().map(decorate);
+    },
     listFollowed() {
-      const comics = db.prepare('SELECT * FROM comics ORDER BY followed_at DESC').all();
-      return comics.map(c => {
-        const total = db.prepare('SELECT COUNT(*) n FROM chapters WHERE comic_slug=?').get(c.slug).n;
-        const prog = db.prepare('SELECT * FROM reading_progress WHERE comic_slug=?').get(c.slug);
-        let readCount = 0;
-        if (prog) {
-          const ord = db.prepare('SELECT order_index FROM chapters WHERE comic_slug=? AND chapter_name=?')
-            .get(c.slug, prog.chapter_name);
-          readCount = ord ? ord.order_index + 1 : 0;
-        }
-        return { ...c, totalChapters: total, readCount, unread: Math.max(0, total - readCount),
-                 progress: prog ? { chapterName: prog.chapter_name, imagePage: prog.image_page } : null };
-      });
+      return db.prepare('SELECT * FROM comics WHERE followed=1 ORDER BY followed_at DESC')
+        .all().map(decorate);
     },
     setProgress(slug, chapterName, imagePage = 0) {
       db.prepare(`

@@ -1,5 +1,9 @@
+<% const clearMode = typeof mode !== 'undefined' && mode === 'reading'; %>
 <div class="cc-wrap" data-slug="<%= comic.slug %>">
-  <button class="unfollow" type="button" data-slug="<%= comic.slug %>" title="Bỏ theo dõi" aria-label="Bỏ theo dõi">✕</button>
+  <button class="unfollow" type="button" data-slug="<%= comic.slug %>"
+          data-action="<%= clearMode ? 'clear' : 'unfollow' %>"
+          title="<%= clearMode ? 'Xoá khỏi đang đọc dở' : 'Bỏ theo dõi' %>"
+          aria-label="<%= clearMode ? 'Xoá khỏi đang đọc dở' : 'Bỏ theo dõi' %>">✕</button>
   <a class="cc" href="/truyen/<%= comic.slug %>">
     <div class="thumb">
       <img loading="lazy" src="/img?u=<%= encodeURIComponent(comic.thumbUrl || '') %>" alt="<%= comic.name %>">

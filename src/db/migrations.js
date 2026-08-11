@@ -40,4 +40,12 @@ export function createSchema(db) {
 
     CREATE INDEX IF NOT EXISTS idx_chapters_comic ON chapters(comic_slug, order_index);
   `);
+
+  // Tách "có trong thư viện" khỏi "đang theo dõi": mở một truyện để đọc cũng
+  // tạo dòng trong comics (followed = 0) để còn hiện ở mục "Đang đọc dở".
+  // DB cũ đã có bảng comics nên phải thêm cột bằng ALTER.
+  const cols = db.prepare('PRAGMA table_info(comics)').all().map(c => c.name);
+  if (!cols.includes('followed')) {
+    db.exec('ALTER TABLE comics ADD COLUMN followed INTEGER NOT NULL DEFAULT 1');
+  }
 }

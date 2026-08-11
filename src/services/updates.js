@@ -2,7 +2,7 @@ export function createUpdates({ library, source }) {
   async function checkOne(slug) {
     const before = library.chaptersOf(slug).length;
     const detail = await source.detail(slug);
-    library.follow(detail); // upsert refreshes chapter list (already followed)
+    library.remember(detail); // làm mới mục lục, KHÔNG đổi trạng thái theo dõi
     const after = detail.chapters.length;
     return {
       slug,
@@ -13,7 +13,8 @@ export function createUpdates({ library, source }) {
   }
 
   async function checkAll(onProgress = () => {}) {
-    const slugs = library.listFollowed().map(c => c.slug);
+    // Kiểm tra cả truyện đang theo dõi và truyện đang đọc dở
+    const slugs = library.listTracked().map(c => c.slug);
     const results = [];
     for (let i = 0; i < slugs.length; i++) {
       onProgress(i, slugs.length, slugs[i]);

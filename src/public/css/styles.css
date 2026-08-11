@@ -386,7 +386,13 @@ a.link { text-decoration: none; }
 /* Giới thiệu */
 .dsyn { border-top: 1px solid var(--line); padding: 18px 22px 22px; }
 .dsyn h3 { font-family: var(--font-head); font-size: 15px; font-weight: 700; margin: 0 0 8px; color: var(--text); }
-.dsyn p { font-family: var(--font-prose); font-size: 14.5px; line-height: 1.78; color: var(--text-dim); margin: 0; max-width: 78ch; }
+.dsyn p {
+  font-family: var(--font-prose); font-size: 14.5px; line-height: 1.78;
+  color: var(--text-dim); margin: 0; max-width: 78ch;
+  text-align: justify; text-justify: inter-word;
+  hyphens: none; /* tiếng Việt không gạch nối cuối dòng */
+  text-wrap: pretty;
+}
 .dsyn-none { color: var(--text-faint) !important; font-style: italic; }
 
 @media (max-width: 760px) {

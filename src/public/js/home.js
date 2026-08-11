@@ -55,9 +55,11 @@ document.addEventListener('click', async (e) => {
   e.preventDefault(); e.stopPropagation();
   const wrap = btn.closest('.cc-wrap');
   const slug = btn.dataset.slug;
+  // Ở mục "Đang đọc dở" thì ✕ = xoá lịch sử đọc, không phải bỏ theo dõi
+  const endpoint = btn.dataset.action === 'clear' ? '/api/clear-progress' : '/api/unfollow';
   btn.disabled = true;
   try {
-    await api('/api/unfollow', { method: 'POST', body: JSON.stringify({ slug }) });
+    await api(endpoint, { method: 'POST', body: JSON.stringify({ slug }) });
     const box = wrap.closest('.box');
     const grid = wrap.parentElement;
     wrap.remove();
