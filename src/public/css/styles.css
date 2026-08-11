@@ -352,3 +352,45 @@ a.link { text-decoration: none; }
 /* Gợi ý: nhãn lý do */
 .sugwhy { padding: 9px 14px 0; font-size: 12px; color: var(--text-faint); line-height: 1.5; }
 .sugwhy b { color: var(--hot); font-weight: 600; }
+
+/* ============================================================
+   TRANG CHI TIẾT — làm lại phần đầu
+   ============================================================ */
+.dhead { display: grid; grid-template-columns: 210px 1fr; gap: 24px; padding: 22px; align-items: start; }
+.dhead .big { border-radius: var(--r-sm); overflow: hidden; aspect-ratio: 190/247; background: var(--card-2); box-shadow: var(--shadow-lg); }
+.dhead .big img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.dbody { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+
+.dtitle { font-family: var(--font-head); font-size: 30px; font-weight: 700; line-height: 1.14; letter-spacing: .2px; margin: 0; }
+.dalt { font-family: var(--font-prose); font-size: 13.5px; color: var(--text-faint); margin: -8px 0 0; }
+
+/* Hàng dữ kiện dạng viên */
+.dfacts { display: flex; flex-wrap: wrap; gap: 8px; }
+.fact { font-size: 13px; color: var(--text-dim); background: var(--card-2); border-radius: 999px; padding: 6px 13px; }
+.fact b { color: var(--text); font-weight: 700; }
+.fact.live { color: var(--ok); background: rgba(22,169,124,.10); }
+.fact.live b, .fact.done b { color: inherit; }
+.fact.done { color: var(--text-dim); }
+.fact.reading { color: var(--hot); background: var(--hot-soft); }
+.fact.reading b { color: var(--hot); }
+
+/* Nhãn / giá trị căn cột thẳng — chỗ trước đây bị dính chữ */
+.dmeta { display: grid; grid-template-columns: 84px 1fr; gap: 10px 14px; margin: 0; align-items: baseline; }
+.dmeta dt { font-size: 13px; color: var(--text-faint); }
+.dmeta dd { margin: 0; font-size: 14px; font-weight: 500; min-width: 0; }
+.dmeta .tagrow { margin: -2px 0; }
+
+.dbtns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
+.dbtns .btn { padding: 12px 22px; font-size: 15px; }
+
+/* Giới thiệu */
+.dsyn { border-top: 1px solid var(--line); padding: 18px 22px 22px; }
+.dsyn h3 { font-family: var(--font-head); font-size: 15px; font-weight: 700; margin: 0 0 8px; color: var(--text); }
+.dsyn p { font-family: var(--font-prose); font-size: 14.5px; line-height: 1.78; color: var(--text-dim); margin: 0; max-width: 78ch; }
+.dsyn-none { color: var(--text-faint) !important; font-style: italic; }
+
+@media (max-width: 760px) {
+  .dhead { grid-template-columns: 132px 1fr; gap: 16px; padding: 16px; }
+  .dtitle { font-size: 22px; }
+  .dsyn { padding: 16px; }
+}

@@ -1,38 +1,59 @@
 <!doctype html>
 <html lang="vi"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="robots" content="noindex, nofollow"><meta name="theme-color" content="#EBEBEB">
+<meta name="robots" content="noindex, nofollow"><meta name="theme-color" content="#F1F2F4"><meta name="color-scheme" content="light">
 <link rel="manifest" href="/public/manifest.webmanifest"><link rel="stylesheet" href="/public/css/styles.css">
 <title><%= title %></title>
 </head><body>
 <%- include('partials/header', { active }) %>
 <div class="wrap"><div class="col-main">
+
   <div class="box">
     <div class="dhead">
       <div class="big"><img src="/img?u=<%= encodeURIComponent(detail.thumbUrl) %>" alt="<%= detail.name %>"></div>
-      <div>
+
+      <div class="dbody">
         <h1 class="dtitle"><%= detail.name %></h1>
         <% if (detail.origin) { %><div class="dalt"><%= detail.origin %></div><% } %>
-        <div class="dmeta">
-          <% if (detail.author) { %><div class="r"><span>Tác giả</span><b><%= detail.author %></b></div><% } %>
-          <% if (updated) { %><div class="r"><span>Cập nhật</span><b><%= updated %> trước</b></div><% } %>
-          <div class="r"><span>Thể loại</span>
-            <span class="tagrow"><% detail.categories.forEach(t => { %><span class="tag"><%= t %></span><% }) %></span>
-          </div>
+
+        <div class="dfacts">
+          <span class="fact"><b><%= detail.chapters.length %></b> chương</span>
+          <span class="fact <%= detail.status==='completed' ? 'done' : 'live' %>">
+            <%= detail.status==='completed' ? 'Hoàn thành' : 'Đang ra' %></span>
+          <% if (updated) { %><span class="fact">Cập nhật <b><%= updated %></b> trước</span><% } %>
+          <% if (progress) { %><span class="fact reading">Đang đọc chương <b><%= progress.chapterName %></b></span><% } %>
         </div>
-        <div class="numrow">
-          <div><b><%= detail.chapters.length %></b><span>Chương</span></div>
-          <div><b><%= detail.status==='completed'?'Hoàn':'Đang ra' %></b><span>Trạng thái</span></div>
-        </div>
+
+        <dl class="dmeta">
+          <% if (detail.author) { %>
+          <dt>Tác giả</dt><dd><%= detail.author %></dd>
+          <% } %>
+          <dt>Thể loại</dt>
+          <dd><div class="tagrow"><% detail.categories.forEach(t => { %><span class="tag"><%= t %></span><% }) %></div></dd>
+        </dl>
+
         <div class="dbtns">
           <% const cur = progress ? progress.chapterName : (detail.chapters[0] && detail.chapters[0].name); %>
-          <% if (cur) { %><a class="btn" href="/doc/<%= detail.slug %>/<%= encodeURIComponent(cur) %>"><%= progress ? 'Đọc tiếp' : 'Đọc từ đầu' %></a><% } %>
+          <% if (cur) { %><a class="btn" href="/doc/<%= detail.slug %>/<%= encodeURIComponent(cur) %>"><%= progress ? 'Đọc tiếp' : 'Đọc từ đầu' %> →</a><% } %>
+          <% const last = detail.chapters.at(-1); %>
+          <% if (last && (!progress || progress.chapterName !== last.name)) { %>
+            <a class="ghost" href="/doc/<%= detail.slug %>/<%= encodeURIComponent(last.name) %>">Chương mới nhất</a>
+          <% } %>
           <button class="ghost <%= followed?'on':'' %>" id="followBtn" data-slug="<%= detail.slug %>"><%= followed ? '✓ Đang theo dõi' : '+ Theo dõi' %></button>
         </div>
       </div>
     </div>
-    <% if (detail.content) { %><div class="synop"><%- detail.content %></div><% } %>
+
+    <div class="dsyn">
+      <h3>Giới thiệu</h3>
+      <% if (detail.content) { %>
+        <p><%= detail.content %></p>
+      <% } else { %>
+        <p class="dsyn-none">Nguồn không có phần giới thiệu cho truyện này.</p>
+      <% } %>
+    </div>
   </div>
+
   <div class="box"><div class="boxhead"><h2>Danh sách chương</h2><div class="sp"></div><span class="cnt"><%= detail.chapters.length %> chương</span></div>
     <div class="chwrap"><div class="chgrid">
       <% const readName = progress && progress.chapterName; %>
@@ -42,6 +63,7 @@
       <% }) %>
     </div></div>
   </div>
+
 </div></div>
 <script type="module" src="/public/js/common.js"></script>
 <script type="module" src="/public/js/home.js"></script>

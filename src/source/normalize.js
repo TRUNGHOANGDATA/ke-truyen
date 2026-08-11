@@ -1,3 +1,5 @@
+import { cleanSynopsis } from './clean.js';
+
 export function coverUrl(cdnBase, thumbUrl) {
   if (!thumbUrl) return '';
   return `${cdnBase}/uploads/comics/${thumbUrl}`;
@@ -29,7 +31,7 @@ export function mapDetail(data) {
     slug: item.slug,
     name: item.name,
     origin: (item.origin_name || []).join(' · '),
-    content: item.content || '',
+    content: cleanSynopsis(item.content),
     status: item.status,
     thumbUrl: coverUrl(data.APP_DOMAIN_CDN_IMAGE, item.thumb_url),
     categories: (item.category || []).map(c => c.name),
