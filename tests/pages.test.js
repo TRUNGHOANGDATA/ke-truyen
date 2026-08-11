@@ -22,6 +22,7 @@ function makeApp() {
     async detail() { return detail; },
     async home() { return { items: [{ slug: 'x', name: 'Truyện Mới X', thumbUrl: '', updatedAt: null, latestChapter: '10' }], pagination: null }; },
     async categories() { return [{ name: 'Ngôn Tình', slug: 'ngon-tinh' }, { name: 'Action', slug: 'action' }]; },
+    async byCategory() { return { items: [{ slug: 'g1', name: 'Truyện Thể Loại', thumbUrl: '', updatedAt: null, latestChapter: '5' }], pagination: null }; },
   };
   return buildApp({
     passwordHash: hash, sessionSecret: 't', db, source,
@@ -37,6 +38,7 @@ test('home renders followed + recent-from-API section', async () => {
   assert.match(res.text, /Kệ Truyện/);
   assert.match(res.text, /Truyện mới cập nhật/);
   assert.match(res.text, /Truyện Mới X/); // came from source.home()
+  assert.match(res.text, /Ngôn Tình/);     // genre suggestion rail
 });
 
 test('browse page renders genre chips from categories', async () => {

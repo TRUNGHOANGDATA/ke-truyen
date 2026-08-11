@@ -8,27 +8,7 @@
   --font-head: "Segoe UI Variable Display", "Segoe UI", -apple-system, BlinkMacSystemFont, Arial, sans-serif;
   --font-mono: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
   --r: 4px;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #121216; --card: #1B1B21; --card-2: #232329; --line: #2E2E36; --line-2: #3C3C46;
-    --text: #ECEBEF; --text-dim: #A3A0AC; --text-faint: #6E6B78;
-    --hot: #FF4A6E; --hot-soft: #3A1C24; --link: #6FB2F5; --ok: #35C79B; --headbar: #1B1B21;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #121216; --card: #1B1B21; --card-2: #232329; --line: #2E2E36; --line-2: #3C3C46;
-  --text: #ECEBEF; --text-dim: #A3A0AC; --text-faint: #6E6B78;
-  --hot: #FF4A6E; --hot-soft: #3A1C24; --link: #6FB2F5; --ok: #35C79B; --headbar: #1B1B21;
-  color-scheme: dark;
-}
-:root[data-theme="light"] {
-  --bg: #EBEBEB; --card: #FFFFFF; --card-2: #F5F5F5; --line: #DDDDDD; --line-2: #C9C9C9;
-  --text: #1A1A1A; --text-dim: #6B6B6B; --text-faint: #9A9A9A;
-  --hot: #FF2853; --hot-soft: #FFE8ED; --link: #1568C8; --ok: #17A67B; --headbar: #FFFFFF;
-  color-scheme: light;
+  color-scheme: light only;
 }
 
 * { box-sizing: border-box; }
@@ -88,6 +68,23 @@ a { color: inherit; }
 .cc:hover .tt { color: var(--hot); }
 .cc .row { display: flex; align-items: center; gap: 8px; }
 .cc .ch { font-size: 12px; color: var(--link); }
+
+/* followed card with live unfollow */
+.cc-wrap { position: relative; min-width: 0; }
+.unfollow { position: absolute; top: 5px; right: 5px; z-index: 6; width: 24px; height: 24px; border-radius: 50%;
+  border: none; background: rgba(0,0,0,.6); color: #fff; font-size: 13px; line-height: 1; cursor: pointer;
+  opacity: 0; transition: opacity .15s; display: grid; place-items: center; }
+.cc-wrap:hover .unfollow, .unfollow:focus-visible { opacity: 1; }
+.unfollow:hover { background: var(--hot); }
+@media (hover: none) { .unfollow { opacity: 1; } }
+
+/* section heading with a "see more" link */
+.boxhead .seemore { font-size: 12.5px; color: var(--link); text-decoration: none; }
+.boxhead .seemore:hover { text-decoration: underline; }
+
+/* inline check-new feedback (no status panel) */
+.checkmsg { font-size: 12px; color: var(--text-dim); padding: 0 2px; min-height: 16px; }
+.checkmsg.ok { color: var(--ok); }
 
 /* ============ PAGINATION ============ */
 .pager { display: flex; gap: 5px; justify-content: center; padding: 4px 13px 15px; flex-wrap: wrap; }

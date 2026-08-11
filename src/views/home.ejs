@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="vi"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="robots" content="noindex, nofollow"><meta name="theme-color" content="#EBEBEB">
+<meta name="robots" content="noindex, nofollow"><meta name="theme-color" content="#EBEBEB"><meta name="color-scheme" content="light">
 <link rel="manifest" href="/public/manifest.webmanifest"><link rel="stylesheet" href="/public/css/styles.css">
 <title><%= title %></title>
 </head><body>
@@ -39,21 +39,21 @@
       <div class="box">
         <div class="boxhead"><h2>Đang đọc</h2><div class="sp"></div><span class="cnt"><%= reading.length %></span></div>
         <div class="cgrid">
-          <% reading.forEach(comic => { %><%- include('partials/comic-card', { comic }) %><% }) %>
+          <% reading.forEach(comic => { %><%- include('partials/followed-card', { comic }) %><% }) %>
         </div>
       </div>
       <% } %>
       <% if (items && items.length) { %>
       <div class="box">
-        <div class="boxhead"><h2>Đang theo dõi</h2><div class="sp"></div><span class="cnt"><%= items.length %></span>
-          <button class="side-btn" id="checkNew" type="button" style="width:auto;padding:8px 14px;margin-left:10px">Kiểm tra chương mới</button></div>
+        <div class="boxhead"><h2>Đang theo dõi</h2><div class="sp"></div><span class="cnt"><%= items.length %></span></div>
         <div class="cgrid">
-          <% items.forEach(comic => { %><%- include('partials/comic-card', { comic }) %><% }) %>
+          <% items.forEach(comic => { %><%- include('partials/followed-card', { comic }) %><% }) %>
         </div>
       </div>
       <% } %>
+
       <div class="box">
-        <div class="boxhead"><h2><i>✦</i> Truyện mới cập nhật</h2></div>
+        <div class="boxhead"><h2><i>✦</i> Truyện mới cập nhật</h2><div class="sp"></div><a class="seemore" href="/browse">Xem tất cả →</a></div>
         <% if (recent && recent.length) { %>
         <div class="cgrid">
           <% recent.forEach(comic => { %><%- include('partials/comic-card', { comic }) %><% }) %>
@@ -62,14 +62,22 @@
         <div style="padding:24px 16px; color:var(--text-faint)">Không tải được danh sách từ nguồn. Thử lại sau.</div>
         <% } %>
       </div>
+
+      <% (genres || []).forEach(g => { %>
+      <div class="box">
+        <div class="boxhead"><h2><%= g.name %></h2><div class="sp"></div><a class="seemore" href="/browse">Xem thêm →</a></div>
+        <div class="cgrid">
+          <% g.items.forEach(comic => { %><%- include('partials/comic-card', { comic }) %><% }) %>
+        </div>
+      </div>
+      <% }) %>
     <% } %>
   </div>
 
   <aside class="col-side">
     <button class="side-btn" id="checkNewSide" type="button">Kiểm tra chương mới</button>
-    <div class="box"><div class="boxhead"><h2>Tình trạng</h2></div>
-      <div class="sysbox" id="sysbox">Nhấn "Kiểm tra chương mới" để cập nhật.</div></div>
-    <div class="box"><div class="boxhead"><h2>Nhanh</h2></div>
+    <div class="checkmsg" id="checkmsg"></div>
+    <div class="box"><div class="boxhead"><h2>Khám phá</h2></div>
       <div class="ranklist">
         <a class="rk" href="/browse"><span class="info"><span class="a">Duyệt theo thể loại</span></span></a>
         <a class="rk" href="/search"><span class="info"><span class="a">Tìm truyện</span></span></a>

@@ -13,19 +13,35 @@ export function relTime(iso) {
 export function mountPages(app) {
   const svc = () => app.locals.services;
 
+  // Vài thể loại phổ biến để gợi ý ở trang chủ
+  const HOME_GENRES = [
+    { slug: 'ngon-tinh', name: 'Ngôn Tình' },
+    { slug: 'manhua', name: 'Manhua' },
+    { slug: 'xuyen-khong', name: 'Xuyên Không' },
+    { slug: 'action', name: 'Action' },
+    { slug: 'co-dai', name: 'Cổ Đại' },
+  ];
+
   app.get('/', async (req, res) => {
     const items = svc().library.listFollowed().map(c => ({
-      ...c, thumbUrl: c.thumb_url, when: relTime(c.updated_at_source),
-      latestChapter: c.last_chapter_seen,
+      ...c, thumbUrl: c.thumb_url, latestChapter: c.last_chapter_seen,
     }));
     const reading = items.filter(c => c.progress);
+    const source = svc().source;
     let recent = [];
+    let genres = [];
     try {
-      const home = await svc().source.home();
-      recent = home.items.map(c => ({ ...c, when: relTime(c.updatedAt) }));
-    } catch { /* API tạm lỗi — vẫn hiện phần theo dõi */ }
+      const [home, ...cats] = await Promise.all([
+        source.home().catch(() => ({ items: [] })),
+        ...HOME_GENRES.map(g => source.byCategory(g.slug, 1).catch(() => ({ items: [] }))),
+      ]);
+      recent = (home.items || []).slice(0, 12).map(c => ({ ...c, when: relTime(c.updatedAt) }));
+      genres = HOME_GENRES.map((g, i) => ({
+        ...g, items: (cats[i]?.items || []).slice(0, 6).map(c => ({ ...c, when: relTime(c.updatedAt) })),
+      })).filter(g => g.items.length);
+    } catch { /* nguồn tạm lỗi — vẫn hiện phần theo dõi */ }
     res.render('home', {
-      title: 'Kệ Truyện', active: 'home', items, reading, recent,
+      title: 'Kệ Truyện', active: 'home', items, reading, recent, genres,
       categories: [], q: '', search: false, browse: false,
     });
   });
@@ -36,13 +52,13 @@ export function mountPages(app) {
     let categories = [];
     try { categories = await svc().source.categories(); } catch { /* để trống nếu lỗi */ }
     res.render('home', {
-      title: 'Duyệt truyện', active: 'browse', items: [], reading: [], recent: [],
+      title: 'Duyệt truyện', active: 'browse', items: [], reading: [], recent: [], genres: [],
       categories, q: '', browse: true, search: false,
     });
   });
 
   app.get('/search', (req, res) => res.render('home', {
-    title: 'Tìm truyện', active: '', items: [], reading: [], recent: [],
+    title: 'Tìm truyện', active: '', items: [], reading: [], recent: [], genres: [],
     categories: [], q: req.query.q || '', search: true, browse: false,
   }));
 

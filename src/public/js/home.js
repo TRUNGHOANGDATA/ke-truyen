@@ -1,7 +1,5 @@
 import { api } from './common.js';
 
-const sys = document.getElementById('sysbox');
-
 function cardHtml(c) {
   return `<a class="cc" href="/truyen/${c.slug}">
     <div class="thumb"><img loading="lazy" src="/img?u=${encodeURIComponent(c.thumbUrl || '')}" alt="">
@@ -12,23 +10,47 @@ function cardHtml(c) {
 }
 
 /* ---------- Kiểm tra chương mới ---------- */
+const checkmsg = document.getElementById('checkmsg');
 async function runCheck(btn) {
   if (btn) btn.disabled = true;
-  if (sys) sys.textContent = 'Đang kiểm tra…';
+  if (checkmsg) { checkmsg.className = 'checkmsg'; checkmsg.textContent = 'Đang kiểm tra…'; }
   try {
     const { results } = await api('/api/check', { method: 'POST', body: '{}' });
     const withNew = results.filter(r => r.newCount > 0);
     const total = withNew.reduce((a, r) => a + r.newCount, 0);
-    if (sys) sys.textContent = withNew.length ? `${withNew.length} truyện có ${total} chương mới` : 'Không có chương mới.';
+    if (checkmsg) {
+      checkmsg.className = 'checkmsg ok';
+      checkmsg.textContent = withNew.length ? `${withNew.length} truyện có ${total} chương mới` : 'Không có chương mới.';
+    }
     if (withNew.length) setTimeout(() => location.reload(), 900);
   } catch (e) {
-    if (sys) sys.textContent = 'Lỗi kiểm tra: ' + e.message;
+    if (checkmsg) { checkmsg.className = 'checkmsg'; checkmsg.textContent = 'Lỗi kiểm tra: ' + e.message; }
   } finally { if (btn) btn.disabled = false; }
 }
-document.getElementById('checkNew')?.addEventListener('click', e => runCheck(e.target));
 document.getElementById('checkNewSide')?.addEventListener('click', e => runCheck(e.target));
 
-/* ---------- Theo dõi (trang chi tiết) ---------- */
+/* ---------- Bỏ theo dõi ngay trên card (không cần F5) ---------- */
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.unfollow');
+  if (!btn) return;
+  e.preventDefault(); e.stopPropagation();
+  const wrap = btn.closest('.cc-wrap');
+  const slug = btn.dataset.slug;
+  btn.disabled = true;
+  try {
+    await api('/api/unfollow', { method: 'POST', body: JSON.stringify({ slug }) });
+    const box = wrap.closest('.box');
+    const grid = wrap.parentElement;
+    wrap.remove();
+    // cập nhật số đếm ở tiêu đề
+    const cnt = box?.querySelector('.boxhead .cnt');
+    if (cnt) { const n = parseInt(cnt.textContent, 10); if (!Number.isNaN(n)) cnt.textContent = String(Math.max(0, n - 1)); }
+    // hết card thì bỏ luôn cả khối
+    if (grid && !grid.querySelector('.cc-wrap')) box?.remove();
+  } catch (err) { btn.disabled = false; alert('Lỗi bỏ theo dõi: ' + err.message); }
+});
+
+/* ---------- Theo dõi / bỏ theo dõi (trang chi tiết) ---------- */
 const fb = document.getElementById('followBtn');
 fb?.addEventListener('click', async () => {
   const slug = fb.dataset.slug;
@@ -67,7 +89,7 @@ if (q) {
     } catch (e) { grid.innerHTML = `<div style="padding:24px 16px;color:var(--text-faint)">Lỗi: ${e.message}</div>`; }
   }
   q.addEventListener('input', () => { clearTimeout(t); t = setTimeout(doSearch, 350); });
-  if (q.value.trim()) doSearch(); // từ khoá đến sẵn qua ?q=
+  if (q.value.trim()) doSearch();
 }
 
 /* ---------- Duyệt theo thể loại ---------- */
@@ -118,6 +140,5 @@ if (chips) {
     filter = b.dataset.cat ? { cat: b.dataset.cat, name: b.textContent.trim() } : { type: b.dataset.type, name: 'Mới cập nhật' };
     load(1);
   });
-
   load(1);
 }

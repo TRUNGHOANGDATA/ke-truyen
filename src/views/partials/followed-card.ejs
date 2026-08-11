@@ -1,0 +1,13 @@
+<div class="cc-wrap" data-slug="<%= comic.slug %>">
+  <button class="unfollow" type="button" data-slug="<%= comic.slug %>" title="Bỏ theo dõi" aria-label="Bỏ theo dõi">✕</button>
+  <a class="cc" href="/truyen/<%= comic.slug %>">
+    <div class="thumb">
+      <img loading="lazy" src="/img?u=<%= encodeURIComponent(comic.thumbUrl || '') %>" alt="<%= comic.name %>">
+      <% if (comic.progress) { %><span class="when">Đang đọc</span><% } %>
+      <% if (comic.unread) { %><span class="hotflag"><%= comic.unread %></span><% } %>
+      <% if (comic.latestChapter) { %><span class="newflag">Chương <b><%= comic.latestChapter %></b></span><% } %>
+    </div>
+    <div class="tt"><%= comic.name %></div>
+    <div class="row"><span class="ch">Chương <%= comic.latestChapter || '?' %></span></div>
+  </a>
+</div>
