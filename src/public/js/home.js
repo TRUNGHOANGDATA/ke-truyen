@@ -5,7 +5,7 @@ function cardHtml(c) {
     <div class="thumb"><img loading="lazy" src="/img?u=${encodeURIComponent(c.thumbUrl || '')}" alt="">
       ${c.latestChapter ? `<span class="newflag">Chương <b>${c.latestChapter}</b></span>` : ''}</div>
     <div class="tt">${c.name}</div>
-    <div class="row"><span class="ch">Chương ${c.latestChapter || '?'}</span></div>
+    ${c.latestChapter ? `<div class="row"><span class="ch">Chương ${c.latestChapter}</span></div>` : ''}
   </a>`;
 }
 

@@ -114,7 +114,8 @@
         <% suggested.forEach(c => { %>
         <a class="rk" href="/truyen/<%= c.slug %>">
           <span class="mini"><img loading="lazy" src="/img?u=<%= encodeURIComponent(c.thumbUrl || '') %>" alt=""></span>
-          <span class="info"><span class="a"><%= c.name %></span><span class="b">Chương <%= c.latestChapter || '?' %></span></span>
+          <span class="info"><span class="a"><%= c.name %></span>
+            <span class="b"><%= (c.categories && c.categories[0]) ? c.categories[0] : (c.when ? 'Cập nhật ' + c.when : '') %></span></span>
         </a>
         <% }) %>
       </div>

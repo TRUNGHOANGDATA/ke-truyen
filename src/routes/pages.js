@@ -39,12 +39,21 @@ export function mountPages(app) {
         ...g, items: (cats[i]?.items || []).slice(0, 6).map(c => ({ ...c, when: relTime(c.updatedAt) })),
       })).filter(g => g.items.length);
 
-      // Gợi ý: theo thể loại mà bạn hay theo dõi (nếu có), loại bỏ truyện đã theo
+      // Gợi ý: trộn nhiều thể loại (ưu tiên thể loại bạn hay theo dõi), loại bỏ truyện đã theo
       const followedCats = new Set(items.flatMap(c => (c.categories || '').split(', ').filter(Boolean)));
-      const pick = Math.max(0, HOME_GENRES.findIndex(g => followedCats.has(g.name)));
       const followedSlugs = new Set(items.map(c => c.slug));
-      suggested = (cats[pick]?.items || []).filter(c => !followedSlugs.has(c.slug)).slice(0, 6)
-        .map(c => ({ ...c, when: relTime(c.updatedAt) }));
+      const order = HOME_GENRES
+        .map((g, i) => ({ i, pref: followedCats.has(g.name) ? 0 : 1 }))
+        .sort((a, b) => a.pref - b.pref).map(o => o.i);
+      const lists = order.map(i => (cats[i]?.items || []).filter(c => !followedSlugs.has(c.slug)));
+      const seenSug = new Set();
+      for (let round = 0; suggested.length < 12 && round < 12; round++) {
+        for (const l of lists) {
+          const c = l[round];
+          if (c && !seenSug.has(c.slug)) { seenSug.add(c.slug); suggested.push({ ...c, when: relTime(c.updatedAt) }); }
+          if (suggested.length >= 12) break;
+        }
+      }
 
       // Banner: ưu tiên truyện đang đọc / đang theo, rồi tới truyện hot mới
       const seen = new Set();

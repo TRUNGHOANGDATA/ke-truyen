@@ -8,6 +8,6 @@
       <% if (comic.latestChapter) { %><span class="newflag">Chương <b><%= comic.latestChapter %></b></span><% } %>
     </div>
     <div class="tt"><%= comic.name %></div>
-    <div class="row"><span class="ch">Chương <%= comic.latestChapter || '?' %></span></div>
+    <% if (comic.latestChapter) { %><div class="row"><span class="ch">Chương <%= comic.latestChapter %></span></div><% } %>
   </a>
 </div>
