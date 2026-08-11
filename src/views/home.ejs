@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="vi"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="robots" content="noindex, nofollow"><meta name="theme-color" content="#EBEBEB"><meta name="color-scheme" content="light">
+<meta name="robots" content="noindex, nofollow"><meta name="theme-color" content="#F1F2F4"><meta name="color-scheme" content="light">
 <link rel="manifest" href="/public/manifest.webmanifest"><link rel="stylesheet" href="/public/css/styles.css">
 <title><%= title %></title>
 </head><body>
@@ -23,43 +23,64 @@
   <div class="col-main">
     <% if (search) { %>
       <div class="box">
-        <div class="boxhead"><h2><i>✦</i> Tìm truyện</h2></div>
-        <div style="padding:12px"><input id="q" class="field" placeholder="Nhập tên truyện…" style="width:100%" value="<%= q %>" autofocus></div>
+        <div class="boxhead"><h2>Tìm truyện</h2></div>
+        <div style="padding:14px"><input id="q" class="field" placeholder="Nhập tên truyện…" style="width:100%" value="<%= q %>" autofocus></div>
         <div class="cgrid" id="grid"></div>
         <div id="hint" style="padding:0 16px 20px; color:var(--text-faint)">Gõ tên truyện để tìm trong 26.000+ bộ.</div>
       </div>
+
     <% } else if (browse) { %>
       <div class="box">
-        <div class="boxhead"><h2><i>✦</i> Duyệt truyện</h2><div class="sp"></div><span class="cnt" id="browseLabel">Mới cập nhật</span></div>
-        <div class="cgrid" id="grid"><div style="padding:24px 16px; color:var(--text-faint)">Đang tải…</div></div>
+        <div class="boxhead"><h2>Duyệt truyện</h2><div class="sp"></div><span class="cnt" id="browseLabel">Mới cập nhật</span></div>
+        <div class="cgrid" id="grid"><div class="emptymsg">Đang tải…</div></div>
         <div class="pager" id="pager"></div>
       </div>
+
+    <% } else if (following) { %>
+      <div class="box">
+        <div class="boxhead"><h2>Đang theo dõi</h2><div class="sp"></div><span class="cnt"><%= items.length %> bộ</span></div>
+        <% if (items.length) { %>
+        <div class="cgrid">
+          <% items.forEach(comic => { %><%- include('partials/followed-card', { comic }) %><% }) %>
+        </div>
+        <% } else { %>
+        <div class="emptymsg">Chưa theo dõi bộ nào. Vào <a href="/browse">Thể loại</a> hoặc <a href="/search">Tìm truyện</a> để thêm.</div>
+        <% } %>
+      </div>
+
     <% } else { %>
-      <% if (reading && reading.length) { %>
+      <%- include('partials/hero', { featured }) %>
+
+      <!-- Đang đọc: luôn hiện để dễ tìm -->
       <div class="box">
         <div class="boxhead"><h2>Đang đọc</h2><div class="sp"></div><span class="cnt"><%= reading.length %></span></div>
+        <% if (reading.length) { %>
         <div class="cgrid">
           <% reading.forEach(comic => { %><%- include('partials/followed-card', { comic }) %><% }) %>
         </div>
+        <% } else { %>
+        <div class="emptymsg">Chưa có truyện đang đọc. Mở một truyện bất kỳ và đọc — nó sẽ tự xuất hiện ở đây kèm vị trí đã đọc.</div>
+        <% } %>
       </div>
-      <% } %>
+
       <% if (items && items.length) { %>
       <div class="box">
-        <div class="boxhead"><h2>Đang theo dõi</h2><div class="sp"></div><span class="cnt"><%= items.length %></span></div>
+        <div class="boxhead"><h2>Đang theo dõi</h2><div class="sp"></div>
+          <a class="seemore" href="/following">Xem tất cả (<%= items.length %>) →</a></div>
         <div class="cgrid">
-          <% items.forEach(comic => { %><%- include('partials/followed-card', { comic }) %><% }) %>
+          <% items.slice(0, 12).forEach(comic => { %><%- include('partials/followed-card', { comic }) %><% }) %>
         </div>
       </div>
       <% } %>
 
       <div class="box">
-        <div class="boxhead"><h2><i>✦</i> Truyện mới cập nhật</h2><div class="sp"></div><a class="seemore" href="/browse">Xem tất cả →</a></div>
+        <div class="boxhead"><h2>Truyện mới cập nhật</h2><div class="sp"></div><a class="seemore" href="/browse">Xem tất cả →</a></div>
         <% if (recent && recent.length) { %>
         <div class="cgrid">
           <% recent.forEach(comic => { %><%- include('partials/comic-card', { comic }) %><% }) %>
         </div>
         <% } else { %>
-        <div style="padding:24px 16px; color:var(--text-faint)">Không tải được danh sách từ nguồn. Thử lại sau.</div>
+        <div class="emptymsg">Không tải được danh sách từ nguồn. Thử lại sau.</div>
         <% } %>
       </div>
 
@@ -77,13 +98,28 @@
   <aside class="col-side">
     <button class="side-btn" id="checkNewSide" type="button">Kiểm tra chương mới</button>
     <div class="checkmsg" id="checkmsg"></div>
+
     <div class="box"><div class="boxhead"><h2>Khám phá</h2></div>
       <div class="ranklist">
-        <a class="rk" href="/browse"><span class="info"><span class="a">Duyệt theo thể loại</span></span></a>
-        <a class="rk" href="/search"><span class="info"><span class="a">Tìm truyện</span></span></a>
-        <a class="rk" href="/settings"><span class="info"><span class="a">Đổi mật khẩu</span></span></a>
+        <a class="rk rk-lite" href="/following"><span class="info"><span class="a">Đang theo dõi</span></span></a>
+        <a class="rk rk-lite" href="/browse"><span class="info"><span class="a">Duyệt theo thể loại</span></span></a>
+        <a class="rk rk-lite" href="/search"><span class="info"><span class="a">Tìm truyện</span></span></a>
+        <a class="rk rk-lite" href="/settings"><span class="info"><span class="a">Đổi mật khẩu</span></span></a>
       </div>
     </div>
+
+    <% if (typeof suggested !== 'undefined' && suggested.length) { %>
+    <div class="box"><div class="boxhead"><h2>Gợi ý cho bạn</h2></div>
+      <div class="ranklist">
+        <% suggested.forEach(c => { %>
+        <a class="rk" href="/truyen/<%= c.slug %>">
+          <span class="mini"><img loading="lazy" src="/img?u=<%= encodeURIComponent(c.thumbUrl || '') %>" alt=""></span>
+          <span class="info"><span class="a"><%= c.name %></span><span class="b">Chương <%= c.latestChapter || '?' %></span></span>
+        </a>
+        <% }) %>
+      </div>
+    </div>
+    <% } %>
   </aside>
 </div>
 <script type="module" src="/public/js/common.js"></script>

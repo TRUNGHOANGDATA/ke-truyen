@@ -1,0 +1,29 @@
+<% if (featured && featured.length) { %>
+<div class="hero" id="hero">
+  <div class="hero-slides">
+    <% featured.forEach((f, i) => { %>
+      <% const img = '/img?u=' + encodeURIComponent(f.thumbUrl || '');
+         const href = f.progress ? ('/doc/' + f.slug + '/' + encodeURIComponent(f.progress.chapterName)) : ('/truyen/' + f.slug); %>
+      <div class="slide<%= i === 0 ? ' on' : '' %>">
+        <div class="slide-bg" style="background-image:url('<%= img %>')"></div>
+        <div class="slide-in">
+          <a class="slide-cover" href="/truyen/<%= f.slug %>"><img src="<%= img %>" alt="<%= f.name %>"></a>
+          <div class="slide-meta">
+            <div class="slide-tags">
+              <% (f.categories || []).slice(0, 3).forEach(t => { %><span class="stag"><%= t %></span><% }) %>
+            </div>
+            <a class="slide-title" href="/truyen/<%= f.slug %>"><%= f.name %></a>
+            <div class="slide-sub"><%= f.progress ? 'Đang đọc · Chương ' + f.progress.chapterName : 'Chương mới nhất ' + (f.latestChapter || '') %></div>
+            <a class="btn slide-btn" href="<%= href %>"><%= f.progress ? 'Đọc tiếp' : 'Đọc ngay' %> →</a>
+          </div>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+  <% if (featured.length > 1) { %>
+  <div class="hero-dots" id="heroDots">
+    <% featured.forEach((f, i) => { %><button type="button" class="<%= i === 0 ? 'on' : '' %>" data-i="<%= i %>" aria-label="Slide <%= i + 1 %>"></button><% }) %>
+  </div>
+  <% } %>
+</div>
+<% } %>

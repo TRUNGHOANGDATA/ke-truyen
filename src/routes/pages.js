@@ -22,14 +22,13 @@ export function mountPages(app) {
     { slug: 'co-dai', name: 'Cổ Đại' },
   ];
 
+  const mapFollowed = (c) => ({ ...c, thumbUrl: c.thumb_url, latestChapter: c.last_chapter_seen });
+
   app.get('/', async (req, res) => {
-    const items = svc().library.listFollowed().map(c => ({
-      ...c, thumbUrl: c.thumb_url, latestChapter: c.last_chapter_seen,
-    }));
+    const items = svc().library.listFollowed().map(mapFollowed);
     const reading = items.filter(c => c.progress);
     const source = svc().source;
-    let recent = [];
-    let genres = [];
+    let recent = [], genres = [], suggested = [], featured = [];
     try {
       const [home, ...cats] = await Promise.all([
         source.home().catch(() => ({ items: [] })),
@@ -39,27 +38,56 @@ export function mountPages(app) {
       genres = HOME_GENRES.map((g, i) => ({
         ...g, items: (cats[i]?.items || []).slice(0, 6).map(c => ({ ...c, when: relTime(c.updatedAt) })),
       })).filter(g => g.items.length);
+
+      // Gợi ý: theo thể loại mà bạn hay theo dõi (nếu có), loại bỏ truyện đã theo
+      const followedCats = new Set(items.flatMap(c => (c.categories || '').split(', ').filter(Boolean)));
+      const pick = Math.max(0, HOME_GENRES.findIndex(g => followedCats.has(g.name)));
+      const followedSlugs = new Set(items.map(c => c.slug));
+      suggested = (cats[pick]?.items || []).filter(c => !followedSlugs.has(c.slug)).slice(0, 6)
+        .map(c => ({ ...c, when: relTime(c.updatedAt) }));
+
+      // Banner: ưu tiên truyện đang đọc / đang theo, rồi tới truyện hot mới
+      const seen = new Set();
+      for (const c of [...items].sort((a, b) => (b.progress ? 1 : 0) - (a.progress ? 1 : 0))) {
+        if (featured.length >= 6) break;
+        featured.push({ slug: c.slug, name: c.name, thumbUrl: c.thumb_url, latestChapter: c.last_chapter_seen,
+          categories: (c.categories || '').split(', ').filter(Boolean), progress: c.progress });
+        seen.add(c.slug);
+      }
+      for (const c of recent) {
+        if (featured.length >= 6) break;
+        if (seen.has(c.slug)) continue;
+        featured.push({ slug: c.slug, name: c.name, thumbUrl: c.thumbUrl, latestChapter: c.latestChapter, categories: c.categories || [] });
+        seen.add(c.slug);
+      }
     } catch { /* nguồn tạm lỗi — vẫn hiện phần theo dõi */ }
     res.render('home', {
-      title: 'Kệ Truyện', active: 'home', items, reading, recent, genres,
-      categories: [], q: '', search: false, browse: false,
+      title: 'Kệ Truyện', active: 'home', items, reading, recent, genres, suggested, featured,
+      following: false, categories: [], q: '', search: false, browse: false,
     });
   });
 
-  app.get('/following', (req, res) => res.redirect('/'));
+  app.get('/following', (req, res) => {
+    const items = svc().library.listFollowed().map(mapFollowed);
+    const reading = items.filter(c => c.progress);
+    res.render('home', {
+      title: 'Đang theo dõi', active: 'following', items, reading, recent: [], genres: [],
+      suggested: [], featured: [], following: true, categories: [], q: '', search: false, browse: false,
+    });
+  });
 
   app.get('/browse', async (req, res) => {
     let categories = [];
     try { categories = await svc().source.categories(); } catch { /* để trống nếu lỗi */ }
     res.render('home', {
       title: 'Duyệt truyện', active: 'browse', items: [], reading: [], recent: [], genres: [],
-      categories, q: '', browse: true, search: false,
+      suggested: [], featured: [], following: false, categories, q: '', browse: true, search: false,
     });
   });
 
   app.get('/search', (req, res) => res.render('home', {
     title: 'Tìm truyện', active: '', items: [], reading: [], recent: [], genres: [],
-    categories: [], q: req.query.q || '', search: true, browse: false,
+    suggested: [], featured: [], following: false, categories: [], q: req.query.q || '', search: true, browse: false,
   }));
 
   app.get('/status', (req, res) => res.render('status', { title: 'Tình trạng', active: 'status' }));

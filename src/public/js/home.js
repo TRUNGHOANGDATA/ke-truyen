@@ -9,6 +9,25 @@ function cardHtml(c) {
   </a>`;
 }
 
+/* ---------- Banner tự chạy ---------- */
+const hero = document.getElementById('hero');
+if (hero) {
+  const slides = [...hero.querySelectorAll('.slide')];
+  const dots = [...hero.querySelectorAll('.hero-dots button')];
+  let cur = 0, timer;
+  const show = (i) => {
+    cur = (i + slides.length) % slides.length;
+    slides.forEach((s, k) => s.classList.toggle('on', k === cur));
+    dots.forEach((d, k) => d.classList.toggle('on', k === cur));
+  };
+  const start = () => { if (slides.length > 1) timer = setInterval(() => show(cur + 1), 5000); };
+  const stop = () => clearInterval(timer);
+  dots.forEach(d => d.addEventListener('click', () => { stop(); show(Number(d.dataset.i)); start(); }));
+  hero.addEventListener('mouseenter', stop);
+  hero.addEventListener('mouseleave', start);
+  start();
+}
+
 /* ---------- Kiểm tra chương mới ---------- */
 const checkmsg = document.getElementById('checkmsg');
 async function runCheck(btn) {
