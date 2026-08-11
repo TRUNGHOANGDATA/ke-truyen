@@ -1,19 +1,25 @@
+@import "fonts.css";
+
 /* ============ TOKENS ============ */
 :root {
-  --bg: #EBEBEB; --card: #FFFFFF; --card-2: #F5F5F5; --line: #DDDDDD; --line-2: #C9C9C9;
-  --text: #1A1A1A; --text-dim: #6B6B6B; --text-faint: #9A9A9A;
-  --hot: #FF2853; --hot-soft: #FFE8ED; --link: #1568C8; --ok: #17A67B; --headbar: #FFFFFF;
+  --bg: #F1F2F4; --card: #FFFFFF; --card-2: #F5F6F8; --line: #E7E9ED; --line-2: #D3D7DE;
+  --text: #14161A; --text-dim: #626873; --text-faint: #9AA0AC;
+  --hot: #FF2E55; --hot-2: #FF5A78; --hot-soft: #FFEAEF; --link: #1568C8; --ok: #16A97C; --headbar: #FFFFFF;
   --readerbg: #0B0A0D;
-  --font-ui: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
-  --font-head: "Segoe UI Variable Display", "Segoe UI", -apple-system, BlinkMacSystemFont, Arial, sans-serif;
-  --font-mono: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
-  --r: 4px;
+  --font-ui: "Roboto Condensed", "Segoe UI", -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+  --font-head: "Roboto Condensed", "Segoe UI", -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+  --font-prose: "Roboto", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Roboto Condensed", ui-monospace, Consolas, monospace;
+  --r: 12px; --r-sm: 8px;
+  --shadow: 0 1px 2px rgba(20,22,26,.04), 0 4px 16px rgba(20,22,26,.06);
+  --shadow-lg: 0 6px 28px rgba(20,22,26,.14);
   color-scheme: light only;
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 14px; -webkit-font-smoothing: antialiased; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
 a { color: inherit; }
+::selection { background: var(--hot-soft); }
 
 /* ============ HEADER ============ */
 .topnav { background: var(--headbar); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 30; }
@@ -194,3 +200,96 @@ a.link { text-decoration: none; }
   .dhead { grid-template-columns: 1fr; }
   .who .nm { display: none; }
 }
+
+/* ============================================================
+   POLISH — nâng cấp giao diện (ghi đè các quy tắc phía trên)
+   ============================================================ */
+
+/* Header: nền mờ, bóng nhẹ, chữ đậm hơn */
+.topnav { background: rgba(255,255,255,.9); backdrop-filter: saturate(1.4) blur(8px); border-bottom: 1px solid var(--line); box-shadow: 0 1px 0 rgba(20,22,26,.02); }
+.topnav-in { height: 58px; gap: 16px; }
+.logo { font-size: 22px; font-weight: 700; letter-spacing: .2px; }
+.logo svg { width: 21px; height: 21px; filter: drop-shadow(0 1px 2px rgba(255,46,85,.35)); }
+.mainnav a { font-size: 15px; font-weight: 500; padding: 7px 12px; border-radius: 999px; }
+.mainnav a.sel { background: var(--hot-soft); color: var(--hot); }
+.navsearch { border-radius: 999px; padding: 8px 15px; width: 220px; transition: border-color .15s, box-shadow .15s; }
+.navsearch:focus { box-shadow: 0 0 0 3px var(--hot-soft); }
+.who .av { background: linear-gradient(135deg, var(--hot), var(--hot-2)); color: #fff; box-shadow: 0 2px 6px rgba(255,46,85,.35); font-weight: 700; }
+
+/* Boxes: bóng mềm, không viền cứng */
+.box { border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; }
+.boxhead { padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.boxhead h2 { font-size: 18px; font-weight: 700; letter-spacing: .2px; position: relative; padding-left: 12px; }
+.boxhead h2::before { content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 4px; height: 18px; border-radius: 3px; background: linear-gradient(var(--hot), var(--hot-2)); }
+.boxhead h2 i { display: none; }
+
+/* Grid + cards: nâng nhẹ khi hover, ảnh zoom */
+.cgrid { padding: 16px; gap: 20px 14px; }
+.cc .thumb { border-radius: var(--r-sm); box-shadow: 0 2px 8px rgba(20,22,26,.10); transition: transform .18s ease, box-shadow .18s ease; }
+.cc .thumb img { transition: transform .35s ease; }
+.cc:hover .thumb { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+.cc:hover .thumb img { transform: scale(1.06); }
+.cc .tt { font-size: 14px; font-weight: 500; margin-top: 2px; }
+.cc .newflag { font-family: var(--font-mono); font-weight: 500; font-size: 11.5px; padding: 16px 8px 6px; }
+.cc .newflag b { color: #FFD84A; }
+.cc .hotflag { background: linear-gradient(135deg, var(--hot), var(--hot-2)); border-radius: 0 var(--r-sm) 0 8px; font-size: 10.5px; padding: 3px 7px; }
+.cc .when { border-radius: var(--r-sm) 0 8px 0; padding: 3px 7px; font-family: var(--font-mono); }
+
+/* Buttons: gradient, bo vừa, có bóng */
+.btn, .side-btn { background: linear-gradient(135deg, var(--hot), var(--hot-2)); border-radius: var(--r-sm); box-shadow: 0 3px 10px rgba(255,46,85,.28); transition: transform .12s ease, box-shadow .12s ease, filter .12s; font-weight: 700; letter-spacing: .3px; }
+.btn:hover, .side-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(255,46,85,.36); filter: brightness(1.03); }
+.btn:active, .side-btn:active { transform: translateY(0); }
+.ghost { border-radius: var(--r-sm); font-weight: 500; }
+.field, .navsearch { border-radius: var(--r-sm); }
+.navsearch { border-radius: 999px; }
+
+/* Chips */
+.gchip { padding: 7px 14px; font-size: 13px; font-weight: 500; transition: background .12s, color .12s; }
+.gchip.sel { background: linear-gradient(135deg, var(--hot), var(--hot-2)); box-shadow: 0 2px 8px rgba(255,46,85,.3); }
+.morechip { border-radius: 999px; font-weight: 500; }
+.chipbar { background: var(--card); box-shadow: var(--shadow); }
+
+/* Tags + numbers on detail */
+.tag { border-radius: 999px; font-weight: 500; }
+.tag:hover { background: var(--hot-soft); }
+.dtitle { font-weight: 700; letter-spacing: .2px; }
+.numrow b { font-family: var(--font-head); }
+.numrow .hot b, .numrow div:nth-child(2) b { color: var(--hot); }
+
+/* Sidebar quick links */
+.rk { transition: background .12s; }
+.rk:hover { background: var(--hot-soft); }
+.rk .info .a { font-weight: 500; }
+
+/* Chapter list */
+.chi { transition: background .1s; }
+.chi.here { box-shadow: inset 4px 0 0 var(--hot); }
+.chi .n { font-family: var(--font-mono); }
+
+/* Detail cover */
+.dhead .big { border-radius: var(--r-sm); box-shadow: var(--shadow-lg); }
+
+/* Section spacing rhythm */
+.col-main { gap: 18px; }
+.wrap { padding: 18px 14px; gap: 18px; }
+
+/* Nicer scrollbar (desktop) */
+* { scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 999px; border: 2px solid var(--bg); }
+
+/* Login card polish */
+.login-card { border-radius: 16px; box-shadow: var(--shadow-lg); border: none; padding: 32px; }
+.login-logo { font-size: 26px; letter-spacing: .3px; }
+.login-card .btn { padding: 12px; }
+
+/* Reader top bar keeps dark; refine buttons */
+.rnav button.pri { background: linear-gradient(135deg, var(--hot), var(--hot-2)); box-shadow: 0 3px 10px rgba(255,46,85,.3); }
+.endblk .b1 { background: linear-gradient(135deg, var(--hot), var(--hot-2)); border-radius: var(--r-sm); box-shadow: 0 4px 14px rgba(255,46,85,.35); }
+
+/* Empty-state text a bit friendlier */
+.checkmsg { font-family: var(--font-mono); }
+
+/* Body reading text uses Roboto (dễ đọc hơn Condensed) */
+.synop, .dalt { font-family: var(--font-prose); }
+.synop { font-size: 14.5px; line-height: 1.75; }
