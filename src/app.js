@@ -2,13 +2,14 @@ import express from 'express';
 import cookieSession from 'cookie-session';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { config } from './config.js';
+import { config, IMAGE_HOSTS, refererFor } from './config.js';
 import { requireAuth, mountAuth } from './routes/auth.js';
 import { createImageCache } from './cache/imageCache.js';
 import { mountImageProxy } from './routes/image.js';
 import { openDb } from './db/index.js';
 import { createSchema } from './db/migrations.js';
 import { createSource } from './source/otruyen.js';
+import { createTruyenQQSource } from './source/truyenqq.js';
 import { withCache } from './source/cached.js';
 import { createLibrary } from './services/library.js';
 import { createUpdates } from './services/updates.js';
@@ -16,6 +17,14 @@ import { mountApi } from './routes/api.js';
 import { mountPages } from './routes/pages.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+/** Chọn nguồn truyện theo config.SOURCE */
+function buildSource() {
+  if (config.SOURCE === 'otruyen') {
+    return createSource({ base: config.OTRUYEN_BASE, cdnBase: config.CDN_IMAGE_BASE });
+  }
+  return createTruyenQQSource({ base: config.TRUYENQQ_BASE });
+}
 
 export function buildApp(deps = {}) {
   const passwordHash = deps.passwordHash ?? config.PASSWORD_HASH;
@@ -48,12 +57,12 @@ export function buildApp(deps = {}) {
   mountImageProxy(app, {
     fetchFn: deps.imageFetchFn ?? fetch,
     cache,
-    allowSuffixes: ['img.otruyenapi.com', 'otruyencdn.com'],
+    allowSuffixes: IMAGE_HOSTS,
+    refererFor,
   });
 
   const db = deps.db ?? (() => { const d = openDb(config.DB_PATH); createSchema(d); return d; })();
-  const source = deps.source ??
-    withCache(db, createSource({ base: config.OTRUYEN_BASE, cdnBase: config.CDN_IMAGE_BASE }));
+  const source = deps.source ?? withCache(db, buildSource());
   const library = createLibrary(db);
   const updates = createUpdates({ library, source });
 

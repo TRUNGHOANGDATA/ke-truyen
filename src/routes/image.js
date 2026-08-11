@@ -4,7 +4,7 @@ export function isAllowedHost(url, allowSuffixes) {
   return allowSuffixes.some(s => host === s || host.endsWith('.' + s) || host.endsWith(s));
 }
 
-export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes }) {
+export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes, refererFor }) {
   app.get('/img', async (req, res) => {
     const url = req.query.u;
     if (!url || !isAllowedHost(url, allowSuffixes)) return res.status(403).end();
@@ -16,8 +16,15 @@ export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes }) 
       return res.end(cached.buf);
     }
     try {
-      const referer = new URL(url).origin + '/';
-      const upstream = await fetchFn(url, { headers: { Referer: referer, 'user-agent': 'web-truyen/1.0' } });
+      const referer = refererFor ? refererFor(url) : new URL(url).origin + '/';
+      const upstream = await fetchFn(url, {
+        headers: {
+          Referer: referer,
+          // CDN truyện thường chặn user-agent lạ
+          'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+          Accept: 'image/avif,image/webp,image/*,*/*;q=0.8',
+        },
+      });
       if (!upstream.ok) return res.status(502).end();
       const contentType = upstream.headers.get('content-type') || 'image/jpeg';
       const buf = Buffer.from(await upstream.arrayBuffer());

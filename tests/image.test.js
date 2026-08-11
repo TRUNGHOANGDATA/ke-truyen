@@ -9,6 +9,7 @@ import { openDb } from '../src/db/index.js';
 import { createSchema } from '../src/db/migrations.js';
 import { buildApp } from '../src/app.js';
 import { isAllowedHost } from '../src/routes/image.js';
+import { IMAGE_HOSTS, refererFor } from '../src/config.js';
 
 const hash = bcrypt.hashSync('secret123', 10);
 function agentApp() {
@@ -51,4 +52,19 @@ test('/img serves whitelisted image', async () => {
 test('/img requires auth', async () => {
   const res = await request(agentApp()).get('/img?u=' + encodeURIComponent('https://img.otruyenapi.com/a.jpg'));
   assert.equal(res.status, 401);
+});
+
+test('refererFor gửi Referer của TruyenQQ cho CDN của họ', () => {
+  // CDN TruyenQQ chống hotlink theo trang chủ; dùng host ảnh sẽ bị 403
+  assert.match(refererFor('https://s135.hinhhinh.com/3755/951/0.jpg'), /truyenqq/);
+  assert.match(refererFor('https://i178.truyenvua.com/1/2/0.jpg'), /truyenqq/);
+  assert.match(refererFor('https://111.tintruyen.net/1/2/0.jpg'), /truyenqq/);
+  // Nguồn khác thì dùng chính origin của ảnh
+  assert.equal(refererFor('https://img.otruyenapi.com/a.jpg'), 'https://img.otruyenapi.com/');
+});
+
+test('proxy chấp nhận host ảnh của TruyenQQ', () => {
+  assert.ok(isAllowedHost('https://s135.hinhhinh.com/a.jpg', IMAGE_HOSTS));
+  assert.ok(isAllowedHost('https://i178.truyenvua.com/a.jpg', IMAGE_HOSTS));
+  assert.ok(!isAllowedHost('https://evil.com/a.jpg', IMAGE_HOSTS));
 });

@@ -13,24 +13,34 @@ export function relTime(iso) {
 export function mountPages(app) {
   const svc = () => app.locals.services;
 
-  // Thể loại hot hiện nay, dùng slug thật của nguồn.
-  // Lưu ý: nguồn KHÔNG có "Hệ thống" / "Tu tiên" / "Huyền huyễn" —
-  // dùng thể loại gần nhất: Martial Arts (~tu tiên), Fantasy (~huyền huyễn),
-  // Chuyển Sinh (~hệ thống); truyện tu tiên/huyền huyễn phần lớn nằm trong Manhua.
+  // Thể loại hiện ở trang chủ, khai báo theo TÊN rồi tự map sang slug của nguồn
+  // đang dùng (TruyenQQ dùng slug kèm id như "action-26", OTruyen dùng "action").
+  // 'as' = nhãn hiển thị nếu muốn khác tên gốc.
   const HOME_GENRES = [
-    { slug: 'manhua', name: 'Manhua (Tu tiên · Huyền huyễn)' },
-    { slug: 'manhwa', name: 'Manhwa' },
-    { slug: 'manga', name: 'Manga' },
-    { slug: 'webtoon', name: 'Webtoon' },
-    { slug: 'xuyen-khong', name: 'Xuyên Không' },
-    { slug: 'chuyen-sinh', name: 'Chuyển Sinh' },
-    { slug: 'martial-arts', name: 'Tu Tiên · Võ Thuật' },
-    { slug: 'fantasy', name: 'Huyền Huyễn · Fantasy' },
-    { slug: 'ngon-tinh', name: 'Ngôn Tình' },
-    { slug: 'action', name: 'Action' },
-    { slug: 'co-dai', name: 'Cổ Đại' },
-    { slug: 'truyen-mau', name: 'Truyện Màu' },
+    { name: 'Huyền Huyễn', as: 'Huyền Huyễn · Tu tiên' },
+    { name: 'Manhua' },
+    { name: 'Manhwa' },
+    { name: 'Xuyên Không' },
+    { name: 'Trọng Sinh' },
+    { name: 'Chuyển Sinh' },
+    { name: 'Martial Arts', as: 'Võ Thuật' },
+    { name: 'Ngôn Tình' },
+    { name: 'Manga' },
+    { name: 'Webtoon' },
+    { name: 'Action' },
+    { name: 'Cổ Đại' },
+    { name: 'Truyện Màu' },
   ];
+
+  /** Map tên thể loại -> slug của nguồn đang dùng */
+  async function resolveGenres(source) {
+    let cats = [];
+    try { cats = await source.categories(); } catch { return []; }
+    const bySlug = new Map(cats.map(c => [c.name.trim().toLowerCase(), c.slug]));
+    return HOME_GENRES
+      .map(g => ({ name: g.as || g.name, slug: bySlug.get(g.name.toLowerCase()) }))
+      .filter(g => g.slug);
+  }
 
   const PER_RAIL = 18; // ≥ 15 truyện mỗi thể loại
 
@@ -54,12 +64,13 @@ export function mountPages(app) {
     const source = svc().source;
     let recent = [], genres = [], suggested = [], featured = [], whyGenres = [];
     try {
+      const rails = await resolveGenres(source);
       const [home, ...cats] = await inBatches([
         () => source.home().catch(() => ({ items: [] })),
-        ...HOME_GENRES.map(g => () => source.byCategory(g.slug, 1).catch(() => ({ items: [] }))),
+        ...rails.map(g => () => source.byCategory(g.slug, 1).catch(() => ({ items: [] }))),
       ]);
       recent = (home.items || []).slice(0, 18).map(c => ({ ...c, when: relTime(c.updatedAt) }));
-      genres = HOME_GENRES.map((g, i) => ({
+      genres = rails.map((g, i) => ({
         ...g, items: (cats[i]?.items || []).slice(0, PER_RAIL).map(c => ({ ...c, when: relTime(c.updatedAt) })),
       })).filter(g => g.items.length);
 

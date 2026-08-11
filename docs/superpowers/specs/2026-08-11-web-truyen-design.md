@@ -73,7 +73,57 @@ Vấn đề đang giải quyết: các trang truyện hiện có đầy quảng 
 
 **Vì sao SQLite:** chỉ 1–3 người dùng, không cần server database riêng; là một file duy nhất nên backup và di chuyển cực dễ.
 
-## 5. Nguồn dữ liệu — OTruyen API
+## 5b. Cập nhật 12/08/2026 — đổi nguồn chính sang TruyenQQ (crawl)
+
+**Rủi ro "OTruyen API ngừng hoạt động" (mục 15) đã xảy ra.** Kiểm tra thực tế:
+không endpoint nào của OTruyen có dữ liệu mới hơn **11/06/2026** (kể cả
+`/danh-sach/truyen-moi` sắp theo `updatedAt`). Nguồn đã dừng nạp chương mới ~2 tháng.
+
+Đã khảo sát các API thay thế:
+- **MangaDex** (`api.mangadex.org`) — còn sống, API chính thức, 6.534 truyện có bản
+  tiếng Việt, 108.795 chương, cập nhật hằng ngày. **Nhưng** không có dòng manhua
+  tu tiên/huyền huyễn Trung Quốc (Nguyên Tôn, Đấu Phá Thương Khung… không có bản
+  tiếng Việt) → không thay thế được cho nhu cầu thực tế.
+- `cuutruyen.net`, `nettruyenapi.com`, `truyenvuaapi.com`: không kết nối được từ môi
+  trường kiểm thử (một phần do giới hạn mạng ở đó), chưa kết luận là đã chết.
+
+**Quyết định: nguồn chính là TruyenQQ, lấy dữ liệu bằng crawl HTML.** Trang này cập
+nhật theo từng phút và có đúng dòng truyện cần đọc.
+
+**Chọn nguồn:** biến môi trường `SOURCE` = `truyenqq` (mặc định) hoặc `otruyen`.
+Tầng `ComicSource` giữ nguyên giao diện nên phần còn lại của web không đổi.
+
+**Bản đồ dữ liệu TruyenQQ** (`src/source/truyenqq.js`, mọi selector gom ở hằng `SEL`):
+
+| Việc | Đường dẫn | Ghi chú |
+|---|---|---|
+| Mới cập nhật | `/truyen-moi-cap-nhat`, trang N: `…/trang-N` | 42 truyện/trang |
+| Thể loại | `/the-loai/{slug}-{id}` (vd `action-26`) | 46 thể loại |
+| Chi tiết | `/truyen-tranh/{slug}` | slug kèm id, vd `nguyen-ton-3755` |
+| Đọc chương | `/truyen-tranh/{slug}-chap-{n}` | ảnh ở `.page-chapter img[data-original]` |
+| Tìm kiếm | `POST /frontend/search/search`, body `search=` | GET `/tim-kiem?q=` trả rỗng |
+
+**Những điểm phải xử lý riêng cho nguồn này:**
+- Thời gian dạng tiếng Việt ("1 Phút Trước", "12/08/2026") → chuyển sang ISO (`parseVnTime`).
+- Trang thể loại **không** sắp theo thời gian cập nhật và tham số `sort` của họ không
+  dùng được → adapter tự sắp lại, mới cập nhật lên trước.
+- Ô "Tác giả" ghi "TruyenQQ" nghĩa là không rõ tác giả → để trống.
+- Mục lục trang chi tiết liệt kê mới→cũ, có cả chương thập phân (206.1, 206.5) → đảo
+  lại cho tăng dần rồi đánh số thứ tự.
+- **CDN ảnh chống hotlink theo trang chủ của họ**: proxy phải gửi `Referer:
+  https://truyenqqko.com/` (dùng chính host ảnh sẽ bị chặn) — xem `refererFor()`.
+- Host ảnh cần cho vào danh sách trắng: `truyenvua.com`, `hinhhinh.com`,
+  `tintruyen.net`, `truyenqqko.com`.
+- Crawl tử tế: nghỉ 400ms giữa các request, tối đa 4 request đồng thời, thử lại 2 lần
+  có giãn cách.
+- Thể loại ở trang chủ khai báo **theo tên** rồi tự map sang slug của nguồn đang dùng,
+  nên đổi nguồn không phải sửa danh sách.
+
+**Chú ý khi đổi nguồn:** slug của hai nguồn khác nhau, nên thư viện (truyện theo dõi,
+vị trí đọc) gắn với nguồn đang dùng. Đổi `SOURCE` thì các mục cũ trỏ sang nguồn mới sẽ
+không tìm thấy — coi như bắt đầu thư viện mới.
+
+## 5. Nguồn dữ liệu — OTruyen API (nguồn phụ, đã ngừng cập nhật)
 
 Tài liệu: `https://docs.otruyenapi.com/` · Base URL: `https://otruyenapi.com/v1/api`
 

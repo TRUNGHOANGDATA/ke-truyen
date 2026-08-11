@@ -1,8 +1,19 @@
 # Kệ Truyện — web đọc truyện tranh cá nhân
 
 Web đọc truyện tranh tiếng Việt, **không quảng cáo**, dùng riêng (đăng nhập bằng mật khẩu).
-Nội dung lấy trực tiếp từ OTruyen API; ảnh đi qua proxy có cache. Chạy 24/7 miễn phí trên
-Oracle Cloud Always Free.
+Ảnh đi qua proxy có cache. Chạy 24/7 miễn phí trên Oracle Cloud Always Free.
+
+## Nguồn truyện
+
+Chọn bằng biến `SOURCE` trong `.env`:
+
+| `SOURCE` | Nguồn | Tình trạng |
+|---|---|---|
+| `truyenqq` (mặc định) | TruyenQQ, crawl HTML | **Cập nhật từng phút** |
+| `otruyen` | OTruyen API | Đã ngừng nạp chương mới từ 11/06/2026 |
+
+Đổi nguồn thì slug truyện khác nhau, nên thư viện (truyện theo dõi, vị trí đọc) coi như
+bắt đầu lại. Chi tiết trong tài liệu thiết kế, mục 5b.
 
 ## Chạy thử trên máy (dev)
 
