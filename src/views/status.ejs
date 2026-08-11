@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="vi"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow"><link rel="stylesheet" href="/public/css/styles.css"><title><%= title %></title>
+</head><body>
+<%- include('partials/header', { active }) %>
+<div class="wrap"><div class="col-main">
+  <div class="box">
+    <div class="boxhead"><h2>Tình trạng hệ thống</h2></div>
+    <div class="sysbox" id="status">Đang tải…</div>
+  </div>
+  <div class="box" style="margin-top:14px"><div class="boxhead"><h2>Cài đặt</h2></div>
+    <div class="sysbox"><a href="/settings">Đổi mật khẩu →</a> · <form method="post" action="/logout" style="display:inline"><button class="morechip" type="submit">Đăng xuất</button></form></div></div>
+</div></div>
+<script type="module">
+  import { api } from '/public/js/common.js';
+  const el = document.getElementById('status');
+  try {
+    const s = await api('/api/status');
+    el.innerHTML = `Nguồn: OTruyen API<br>Đang theo dõi: ${s.followedCount} bộ<br>` +
+      `Chương chưa đọc: ${s.unreadTotal}<br>Cache ảnh: ${(s.cacheBytes/1e6).toFixed(1)} MB / 2000 MB`;
+  } catch (e) { el.textContent = 'Lỗi: ' + e.message; }
+</script>
+</body></html>

@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="vi"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow"><link rel="stylesheet" href="/public/css/styles.css">
+  <title>Đăng nhập — Kệ Truyện</title>
+</head><body class="login-body">
+  <form class="login-card" method="post" action="/login">
+    <div class="login-logo">Kệ <b>Truyện</b></div>
+    <% if (error) { %><p class="login-err"><%= error %></p><% } %>
+    <input type="password" name="password" placeholder="Mật khẩu" autofocus autocomplete="current-password">
+    <button class="btn" type="submit">Đăng nhập</button>
+  </form>
+</body></html>

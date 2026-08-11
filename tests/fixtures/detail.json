@@ -1,0 +1,24 @@
+{
+  "status": "success",
+  "message": "",
+  "data": {
+    "APP_DOMAIN_CDN_IMAGE": "https://img.otruyenapi.com",
+    "item": {
+      "name": "Tiên Nghịch",
+      "slug": "tien-nghich",
+      "origin_name": ["Renegade Immortal"],
+      "content": "<p>Vương Lâm...</p>",
+      "status": "ongoing",
+      "thumb_url": "tien-nghich-thumb.jpg",
+      "category": [{ "id": "1", "name": "Action", "slug": "action" }],
+      "chapters": [
+        { "server_name": "Server #1", "server_data": [
+          { "filename": "c1", "chapter_name": "1", "chapter_title": "",
+            "chapter_api_data": "https://sv1.otruyencdn.com/v1/api/chapter/aaa" },
+          { "filename": "c2", "chapter_name": "2", "chapter_title": "Khởi đầu",
+            "chapter_api_data": "https://sv1.otruyencdn.com/v1/api/chapter/bbb" }
+        ]}
+      ]
+    }
+  }
+}

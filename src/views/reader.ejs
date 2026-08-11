@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="vi"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow"><meta name="theme-color" content="#0B0A0D">
+<link rel="stylesheet" href="/public/css/styles.css"><title><%= title %></title>
+</head><body class="rd">
+<div class="rdbar">
+  <a class="bk" href="/truyen/<%= slug %>" aria-label="Quay lại">‹</a>
+  <div class="ti"><div class="a"><%= name %></div><div class="b">Chương <%= chapterName %> · <%= images.length %> trang</div></div>
+  <div class="sp"></div>
+  <div class="rnav">
+    <% if (prev) { %><a class="link" href="/doc/<%= slug %>/<%= encodeURIComponent(prev) %>"><button type="button">← Chương trước</button></a><% } %>
+    <% if (next) { %><a class="link" href="/doc/<%= slug %>/<%= encodeURIComponent(next) %>"><button class="pri" type="button">Chương sau →</button></a><% } %>
+  </div>
+</div>
+
+<div class="rdstage"><div class="rdcol" id="pages"
+     data-slug="<%= slug %>" data-chapter="<%= chapterName %>" data-start="<%= startPage %>">
+  <% images.forEach(img => { %>
+    <div class="mpage" data-page="<%= img.page %>">
+      <span class="pn"><%= img.page + 1 %> / <%= images.length %></span>
+      <img loading="lazy" data-src="/img?u=<%= encodeURIComponent(img.url) %>" alt="trang <%= img.page + 1 %>">
+    </div>
+  <% }) %>
+  <div class="endblk">
+    <div class="lb">Hết chương <%= chapterName %></div>
+    <div class="bg">
+      <% if (next) { %><a class="link" href="/doc/<%= slug %>/<%= encodeURIComponent(next) %>"><button class="b1" type="button">Chương <%= next %> →</button></a><% } %>
+      <a class="link" href="/truyen/<%= slug %>"><button class="b2" type="button">Danh sách chương</button></a>
+    </div>
+  </div>
+</div></div>
+
+<div class="rdfoot"><div class="track"><i id="track"></i></div>
+  <div class="row"><div class="p" id="pageLabel">Trang 1 <s>/ <%= images.length %></s></div>
+    <div class="p">Chương <%= chapterName %></div></div></div>
+
+<script type="module" src="/public/js/common.js"></script>
+<script type="module" src="/public/js/reader.js"></script>
+</body></html>

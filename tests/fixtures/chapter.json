@@ -1,0 +1,14 @@
+{
+  "status": "success",
+  "message": "",
+  "data": {
+    "domain_cdn": "https://sv1.otruyencdn.com",
+    "item": {
+      "chapter_path": "uploads/20240606/abc/chapter_1",
+      "chapter_image": [
+        { "image_page": 0, "image_file": "page_0.jpg" },
+        { "image_page": 1, "image_file": "page_1.jpg" }
+      ]
+    }
+  }
+}

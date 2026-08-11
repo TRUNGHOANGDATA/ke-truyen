@@ -1,0 +1,60 @@
+import { api } from './common.js';
+
+const pages = document.getElementById('pages');
+const slug = pages.dataset.slug;
+const chapter = pages.dataset.chapter;
+const startPage = Number(pages.dataset.start || 0);
+const imgs = [...pages.querySelectorAll('.mpage img')];
+const track = document.getElementById('track');
+const pageLabel = document.getElementById('pageLabel');
+const total = imgs.length;
+
+// lazy-load + prefetch next 3 using IntersectionObserver
+const io = new IntersectionObserver((entries) => {
+  for (const e of entries) {
+    if (!e.isIntersecting) continue;
+    const idx = imgs.indexOf(e.target);
+    for (let i = idx; i < Math.min(imgs.length, idx + 4); i++) {
+      const im = imgs[i];
+      if (im.dataset.src) { im.src = im.dataset.src; delete im.dataset.src; }
+    }
+    io.unobserve(e.target);
+  }
+}, { rootMargin: '800px 0px' });
+imgs.forEach(im => io.observe(im));
+
+// jump to saved page
+if (startPage > 0 && imgs[startPage]) {
+  imgs[startPage].closest('.mpage').scrollIntoView();
+}
+
+let saveTimer;
+function currentPage() {
+  const mid = window.innerHeight / 2;
+  let cur = 0;
+  document.querySelectorAll('.mpage').forEach((m, i) => {
+    if (m.getBoundingClientRect().top < mid) cur = i;
+  });
+  return Math.min(cur, total - 1);
+}
+function onScroll() {
+  const cur = currentPage();
+  if (track) track.style.width = ((cur + 1) / total * 100) + '%';
+  if (pageLabel) pageLabel.innerHTML = `Trang ${cur + 1} <s>/ ${total}</s>`;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    api('/api/progress', { method: 'POST', body: JSON.stringify({ slug, chapter, page: cur }) }).catch(() => {});
+  }, 700);
+}
+window.addEventListener('scroll', onScroll, { passive: true });
+onScroll();
+
+// keyboard: left/right = prev/next chapter, f = fullscreen
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') document.querySelector('.rnav .pri')?.closest('a')?.click();
+  if (e.key === 'ArrowLeft') document.querySelector('.rnav button:not(.pri)')?.closest('a')?.click();
+  if (e.key === 'f' || e.key === 'F') {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+    else document.exitFullscreen?.();
+  }
+});

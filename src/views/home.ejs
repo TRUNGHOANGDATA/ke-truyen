@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="vi"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow"><meta name="theme-color" content="#EBEBEB">
+<link rel="manifest" href="/public/manifest.webmanifest"><link rel="stylesheet" href="/public/css/styles.css">
+<title><%= title %></title>
+</head><body>
+<%- include('partials/header', { active }) %>
+<div class="wrap">
+  <div class="col-main">
+    <% if (reading && reading.length) { %>
+    <div class="box">
+      <div class="boxhead"><h2>Đang đọc</h2><div class="sp"></div><span class="cnt"><%= reading.length %></span></div>
+      <div class="cgrid">
+        <% reading.forEach(comic => { %><%- include('partials/comic-card', { comic }) %><% }) %>
+      </div>
+    </div>
+    <% } %>
+    <div class="box">
+      <div class="boxhead"><h2><i>✦</i> <%= search ? 'Tìm truyện' : (browse ? 'Duyệt truyện' : 'Đang theo dõi') %></h2>
+        <div class="sp"></div>
+        <% if (!search && !browse) { %><button class="side-btn" id="checkNew" type="button" style="width:auto;padding:8px 14px">Kiểm tra chương mới</button><% } %>
+      </div>
+      <% if (search) { %><div style="padding:12px"><input id="q" class="field" placeholder="Nhập tên truyện…" style="width:100%" autofocus></div><% } %>
+      <div class="cgrid" id="grid">
+        <% items.forEach(comic => { %><%- include('partials/comic-card', { comic }) %><% }) %>
+      </div>
+      <% if (!items.length && !search) { %>
+        <div style="padding:26px 16px; color:var(--text-faint); text-align:center">
+          <%= browse ? 'Đang tải…' : 'Chưa theo dõi truyện nào. Vào "Tìm truyện" để thêm.' %>
+        </div>
+      <% } %>
+    </div>
+  </div>
+  <aside class="col-side">
+    <button class="side-btn" id="checkNewSide" type="button">Kiểm tra chương mới</button>
+    <div class="box"><div class="boxhead"><h2>Tình trạng</h2></div>
+      <div class="sysbox" id="sysbox">Nhấn "Kiểm tra chương mới" để cập nhật.</div></div>
+    <div class="box"><div class="boxhead"><h2>Nhanh</h2></div>
+      <div class="ranklist">
+        <a class="rk" href="/browse"><span class="info"><span class="a">Duyệt theo thể loại</span></span></a>
+        <a class="rk" href="/search"><span class="info"><span class="a">Tìm truyện</span></span></a>
+        <a class="rk" href="/settings"><span class="info"><span class="a">Đổi mật khẩu</span></span></a>
+      </div>
+    </div>
+  </aside>
+</div>
+<script type="module" src="/public/js/common.js"></script>
+<script type="module" src="/public/js/home.js"></script>
+</body></html>

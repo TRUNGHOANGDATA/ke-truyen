@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="vi"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow"><link rel="stylesheet" href="/public/css/styles.css"><title><%= title %></title>
+</head><body>
+<%- include('partials/header', { active }) %>
+<div class="wrap"><div class="col-main"><div class="box">
+  <div class="boxhead"><h2>Đổi mật khẩu</h2></div>
+  <div style="padding:14px; display:flex; flex-direction:column; gap:10px; max-width:420px">
+    <input id="cur" class="field" type="password" placeholder="Mật khẩu hiện tại" autocomplete="current-password">
+    <input id="next" class="field" type="password" placeholder="Mật khẩu mới (≥6 ký tự)" autocomplete="new-password">
+    <button class="btn" id="save" type="button" style="justify-content:center">Đổi mật khẩu</button>
+    <div class="sysbox" id="out"></div>
+  </div>
+</div></div></div>
+<script type="module">
+  import { api } from '/public/js/common.js';
+  document.getElementById('save').addEventListener('click', async () => {
+    const out = document.getElementById('out');
+    try {
+      const r = await api('/settings/password', { method: 'POST', body: JSON.stringify({
+        current: document.getElementById('cur').value, next: document.getElementById('next').value }) });
+      out.innerHTML = 'Xong. Dán dòng này vào <code>.env</code> (PASSWORD_HASH) rồi khởi động lại:<br><code>' + r.hash + '</code>';
+    } catch (e) { out.textContent = 'Lỗi: ' + e.message; }
+  });
+</script>
+</body></html>
