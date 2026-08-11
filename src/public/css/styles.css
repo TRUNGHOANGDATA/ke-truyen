@@ -334,3 +334,6 @@ a.link { text-decoration: none; }
 .rk-lite:hover { background: var(--hot-soft); color: var(--hot); }
 .rk .mini { border-radius: 4px; box-shadow: 0 1px 4px rgba(20,22,26,.15); }
 .rk .info .a { font-size: 13px; }
+
+/* Nhãn "đang hot" trên banner */
+.stag-hot { background: linear-gradient(135deg, var(--hot), var(--hot-2)); font-weight: 700; }

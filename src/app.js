@@ -9,6 +9,7 @@ import { mountImageProxy } from './routes/image.js';
 import { openDb } from './db/index.js';
 import { createSchema } from './db/migrations.js';
 import { createSource } from './source/otruyen.js';
+import { withCache } from './source/cached.js';
 import { createLibrary } from './services/library.js';
 import { createUpdates } from './services/updates.js';
 import { mountApi } from './routes/api.js';
@@ -51,7 +52,8 @@ export function buildApp(deps = {}) {
   });
 
   const db = deps.db ?? (() => { const d = openDb(config.DB_PATH); createSchema(d); return d; })();
-  const source = deps.source ?? createSource({ base: config.OTRUYEN_BASE, cdnBase: config.CDN_IMAGE_BASE });
+  const source = deps.source ??
+    withCache(db, createSource({ base: config.OTRUYEN_BASE, cdnBase: config.CDN_IMAGE_BASE }));
   const library = createLibrary(db);
   const updates = createUpdates({ library, source });
 

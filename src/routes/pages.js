@@ -13,14 +13,37 @@ export function relTime(iso) {
 export function mountPages(app) {
   const svc = () => app.locals.services;
 
-  // Vài thể loại phổ biến để gợi ý ở trang chủ
+  // Thể loại hot hiện nay, dùng slug thật của nguồn.
+  // Lưu ý: nguồn KHÔNG có "Hệ thống" / "Tu tiên" / "Huyền huyễn" —
+  // dùng thể loại gần nhất: Martial Arts (~tu tiên), Fantasy (~huyền huyễn),
+  // Chuyển Sinh (~hệ thống); truyện tu tiên/huyền huyễn phần lớn nằm trong Manhua.
   const HOME_GENRES = [
-    { slug: 'ngon-tinh', name: 'Ngôn Tình' },
-    { slug: 'manhua', name: 'Manhua' },
+    { slug: 'manhua', name: 'Manhua (Tu tiên · Huyền huyễn)' },
+    { slug: 'manhwa', name: 'Manhwa' },
+    { slug: 'manga', name: 'Manga' },
+    { slug: 'webtoon', name: 'Webtoon' },
     { slug: 'xuyen-khong', name: 'Xuyên Không' },
+    { slug: 'chuyen-sinh', name: 'Chuyển Sinh' },
+    { slug: 'martial-arts', name: 'Tu Tiên · Võ Thuật' },
+    { slug: 'fantasy', name: 'Huyền Huyễn · Fantasy' },
+    { slug: 'ngon-tinh', name: 'Ngôn Tình' },
     { slug: 'action', name: 'Action' },
     { slug: 'co-dai', name: 'Cổ Đại' },
+    { slug: 'truyen-mau', name: 'Truyện Màu' },
   ];
+
+  const PER_RAIL = 18; // ≥ 15 truyện mỗi thể loại
+
+  // Gọi nguồn theo lô để không bắn hơn 4 request cùng lúc
+  async function inBatches(tasks, size = 4) {
+    const out = [];
+    for (let i = 0; i < tasks.length; i += size) {
+      out.push(...await Promise.all(tasks.slice(i, i + size).map(t => t())));
+    }
+    return out;
+  }
+
+  const chapNum = (c) => { const n = parseFloat(c?.latestChapter); return Number.isFinite(n) ? n : 0; };
 
   const mapFollowed = (c) => ({ ...c, thumbUrl: c.thumb_url, latestChapter: c.last_chapter_seen });
 
@@ -30,13 +53,13 @@ export function mountPages(app) {
     const source = svc().source;
     let recent = [], genres = [], suggested = [], featured = [];
     try {
-      const [home, ...cats] = await Promise.all([
-        source.home().catch(() => ({ items: [] })),
-        ...HOME_GENRES.map(g => source.byCategory(g.slug, 1).catch(() => ({ items: [] }))),
+      const [home, ...cats] = await inBatches([
+        () => source.home().catch(() => ({ items: [] })),
+        ...HOME_GENRES.map(g => () => source.byCategory(g.slug, 1).catch(() => ({ items: [] }))),
       ]);
-      recent = (home.items || []).slice(0, 12).map(c => ({ ...c, when: relTime(c.updatedAt) }));
+      recent = (home.items || []).slice(0, 18).map(c => ({ ...c, when: relTime(c.updatedAt) }));
       genres = HOME_GENRES.map((g, i) => ({
-        ...g, items: (cats[i]?.items || []).slice(0, 12).map(c => ({ ...c, when: relTime(c.updatedAt) })),
+        ...g, items: (cats[i]?.items || []).slice(0, PER_RAIL).map(c => ({ ...c, when: relTime(c.updatedAt) })),
       })).filter(g => g.items.length);
 
       // Gợi ý: trộn nhiều thể loại (ưu tiên thể loại bạn hay theo dõi), loại bỏ truyện đã theo
@@ -55,20 +78,21 @@ export function mountPages(app) {
         }
       }
 
-      // Banner: ưu tiên truyện đang đọc / đang theo, rồi tới truyện hot mới
-      const seen = new Set();
-      for (const c of [...items].sort((a, b) => (b.progress ? 1 : 0) - (a.progress ? 1 : 0))) {
-        if (featured.length >= 6) break;
-        featured.push({ slug: c.slug, name: c.name, thumbUrl: c.thumb_url, latestChapter: c.last_chapter_seen,
-          categories: (c.categories || '').split(', ').filter(Boolean), progress: c.progress });
-        seen.add(c.slug);
-      }
-      for (const c of recent) {
-        if (featured.length >= 6) break;
-        if (seen.has(c.slug)) continue;
-        featured.push({ slug: c.slug, name: c.name, thumbUrl: c.thumbUrl, latestChapter: c.latestChapter, categories: c.categories || [] });
-        seen.add(c.slug);
-      }
+      // Banner: truyện ĐANG HOT. Nguồn không trả lượt xem, nên xếp hot theo
+      // "bộ dài kỳ mà vẫn ra chương đều" = số chương lớn + vừa cập nhật.
+      const pool = new Map();
+      for (const c of (home.items || [])) pool.set(c.slug, c);
+      for (const lst of cats) for (const c of (lst?.items || [])) if (!pool.has(c.slug)) pool.set(c.slug, c);
+      const progressBySlug = new Map(items.filter(c => c.progress).map(c => [c.slug, c.progress]));
+      featured = [...pool.values()]
+        .filter(c => chapNum(c) > 0)
+        .sort((a, b) => chapNum(b) - chapNum(a))
+        .slice(0, 8)
+        .map(c => ({
+          slug: c.slug, name: c.name, thumbUrl: c.thumbUrl,
+          latestChapter: c.latestChapter, categories: c.categories || [],
+          progress: progressBySlug.get(c.slug) || null,
+        }));
     } catch { /* nguồn tạm lỗi — vẫn hiện phần theo dõi */ }
     res.render('home', {
       title: 'Kệ Truyện', active: 'home', items, reading, recent, genres, suggested, featured,

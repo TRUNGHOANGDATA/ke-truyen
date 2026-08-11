@@ -10,6 +10,7 @@
           <a class="slide-cover" href="/truyen/<%= f.slug %>"><img src="<%= img %>" alt="<%= f.name %>"></a>
           <div class="slide-meta">
             <div class="slide-tags">
+              <span class="stag stag-hot">🔥 Đang hot</span>
               <% (f.categories || []).slice(0, 3).forEach(t => { %><span class="stag"><%= t %></span><% }) %>
             </div>
             <a class="slide-title" href="/truyen/<%= f.slug %>"><%= f.name %></a>

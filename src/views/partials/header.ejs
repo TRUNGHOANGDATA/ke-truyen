@@ -6,7 +6,7 @@
   <nav class="mainnav">
     <a href="/" class="<%= active==='home'?'sel':'' %>">Trang chủ</a>
     <a href="/browse" class="<%= active==='browse'?'sel':'' %>">Thể loại</a>
-    <a href="/" class="<%= active==='following'?'sel':'' %>">Đang theo dõi</a>
+    <a href="/following" class="<%= active==='following'?'sel':'' %>">Đang theo dõi</a>
   </nav>
   <form class="navsearch-form" action="/search" method="get" role="search">
     <input class="navsearch" name="q" value="<%= typeof q !== 'undefined' ? q : '' %>" placeholder="⌕ Tìm truyện…" autocomplete="off">
