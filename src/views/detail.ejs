@@ -13,7 +13,13 @@
       <div>
         <h1 class="dtitle"><%= detail.name %></h1>
         <% if (detail.origin) { %><div class="dalt"><%= detail.origin %></div><% } %>
-        <div class="tagrow" style="margin:8px 0"><% detail.categories.forEach(t => { %><span class="tag"><%= t %></span><% }) %></div>
+        <div class="dmeta">
+          <% if (detail.author) { %><div class="r"><span>Tác giả</span><b><%= detail.author %></b></div><% } %>
+          <% if (updated) { %><div class="r"><span>Cập nhật</span><b><%= updated %> trước</b></div><% } %>
+          <div class="r"><span>Thể loại</span>
+            <span class="tagrow"><% detail.categories.forEach(t => { %><span class="tag"><%= t %></span><% }) %></span>
+          </div>
+        </div>
         <div class="numrow">
           <div><b><%= detail.chapters.length %></b><span>Chương</span></div>
           <div><b><%= detail.status==='completed'?'Hoàn':'Đang ra' %></b><span>Trạng thái</span></div>

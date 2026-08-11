@@ -22,7 +22,10 @@ function makeApp() {
     async detail() { return detail; },
     async home() { return { items: [{ slug: 'x', name: 'Truyện Mới X', thumbUrl: '', updatedAt: null, latestChapter: '10' }], pagination: null }; },
     async categories() { return [{ name: 'Ngôn Tình', slug: 'ngon-tinh' }, { name: 'Action', slug: 'action' }]; },
-    async byCategory() { return { items: [{ slug: 'g1', name: 'Truyện Thể Loại', thumbUrl: '', updatedAt: null, latestChapter: '5' }], pagination: null }; },
+    async byCategory() { return { items: [{ slug: 'g1', name: 'Truyện Thể Loại', thumbUrl: '', updatedAt: null, latestChapter: '5', categories: ['Action'] }], pagination: null }; },
+    async chapter() {
+      return { images: [{ page: 0, url: 'https://sv1.otruyencdn.com/uploads/x/chapter_1/page_0.jpg' }] };
+    },
   };
   return buildApp({
     passwordHash: hash, sessionSecret: 't', db, source,
@@ -70,4 +73,22 @@ test('detail page renders comic name and chapters', async () => {
   assert.equal(res.status, 200);
   assert.match(res.text, /Tiên Nghịch/);
   assert.match(res.text, /Chương 1/);
+});
+
+test('reader page shows the full genre list', async () => {
+  const agent = await authed();
+  await agent.post('/api/follow').send({ slug: 'tien-nghich' });
+  const res = await agent.get('/doc/tien-nghich/1');
+  assert.equal(res.status, 200);
+  assert.match(res.text, /class="rdinfo"/);
+  assert.match(res.text, /Action/); // genre chip rendered in the reader
+});
+
+test('suggestions are driven by the genres of what you follow', async () => {
+  const agent = await authed();
+  await agent.post('/api/follow').send({ slug: 'tien-nghich' }); // categories: ['Action']
+  const res = await agent.get('/');
+  assert.equal(res.status, 200);
+  assert.match(res.text, /Vì bạn đọc/);
+  assert.match(res.text, /Gợi ý cho bạn/);
 });

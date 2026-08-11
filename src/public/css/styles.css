@@ -337,3 +337,18 @@ a.link { text-decoration: none; }
 
 /* Nhãn "đang hot" trên banner */
 .stag-hot { background: linear-gradient(135deg, var(--hot), var(--hot-2)); font-weight: 700; }
+
+/* ============ INFO STRIP TRONG TRANG ĐỌC ============ */
+.rdinfo { background: #14131A; border-bottom: 1px solid rgba(255,255,255,.08); }
+.rdinfo-in { max-width: 900px; margin: 0 auto; padding: 10px 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rdinfo-name { font-family: var(--font-head); font-weight: 700; font-size: 14px; color: #EDEBF0; text-decoration: none; }
+.rdinfo-name:hover { color: var(--hot-2); }
+.rdinfo-au, .rdinfo-st { font-size: 12.5px; color: #8E8A98; }
+.rdinfo-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+.rtag { font-size: 11.5px; font-weight: 500; padding: 3px 10px; border-radius: 999px; background: rgba(255,255,255,.08); color: #C9C6D2; text-decoration: none; }
+.rtag:hover { background: var(--hot); color: #fff; }
+@media (max-width: 620px) { .rdinfo-tags { margin-left: 0; width: 100%; } }
+
+/* Gợi ý: nhãn lý do */
+.sugwhy { padding: 9px 14px 0; font-size: 12px; color: var(--text-faint); line-height: 1.5; }
+.sugwhy b { color: var(--hot); font-weight: 600; }

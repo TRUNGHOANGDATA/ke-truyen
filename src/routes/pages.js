@@ -51,7 +51,7 @@ export function mountPages(app) {
     const items = svc().library.listFollowed().map(mapFollowed);
     const reading = items.filter(c => c.progress);
     const source = svc().source;
-    let recent = [], genres = [], suggested = [], featured = [];
+    let recent = [], genres = [], suggested = [], featured = [], whyGenres = [];
     try {
       const [home, ...cats] = await inBatches([
         () => source.home().catch(() => ({ items: [] })),
@@ -62,21 +62,32 @@ export function mountPages(app) {
         ...g, items: (cats[i]?.items || []).slice(0, PER_RAIL).map(c => ({ ...c, when: relTime(c.updatedAt) })),
       })).filter(g => g.items.length);
 
-      // Gợi ý: trộn nhiều thể loại (ưu tiên thể loại bạn hay theo dõi), loại bỏ truyện đã theo
-      const followedCats = new Set(items.flatMap(c => (c.categories || '').split(', ').filter(Boolean)));
-      const followedSlugs = new Set(items.map(c => c.slug));
-      const order = HOME_GENRES
-        .map((g, i) => ({ i, pref: followedCats.has(g.name) ? 0 : 1 }))
-        .sort((a, b) => a.pref - b.pref).map(o => o.i);
-      const lists = order.map(i => (cats[i]?.items || []).filter(c => !followedSlugs.has(c.slug)));
-      const seenSug = new Set();
-      for (let round = 0; suggested.length < 12 && round < 12; round++) {
-        for (const l of lists) {
-          const c = l[round];
-          if (c && !seenSug.has(c.slug)) { seenSug.add(c.slug); suggested.push({ ...c, when: relTime(c.updatedAt) }); }
-          if (suggested.length >= 12) break;
+      // ---- Gợi ý dựa trên THỂ LOẠI BẠN ĐỌC ----
+      // Chấm điểm thể loại: truyện đang đọc dở nặng hơn truyện chỉ theo dõi.
+      const taste = new Map();
+      for (const c of items) {
+        const weight = c.progress ? 3 : 1;
+        for (const g of (c.categories || '').split(', ').filter(Boolean)) {
+          taste.set(g, (taste.get(g) || 0) + weight);
         }
       }
+      const topTaste = [...taste.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+      whyGenres = topTaste.slice(0, 3).map(([g]) => g);
+
+      const followedSlugs = new Set(items.map(c => c.slug));
+      const candidates = new Map();
+      for (const lst of cats) {
+        for (const c of (lst?.items || [])) {
+          if (followedSlugs.has(c.slug) || candidates.has(c.slug)) continue;
+          candidates.set(c.slug, c);
+        }
+      }
+      const scoreOf = (c) => (c.categories || []).reduce((s, g) => s + (taste.get(g) || 0), 0);
+      const ranked = [...candidates.values()]
+        .map(c => ({ c, s: scoreOf(c) }))
+        .sort((a, b) => b.s - a.s || chapNum(b.c) - chapNum(a.c));
+      // Nếu chưa theo dõi gì (chưa có "khẩu vị") thì gợi ý theo bộ dài kỳ đang cập nhật
+      suggested = ranked.slice(0, 12).map(({ c }) => ({ ...c, when: relTime(c.updatedAt) }));
 
       // Banner: truyện ĐANG HOT. Nguồn không trả lượt xem, nên xếp hot theo
       // "bộ dài kỳ mà vẫn ra chương đều" = số chương lớn + vừa cập nhật.
@@ -95,7 +106,7 @@ export function mountPages(app) {
         }));
     } catch { /* nguồn tạm lỗi — vẫn hiện phần theo dõi */ }
     res.render('home', {
-      title: 'Kệ Truyện', active: 'home', items, reading, recent, genres, suggested, featured,
+      title: 'Kệ Truyện', active: 'home', items, reading, recent, genres, suggested, featured, whyGenres,
       following: false, categories: [], q: '', search: false, browse: false,
     });
   });
@@ -105,7 +116,7 @@ export function mountPages(app) {
     const reading = items.filter(c => c.progress);
     res.render('home', {
       title: 'Đang theo dõi', active: 'following', items, reading, recent: [], genres: [],
-      suggested: [], featured: [], following: true, categories: [], q: '', search: false, browse: false,
+      suggested: [], featured: [], whyGenres: [], following: true, categories: [], q: '', search: false, browse: false,
     });
   });
 
@@ -114,13 +125,13 @@ export function mountPages(app) {
     try { categories = await svc().source.categories(); } catch { /* để trống nếu lỗi */ }
     res.render('home', {
       title: 'Duyệt truyện', active: 'browse', items: [], reading: [], recent: [], genres: [],
-      suggested: [], featured: [], following: false, categories, q: '', browse: true, search: false,
+      suggested: [], featured: [], whyGenres: [], following: false, categories, q: '', browse: true, search: false,
     });
   });
 
   app.get('/search', (req, res) => res.render('home', {
     title: 'Tìm truyện', active: '', items: [], reading: [], recent: [], genres: [],
-    suggested: [], featured: [], following: false, categories: [], q: req.query.q || '', search: true, browse: false,
+    suggested: [], featured: [], whyGenres: [], following: false, categories: [], q: req.query.q || '', search: true, browse: false,
   }));
 
   app.get('/status', (req, res) => res.render('status', { title: 'Tình trạng', active: 'status' }));
@@ -132,7 +143,10 @@ export function mountPages(app) {
       const detail = await svc().source.detail(req.params.slug);
       const followed = svc().library.isFollowed(detail.slug);
       const progress = svc().library.getProgress(detail.slug);
-      res.render('detail', { title: detail.name, active: '', detail, followed, progress });
+      res.render('detail', {
+        title: detail.name, active: '', detail, followed, progress,
+        updated: relTime(detail.updatedAt),
+      });
     } catch (e) {
       res.status(502).render('status', { title: 'Lỗi', active: '' });
     }
@@ -158,11 +172,19 @@ export function mountPages(app) {
       const next = idx < chapters.length - 1 ? chapters[idx + 1].chapter_name : null;
       const progress = svcs.library.getProgress(slug);
       const startPage = (progress && progress.chapterName === chapterName) ? progress.imagePage : 0;
-      const name = detail ? detail.name : (svcs.library.listFollowed().find(c => c.slug === slug)?.name || slug);
+      // Thông tin truyện cho dải thể loại trong trang đọc: lấy từ DB nếu đang
+      // theo dõi, không thì từ detail vừa tải (chỉ tải khi chưa có mục lục).
+      const row = svcs.library.listFollowed().find(c => c.slug === slug);
+      if (!detail && !row) detail = await svcs.source.detail(slug);
+      const name = detail?.name || row?.name || slug;
+      const categories = detail
+        ? detail.categories
+        : (row?.categories || '').split(', ').filter(Boolean);
       res.render('reader', {
         title: `${name} — Chương ${chapterName}`,
         slug, name, chapterName, images, prev, next, startPage,
         total: chapters.length, index: idx,
+        categories, author: detail?.author || '', status: detail?.status || row?.status || '',
       });
     } catch (e) {
       res.status(502).send('Lỗi tải chương: ' + (e.message || e));

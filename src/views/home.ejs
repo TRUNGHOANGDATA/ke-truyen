@@ -103,6 +103,11 @@
 
     <% if (typeof suggested !== 'undefined' && suggested.length) { %>
     <div class="box"><div class="boxhead"><h2>Gợi ý cho bạn</h2></div>
+      <% if (whyGenres && whyGenres.length) { %>
+      <div class="sugwhy">Vì bạn đọc <b><%= whyGenres.join(', ') %></b></div>
+      <% } else { %>
+      <div class="sugwhy">Bộ dài kỳ đang cập nhật đều — theo dõi vài bộ để gợi ý sát hơn</div>
+      <% } %>
       <div class="ranklist">
         <% suggested.forEach(c => { %>
         <a class="rk" href="/truyen/<%= c.slug %>">

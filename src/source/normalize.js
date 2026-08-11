@@ -33,6 +33,7 @@ export function mapDetail(data) {
     status: item.status,
     thumbUrl: coverUrl(data.APP_DOMAIN_CDN_IMAGE, item.thumb_url),
     categories: (item.category || []).map(c => c.name),
+    author: (item.author || []).filter(a => a && a !== 'Đang cập nhật').join(', '),
     updatedAt: item.updatedAt,
     chapters,
   };

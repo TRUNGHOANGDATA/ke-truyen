@@ -14,6 +14,19 @@
   </div>
 </div>
 
+<% if ((categories && categories.length) || author) { %>
+<div class="rdinfo">
+  <div class="rdinfo-in">
+    <a class="rdinfo-name" href="/truyen/<%= slug %>"><%= name %></a>
+    <% if (author) { %><span class="rdinfo-au">· <%= author %></span><% } %>
+    <span class="rdinfo-st">· <%= status === 'completed' ? 'Hoàn thành' : 'Đang ra' %></span>
+    <div class="rdinfo-tags">
+      <% (categories || []).forEach(t => { %><a class="rtag" href="/browse"><%= t %></a><% }) %>
+    </div>
+  </div>
+</div>
+<% } %>
+
 <div class="rdstage"><div class="rdcol" id="pages"
      data-slug="<%= slug %>" data-chapter="<%= chapterName %>" data-start="<%= startPage %>">
   <% images.forEach(img => { %>
