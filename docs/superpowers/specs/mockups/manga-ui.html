@@ -1,0 +1,1651 @@
+<title>Thiết kế giao diện — Web đọc truyện tranh</title>
+
+<style>
+  /* ============ TOKENS — bám theo TruyenQQ: nền xám, thẻ trắng ============ */
+  :root {
+    --bg:        #EBEBEB;
+    --card:      #FFFFFF;
+    --card-2:    #F5F5F5;
+    --line:      #DDDDDD;
+    --line-2:    #C9C9C9;
+    --text:      #1A1A1A;
+    --text-dim:  #6B6B6B;
+    --text-faint:#9A9A9A;
+    --hot:       #FF2853;
+    --hot-soft:  #FFE8ED;
+    --link:      #1568C8;
+    --ok:        #17A67B;
+    --headbar:   #FFFFFF;
+    --readerbg:  #0B0A0D;
+
+    --font-ui: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    --font-head: "Segoe UI Variable Display", "Segoe UI", -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+    --font-mono: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
+
+    --r: 4px;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121216; --card: #1B1B21; --card-2: #232329; --line: #2E2E36; --line-2: #3C3C46;
+      --text: #ECEBEF; --text-dim: #A3A0AC; --text-faint: #6E6B78;
+      --hot: #FF4A6E; --hot-soft: #3A1C24; --link: #6FB2F5; --ok: #35C79B; --headbar: #1B1B21;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121216; --card: #1B1B21; --card-2: #232329; --line: #2E2E36; --line-2: #3C3C46;
+    --text: #ECEBEF; --text-dim: #A3A0AC; --text-faint: #6E6B78;
+    --hot: #FF4A6E; --hot-soft: #3A1C24; --link: #6FB2F5; --ok: #35C79B; --headbar: #1B1B21;
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    --bg: #EBEBEB; --card: #FFFFFF; --card-2: #F5F5F5; --line: #DDDDDD; --line-2: #C9C9C9;
+    --text: #1A1A1A; --text-dim: #6B6B6B; --text-faint: #9A9A9A;
+    --hot: #FF2853; --hot-soft: #FFE8ED; --link: #1568C8; --ok: #17A67B; --headbar: #FFFFFF;
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: var(--font-ui); font-size: 14px;
+    -webkit-font-smoothing: antialiased; overflow-x: hidden;
+  }
+
+  /* ============ DOC WRAPPER ============ */
+  .stage { max-width: 1340px; margin: 0 auto; padding: 34px 18px 60px; }
+  .masthead { display: flex; flex-direction: column; gap: 9px; margin-bottom: 6px; }
+  .eyebrow {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: .04em; color: var(--text-faint);
+  }
+  .masthead h1 {
+    font-family: var(--font-head); font-weight: 600; letter-spacing: -.028em;
+    font-size: clamp(28px, 5vw, 44px); line-height: 1.05; margin: 0; text-wrap: balance;
+  }
+  .masthead h1 em { font-style: normal; color: var(--hot); }
+  .masthead p {
+    font-size: 15px; line-height: 1.62; color: var(--text-dim); max-width: 66ch; margin: 0;
+  }
+  .rule { height: 1px; background: var(--line-2); margin: 26px 0; }
+
+  .switchbar { display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 20px; }
+  .switchgrp { display: flex; flex-direction: column; gap: 6px; }
+  .tabs { display: flex; gap: 7px; flex-wrap: wrap; }
+  .tab {
+    font-family: var(--font-head); font-size: 13.5px; font-weight: 600; letter-spacing: -.005em;
+    padding: 8px 14px; background: var(--card); color: var(--text-dim);
+    border: 1px solid var(--line); border-radius: var(--r); cursor: pointer;
+    display: flex; align-items: baseline; gap: 7px;
+  }
+  .tab span { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); font-weight: 400; }
+  .tab:hover { color: var(--text); border-color: var(--line-2); }
+  .tab[aria-selected="true"] { background: var(--hot); color: #fff; border-color: var(--hot); }
+  .tab[aria-selected="true"] span { color: #fff; opacity: .7; }
+  .tab:focus-visible, .btn:focus-visible, .ghost:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+
+  .view { display: none; } .view.on { display: block; }
+  .screen { display: none; } .screen.on { display: block; }
+  @media (prefers-reduced-motion: no-preference) {
+    .screen.on { animation: fade .2s ease both; }
+    @keyframes fade { from { opacity: 0 } to { opacity: 1 } }
+  }
+
+  /* ============ BROWSER FRAME ============ */
+  .browser {
+    border: 1px solid var(--line-2); border-radius: 8px; overflow: hidden;
+    background: var(--bg); box-shadow: 0 24px 60px -30px rgba(0,0,0,.45);
+  }
+  .chrome {
+    display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+    background: var(--card-2); border-bottom: 1px solid var(--line);
+  }
+  .dots { display: flex; gap: 5px; }
+  .dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--line-2); display: block; }
+  .urlbar {
+    flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: 20px;
+    font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim);
+    padding: 5px 12px; display: flex; align-items: center; gap: 7px;
+  }
+  .urlbar b { color: var(--ok); font-weight: 400; }
+  .urlbar s { color: var(--text-faint); text-decoration: none; }
+
+  /* ============ SITE HEADER ============ */
+  .site { background: var(--bg); }
+  .topnav {
+    background: var(--headbar); border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 30;
+  }
+  .topnav-in {
+    max-width: 1180px; margin: 0 auto; padding: 0 14px;
+    display: flex; align-items: center; gap: 13px; height: 52px;
+  }
+  .logo {
+    font-family: var(--font-head); font-size: 19.5px; font-weight: 700;
+    letter-spacing: -.032em; color: var(--text);
+    display: flex; align-items: center; gap: 7px; flex: 0 0 auto;
+  }
+  .logo svg { width: 19px; height: 19px; fill: var(--hot); flex: 0 0 auto; }
+  .mainnav { display: flex; align-items: center; gap: 1px; flex: 1; min-width: 0; }
+  .mainnav a {
+    padding: 6px 10px; border-radius: 16px; color: var(--text-dim); text-decoration: none;
+    font-size: 13.5px; white-space: nowrap; display: flex; align-items: center; gap: 4px;
+  }
+  .mainnav a:hover { background: var(--card-2); color: var(--text); }
+  .mainnav a.sel { color: var(--hot); background: var(--hot-soft); font-weight: 600; }
+  .mainnav a s { text-decoration: none; font-size: 8.5px; opacity: .55; }
+  .navsearch {
+    background: var(--card-2); border: 1px solid var(--line); border-radius: 20px;
+    padding: 7px 13px; display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--text-faint); width: 210px; flex: 0 0 auto;
+  }
+  .who {
+    display: flex; align-items: center; gap: 8px; flex: 0 0 auto;
+    padding-left: 13px; border-left: 1px solid var(--line);
+  }
+  .who .av {
+    width: 27px; height: 27px; border-radius: 50%; background: var(--hot-soft);
+    display: grid; place-items: center; font-size: 12px; font-weight: 700; color: var(--hot);
+  }
+  .who .nm { font-size: 12.5px; color: var(--text-dim); }
+
+  /* genre chips — xuống dòng, mặc định gọn 2 dòng, bấm mở hết */
+  .chipbar { background: var(--card); border-bottom: 1px solid var(--line); }
+  .chipbar-in {
+    max-width: 1180px; margin: 0 auto; padding: 8px 14px;
+    display: flex; gap: 8px; align-items: flex-start;
+  }
+  .chips {
+    flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 6px;
+    max-height: 66px; overflow: hidden;
+  }
+  .chips.open { max-height: none; }
+  @media (prefers-reduced-motion: no-preference) {
+    .chips { transition: max-height .2s ease; }
+  }
+  .gchip {
+    font-size: 12.5px; padding: 6px 12px; border-radius: 16px; white-space: nowrap;
+    background: var(--card-2); color: var(--text-dim); border: 0; cursor: pointer;
+    font-family: inherit; line-height: 1.4;
+  }
+  .gchip:hover { background: var(--hot-soft); color: var(--hot); }
+  .gchip.sel { background: var(--hot); color: #fff; font-weight: 600; }
+  .morechip {
+    flex: 0 0 auto; font-size: 12.5px; padding: 6px 12px; border-radius: 16px;
+    background: transparent; border: 1px solid var(--line-2); color: var(--text-dim);
+    cursor: pointer; font-family: inherit; line-height: 1.4; white-space: nowrap;
+  }
+  .morechip:hover { border-color: var(--hot); color: var(--hot); }
+
+  /* clean-notice banner (thay cho banner quảng cáo của trang gốc) */
+  .notice {
+    max-width: 1180px; margin: 12px auto 0; padding: 9px 13px;
+    background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--ok);
+    border-radius: var(--r); font-size: 12.5px; color: var(--text-dim);
+    display: flex; align-items: center; gap: 9px;
+  }
+  .notice b { color: var(--ok); }
+
+  /* ============ PAGE BODY ============ */
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 14px; display: grid; grid-template-columns: 1fr 268px; gap: 16px; align-items: start; }
+  .col-main { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+  .box { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); }
+  .boxhead {
+    display: flex; align-items: center; gap: 12px; padding: 11px 13px; border-bottom: 1px solid var(--line);
+  }
+  .boxhead h2 {
+    font-family: var(--font-head); font-size: 16px; font-weight: 600; letter-spacing: -.015em;
+    margin: 0; display: flex; align-items: center; gap: 7px;
+  }
+  .boxhead h2 i { color: var(--hot); font-style: normal; }
+  .boxhead .sp { flex: 1; }
+  .sorttabs { display: flex; gap: 4px; }
+  .sorttabs button {
+    font-size: 12px; padding: 5px 10px; border-radius: 20px; cursor: pointer;
+    background: transparent; border: 1px solid var(--line); color: var(--text-dim); font-family: inherit;
+  }
+  .sorttabs button[aria-pressed="true"] { background: var(--hot); border-color: var(--hot); color: #fff; }
+  .cnt { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-faint); }
+
+  /* ============ DENSE COMIC GRID (bám theo TruyenQQ: thẻ ~170px) ============ */
+  .cgrid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+    gap: 16px 12px; padding: 13px;
+  }
+  .cc { display: flex; flex-direction: column; gap: 6px; cursor: pointer; min-width: 0; }
+  .cc .thumb {
+    position: relative; border-radius: 3px; overflow: hidden; background: var(--card-2);
+    aspect-ratio: 190/247;
+  }
+  .cc .thumb svg { display: block; width: 100%; height: 100%; }
+  .cc .when {
+    position: absolute; top: 0; left: 0; z-index: 3;
+    background: rgba(0,0,0,.62); color: #fff; font-size: 10px;
+    padding: 3px 6px; border-bottom-right-radius: 4px;
+    font-family: var(--font-mono);
+  }
+  .cc .hotflag {
+    position: absolute; top: 0; right: 0; z-index: 3;
+    background: var(--hot); color: #fff; font-size: 9.5px; font-weight: 700;
+    padding: 3px 6px; border-bottom-left-radius: 4px;
+  }
+  .cc .newflag {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 3;
+    background: linear-gradient(transparent, rgba(0,0,0,.82));
+    color: #fff; font-size: 10.5px; padding: 14px 7px 5px;
+    font-family: var(--font-mono);
+  }
+  .cc .newflag b { color: #FFD84A; font-weight: 700; }
+  .cc .tt {
+    font-size: 13px; line-height: 1.32; font-weight: 600; color: var(--text);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .cc:hover .tt { color: var(--hot); }
+  .cc .row { display: flex; align-items: center; gap: 8px; }
+  .cc .ch { font-size: 12px; color: var(--link); }
+  .cc .stat {
+    margin-left: auto; display: flex; gap: 8px;
+    font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); font-variant-numeric: tabular-nums;
+  }
+  .cc .bar { height: 3px; background: var(--card-2); border-radius: 2px; overflow: hidden; }
+  .cc .bar i { display: block; height: 100%; background: var(--hot); }
+
+  /* pagination */
+  .pager { display: flex; gap: 5px; justify-content: center; padding: 4px 13px 15px; flex-wrap: wrap; }
+  .pager button {
+    min-width: 32px; height: 32px; padding: 0 9px; cursor: pointer;
+    background: var(--card-2); border: 1px solid var(--line); border-radius: var(--r);
+    font-family: var(--font-mono); font-size: 12px; color: var(--text-dim);
+  }
+  .pager button.sel { background: var(--hot); border-color: var(--hot); color: #fff; font-weight: 700; }
+  .pager button:hover:not(.sel) { border-color: var(--line-2); color: var(--text); }
+
+  /* ============ SIDEBAR ============ */
+  .col-side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .side-btn {
+    width: 100%; padding: 11px; border: none; border-radius: var(--r); cursor: pointer;
+    background: var(--hot); color: #fff; font-family: var(--font-head);
+    font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .side-btn s { text-decoration: none; font-family: var(--font-mono); font-size: 10px; opacity: .8; font-weight: 400; }
+  .ranklist { display: flex; flex-direction: column; }
+  .rk {
+    display: flex; align-items: center; gap: 9px; padding: 9px 12px;
+    border-bottom: 1px solid var(--line); cursor: pointer;
+  }
+  .ranklist .rk:last-child { border-bottom: 0; }
+  .rk:hover { background: var(--card-2); }
+  .rk .no {
+    font-family: var(--font-mono); font-size: 15px; font-weight: 700; width: 20px;
+    color: var(--text-faint); text-align: center; flex: 0 0 auto;
+  }
+  .rk:nth-child(1) .no { color: var(--hot); }
+  .rk:nth-child(2) .no, .rk:nth-child(3) .no { color: #E89B2C; }
+  .rk .mini { width: 34px; aspect-ratio: 190/247; border-radius: 2px; overflow: hidden; flex: 0 0 auto; }
+  .rk .mini svg { display: block; width: 100%; height: 100%; }
+  .rk .info { min-width: 0; flex: 1; }
+  .rk .info .a {
+    font-size: 12.5px; font-weight: 600; line-height: 1.28;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .rk .info .b { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); margin-top: 2px; }
+  .sysbox { padding: 11px 12px; font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); line-height: 1.75; }
+  .sysbox b { color: var(--ok); font-weight: 400; }
+  .sysbox hr { border: 0; border-top: 1px solid var(--line); margin: 8px 0; }
+
+  /* footer */
+  .foot {
+    background: var(--card); border-top: 1px solid var(--line); margin-top: 6px;
+    padding: 16px 14px; text-align: center; font-size: 12px; color: var(--text-faint); line-height: 1.7;
+  }
+  .foot b { color: var(--text-dim); }
+
+  /* ============ DETAIL ============ */
+  .dhead { display: grid; grid-template-columns: 200px 1fr; gap: 18px; padding: 16px; }
+  .dhead .big { border-radius: 3px; overflow: hidden; aspect-ratio: 190/247; }
+  .dhead .big svg { display: block; width: 100%; height: 100%; }
+  .dtitle {
+    font-family: var(--font-head); font-size: 25px; font-weight: 600; letter-spacing: -.02em;
+    margin: 0 0 4px; line-height: 1.15; text-wrap: balance;
+  }
+  .dalt { font-size: 12.5px; color: var(--text-faint); margin-bottom: 12px; }
+  .dmeta { display: flex; flex-direction: column; gap: 7px; margin-bottom: 13px; }
+  .dmeta .r { display: flex; gap: 9px; font-size: 13px; }
+  .dmeta .r > span:first-child { width: 88px; flex: 0 0 auto; color: var(--text-faint); }
+  .dmeta .r b { font-weight: 600; }
+  .dmeta .r .ok { color: var(--ok); }
+  .tagrow { display: flex; flex-wrap: wrap; gap: 5px; }
+  .tag {
+    font-size: 11.5px; border: 1px solid var(--line); color: var(--text-dim);
+    padding: 3px 8px; border-radius: 20px;
+  }
+  .tag:hover { border-color: var(--hot); color: var(--hot); cursor: pointer; }
+  .numrow { display: flex; gap: 22px; margin: 4px 0 14px; }
+  .numrow div { display: flex; flex-direction: column; gap: 1px; }
+  .numrow b {
+    font-family: var(--font-mono); font-size: 19px; font-weight: 700;
+    font-variant-numeric: tabular-nums; line-height: 1.1;
+  }
+  .numrow .hot b { color: var(--hot); }
+  .numrow span { font-size: 11px; color: var(--text-faint); }
+  .dbtns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn {
+    padding: 11px 18px; border: none; border-radius: var(--r); cursor: pointer;
+    background: var(--hot); color: #fff; font-family: var(--font-head);
+    font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn s { text-decoration: none; font-family: var(--font-mono); font-size: 10.5px; opacity: .82; font-weight: 400; }
+  .ghost {
+    padding: 11px 16px; border: 1px solid var(--line-2); border-radius: var(--r); cursor: pointer;
+    background: transparent; color: var(--text-dim); font-family: var(--font-ui); font-size: 13.5px;
+  }
+  .ghost:hover { color: var(--text); border-color: var(--text-faint); }
+  .ghost.on { color: var(--ok); border-color: var(--ok); }
+  .synop { padding: 0 16px 14px; font-size: 14px; line-height: 1.72; color: var(--text-dim); margin: 0; }
+
+  .chwrap { padding: 0 13px 13px; }
+  .chgrid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(216px, 1fr));
+    gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden;
+  }
+  .chi { display: flex; align-items: center; gap: 9px; padding: 9px 11px; background: var(--card); cursor: pointer; }
+  .chi:hover { background: var(--card-2); }
+  .chi .n {
+    font-family: var(--font-mono); font-size: 12.5px; font-weight: 700;
+    min-width: 62px; font-variant-numeric: tabular-nums;
+  }
+  .chi .d { margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); }
+  .chi.fresh .n { color: var(--hot); }
+  .chi.done .n { color: var(--text-faint); font-weight: 400; }
+  .chi.done .d { color: var(--text-faint); }
+  .chi.here { background: var(--card-2); box-shadow: inset 3px 0 0 var(--hot); }
+  .chi .tick { color: var(--ok); font-size: 10px; }
+
+  /* ============ READER ============ */
+  .rd { background: var(--readerbg); }
+  .rdbar {
+    position: sticky; top: 0; z-index: 25; background: rgba(11,10,13,.96);
+    border-bottom: 1px solid rgba(255,255,255,.1); color: #EDEBF0;
+    display: flex; align-items: center; gap: 13px; padding: 10px 16px;
+  }
+  .rdbar .bk { background: none; border: none; color: #EDEBF0; font-size: 19px; cursor: pointer; }
+  .rdbar .ti .a { font-family: var(--font-head); font-size: 15px; font-weight: 600; letter-spacing: -.015em; }
+  .rdbar .ti .b { font-family: var(--font-mono); font-size: 10.5px; color: #9C98A6; margin-top: 1px; }
+  .rdbar .sp { flex: 1; }
+  .pick {
+    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); color: #EDEBF0;
+    font-family: var(--font-mono); font-size: 11.5px; padding: 7px 11px; border-radius: 3px;
+    display: flex; align-items: center; gap: 9px; cursor: pointer;
+  }
+  .pick s { color: #7C7987; text-decoration: none; }
+  .rnav { display: flex; gap: 6px; }
+  .rnav button {
+    font-size: 12px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14);
+    color: #EDEBF0; padding: 8px 12px; border-radius: 3px; cursor: pointer; font-family: inherit;
+  }
+  .rnav button.pri { background: var(--hot); border-color: var(--hot); font-weight: 600; }
+  .rnav button:hover { background: rgba(255,255,255,.16); }
+  .rnav button.pri:hover { filter: brightness(1.08); }
+
+  /* dropdown chương + bảng cài đặt trong trình đọc */
+  .pop { position: relative; flex: 0 0 auto; }
+  .popmenu {
+    display: none;
+    position: absolute; top: calc(100% + 7px); right: 0; z-index: 40;
+    background: #17161C; border: 1px solid rgba(255,255,255,.15);
+    border-radius: 6px; box-shadow: 0 18px 40px -14px rgba(0,0,0,.8);
+  }
+  .pop.open .chmenu { display: block; }
+  .pop.open .setmenu { display: flex; }
+  .pick.on { background: var(--hot); border-color: var(--hot); }
+  .chmenu { width: 258px; padding: 5px; }
+  .chmenu .hd {
+    padding: 7px 9px 8px; font-family: var(--font-mono); font-size: 10px; color: #7C7987;
+    border-bottom: 1px solid rgba(255,255,255,.1); margin-bottom: 4px;
+  }
+  .chmenu .scr { max-height: 216px; overflow-y: auto; }
+  .chmenu .it {
+    display: flex; align-items: center; gap: 8px; padding: 8px 9px; border-radius: 4px;
+    font-family: var(--font-mono); font-size: 11.5px; color: #C9C6D2; cursor: pointer;
+  }
+  .chmenu .it:hover { background: rgba(255,255,255,.08); }
+  .chmenu .it.cur { background: var(--hot); color: #fff; font-weight: 700; }
+  .chmenu .it .t { margin-left: auto; font-size: 10px; opacity: .68; }
+  .chmenu .it.rd { color: #6E6B78; }
+  .chmenu .it.nw { color: var(--hot); }
+  .chmenu .it.cur .t { opacity: .85; }
+
+  .setmenu { width: 286px; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+  .setmenu .fl { display: flex; flex-direction: column; gap: 6px; }
+  .setmenu .fl > span { font-family: var(--font-mono); font-size: 10px; color: #8B8894; }
+  .seg { display: flex; border: 1px solid rgba(255,255,255,.15); border-radius: 4px; overflow: hidden; }
+  .seg button {
+    flex: 1; background: transparent; border: 0; color: #C9C6D2;
+    font-size: 11.5px; padding: 8px 4px; cursor: pointer; font-family: inherit;
+  }
+  .seg button[aria-pressed="true"] { background: var(--hot); color: #fff; font-weight: 600; }
+  .sw2 { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12.5px; color: #C9C6D2; }
+  .tgl {
+    width: 38px; height: 21px; border-radius: 12px; background: var(--hot);
+    position: relative; border: 0; cursor: pointer; flex: 0 0 auto;
+  }
+  .tgl::after {
+    content: ""; position: absolute; top: 2px; left: 19px; width: 17px; height: 17px;
+    border-radius: 50%; background: #fff;
+  }
+  .tgl.off { background: rgba(255,255,255,.2); }
+  .tgl.off::after { left: 2px; }
+
+  /* khối cuối chương */
+  .endblk {
+    padding: 28px 16px 36px; display: flex; flex-direction: column;
+    align-items: center; gap: 14px; text-align: center;
+  }
+  .endblk .lb { font-family: var(--font-mono); font-size: 11px; color: #7C7987; }
+  .endblk .bg { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .endblk .b1 {
+    background: var(--hot); color: #fff; border: 0; border-radius: 5px; padding: 13px 28px;
+    font-family: var(--font-head); font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  .endblk .b2 {
+    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15); color: #EDEBF0;
+    border-radius: 5px; padding: 13px 18px; font-size: 13.5px; cursor: pointer; font-family: inherit;
+  }
+  .endblk .b2:hover { background: rgba(255,255,255,.15); }
+
+  .rdstage { position: relative; padding-bottom: 30px; background: var(--readerbg); }
+  .rdcol { max-width: 760px; margin: 0 auto; }
+  .mpage { position: relative; border-bottom: 1px solid rgba(255,255,255,.07); }
+  .mpage svg { display: block; width: 100%; height: auto; }
+  .mpage .pn {
+    position: absolute; top: 8px; right: 9px; font-family: var(--font-mono); font-size: 10px;
+    color: rgba(255,255,255,.55); background: rgba(0,0,0,.55); padding: 2px 6px; border-radius: 3px;
+    font-variant-numeric: tabular-nums; z-index: 3;
+  }
+  .rails { position: absolute; inset: 0; display: flex; justify-content: space-between; padding: 0 16px; pointer-events: none; }
+  .rails button {
+    pointer-events: auto; position: sticky; top: 46%; width: 44px; height: 44px; border-radius: 50%;
+    background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.15); color: #EDEBF0;
+    font-size: 19px; cursor: pointer;
+  }
+  .rdfoot {
+    position: sticky; bottom: 0; z-index: 25; background: rgba(11,10,13,.96);
+    border-top: 1px solid rgba(255,255,255,.1); padding: 9px 16px 12px;
+  }
+  .rdfoot .track { height: 3px; background: rgba(255,255,255,.15); border-radius: 2px; margin-bottom: 9px; }
+  .rdfoot .track i { display: block; height: 100%; background: var(--hot); border-radius: 2px; }
+  .rdfoot .row { display: flex; align-items: center; gap: 15px; }
+  .rdfoot .p { font-family: var(--font-mono); font-size: 11.5px; color: #EDEBF0; font-variant-numeric: tabular-nums; }
+  .rdfoot .p s { color: #7C7987; text-decoration: none; }
+  .keys { margin-left: auto; display: flex; gap: 13px; }
+  .keys span { font-family: var(--font-mono); font-size: 10px; color: #7C7987; }
+  .keys kbd { border: 1px solid rgba(255,255,255,.18); padding: 1px 5px; border-radius: 3px; color: #A5A2AE; margin-right: 4px; }
+
+  /* ============ PHONE ============ */
+  .rig { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+  .phone {
+    width: 390px; max-width: 100%; flex: 0 0 auto; background: #0A0A0C;
+    border: 1px solid var(--line-2); border-radius: 26px; padding: 8px;
+    box-shadow: 0 26px 60px -28px rgba(0,0,0,.5);
+  }
+  .vp {
+    height: 770px; border-radius: 19px; overflow: hidden; position: relative;
+    background: var(--bg); display: flex; flex-direction: column;
+  }
+  .notch {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 106px; height: 21px; background: #0A0A0C;
+    border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; z-index: 45;
+  }
+  .ps { display: none; flex-direction: column; height: 100%; }
+  .ps.on { display: flex; }
+  .scroll { flex: 1; overflow-y: auto; overflow-x: hidden; }
+  .mbar {
+    background: var(--headbar); border-bottom: 1px solid var(--line);
+    padding: 27px 13px 10px; display: flex; align-items: center; gap: 11px; flex: 0 0 auto;
+  }
+  .mbar .logo { font-size: 18px; }
+  .mbar .sp { flex: 1; }
+  .mbar .ib {
+    width: 34px; height: 34px; border-radius: var(--r); background: var(--card-2);
+    border: 1px solid var(--line); color: var(--text-dim); display: grid; place-items: center;
+    font-size: 14px; cursor: pointer;
+  }
+  .mtabs {
+    display: flex; background: var(--card); border-top: 1px solid var(--line); flex: 0 0 auto;
+  }
+  .mtabs button {
+    flex: 1; background: none; border: none; padding: 8px 2px 12px; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    font-family: inherit; font-size: 10px; color: var(--text-faint);
+  }
+  .mtabs button i { font-style: normal; font-size: 16px; }
+  .mtabs button.sel { color: var(--hot); }
+  .mgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px 9px; padding: 11px; }
+  .mgrid .cc .tt { font-size: 11.5px; }
+  .mgrid .cc .ch { font-size: 11px; }
+  .mgrid .cc .stat { display: none; }
+
+  /* notes */
+  .notes { flex: 1; min-width: 280px; display: flex; flex-direction: column; gap: 20px; }
+  .note h3 {
+    font-family: var(--font-head); font-size: 15px; font-weight: 600; letter-spacing: -.012em;
+    margin: 0 0 9px; display: flex; align-items: center; gap: 8px;
+  }
+  .note h3::before { content: ""; width: 15px; height: 2px; background: var(--hot); flex: 0 0 auto; }
+  .note ul { margin: 0; padding-left: 17px; display: flex; flex-direction: column; gap: 6px; }
+  .note li { font-size: 13.5px; line-height: 1.55; color: var(--text-dim); }
+  .note li b { color: var(--text); font-weight: 600; }
+  .note code {
+    font-family: var(--font-mono); font-size: 11.5px; background: var(--card);
+    border: 1px solid var(--line); padding: 1px 5px; border-radius: 3px; color: var(--text);
+  }
+  .noterow { display: grid; grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); gap: 24px; }
+
+  .tokens { display: grid; grid-template-columns: repeat(auto-fit, minmax(146px, 1fr)); gap: 10px; }
+  .sw { border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; background: var(--card); }
+  .sw .c { height: 48px; }
+  .sw .l { padding: 8px 10px; }
+  .sw .l .n { font-family: var(--font-head); font-size: 13px; font-weight: 600; }
+  .sw .l .h { font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); margin-top: 2px; }
+
+  @media (max-width: 1020px) {
+    .wrap { grid-template-columns: 1fr; }
+    .dhead { grid-template-columns: 150px 1fr; }
+    .navsearch, .mainnav a s { display: none; }
+  }
+  @media (max-width: 760px) {
+    .stage { padding: 22px 12px 44px; }
+    .phone { width: 100%; border: none; padding: 0; box-shadow: none; }
+    .vp { height: 700px; border-radius: 12px; border: 1px solid var(--line-2); }
+    .notch { display: none; }
+    .chrome { display: none; }
+    .dhead { grid-template-columns: 1fr; }
+  }
+</style>
+
+<!-- ══════════ BÌA TRUYỆN DỰNG BẰNG SVG (dùng lại qua <use>) ══════════ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- A · nhân vật trên vách núi + trăng lớn -->
+    <symbol id="cvA" viewBox="0 0 190 247">
+      <rect width="190" height="247" fill="var(--k1)"/>
+      <circle cx="132" cy="72" r="46" fill="var(--k2)" opacity=".92"/>
+      <circle cx="132" cy="72" r="46" fill="none" stroke="#fff" stroke-opacity=".25"/>
+      <path d="M0 247V150l38-26 34 20 44-32 40 26 34-18v127z" fill="#000" opacity=".55"/>
+      <path d="M0 247v-58l46-30 40 26 52-34 52 32v64z" fill="#000" opacity=".8"/>
+      <g fill="#000">
+        <ellipse cx="95" cy="150" rx="7" ry="9"/>
+        <path d="M88 158h14l5 30h-8l-2-16-2 16h-8z"/>
+        <path d="M102 160l22-16 3 5-23 17z"/>
+      </g>
+      <path d="M124 140l14-12" stroke="#fff" stroke-width="3" stroke-opacity=".85"/>
+    </symbol>
+
+    <!-- B · tia tốc độ + bóng người vung kiếm -->
+    <symbol id="cvB" viewBox="0 0 190 247">
+      <rect width="190" height="247" fill="var(--k1)"/>
+      <g stroke="var(--k2)" stroke-width="12" opacity=".8">
+        <path d="M95 118L-40 20M95 118L30-60M95 118L150-60M95 118L280 30M95 118L250 220M95 118L-40 210M95 118L95 300"/>
+      </g>
+      <circle cx="95" cy="118" r="40" fill="var(--k1)"/>
+      <circle cx="95" cy="118" r="40" fill="var(--k2)" opacity=".35"/>
+      <g fill="#000">
+        <ellipse cx="95" cy="104" rx="11" ry="13"/>
+        <path d="M84 118h22l7 46H77z"/>
+        <path d="M106 122l30-40 6 5-30 42z"/>
+        <path d="M78 124L52 96l-6 5 26 30z"/>
+      </g>
+      <path d="M136 84l26-36" stroke="#fff" stroke-width="5"/>
+      <rect width="190" height="247" fill="url(#dots)"/>
+    </symbol>
+
+    <!-- C · cận mặt kịch tính -->
+    <symbol id="cvC" viewBox="0 0 190 247">
+      <rect width="190" height="247" fill="var(--k1)"/>
+      <path d="M0 247c0-90 42-150 95-150s95 60 95 150z" fill="var(--k2)"/>
+      <path d="M30 247c0-72 29-118 65-118s65 46 65 118z" fill="#F0E2D2"/>
+      <path d="M28 132c8-46 34-70 67-70s59 24 67 70c-14-22-38-32-67-32s-53 10-67 32z" fill="#000" opacity=".9"/>
+      <g fill="#000">
+        <ellipse cx="72" cy="152" rx="11" ry="7"/>
+        <ellipse cx="118" cy="152" rx="11" ry="7"/>
+      </g>
+      <circle cx="75" cy="150" r="3" fill="#fff"/>
+      <circle cx="121" cy="150" r="3" fill="#fff"/>
+      <path d="M84 186h22" stroke="#000" stroke-width="3"/>
+      <path d="M0 0h190v56L0 30z" fill="#000" opacity=".35"/>
+      <rect width="190" height="247" fill="url(#dots)"/>
+    </symbol>
+
+    <!-- D · rồng/thú trong mây -->
+    <symbol id="cvD" viewBox="0 0 190 247">
+      <rect width="190" height="247" fill="var(--k1)"/>
+      <g fill="var(--k2)" opacity=".55">
+        <ellipse cx="40" cy="60" rx="52" ry="22"/>
+        <ellipse cx="150" cy="104" rx="58" ry="24"/>
+        <ellipse cx="60" cy="188" rx="64" ry="26"/>
+      </g>
+      <path d="M14 214c40 6 58-24 44-52-13-26 4-52 34-56 30-4 52 14 56 40" fill="none" stroke="#000" stroke-width="17" stroke-opacity=".85" stroke-linecap="round"/>
+      <path d="M148 146l22-16 6 12-20 16z" fill="#000" opacity=".85"/>
+      <circle cx="158" cy="140" r="4" fill="var(--k2)"/>
+      <g stroke="#000" stroke-width="6" stroke-opacity=".8">
+        <path d="M60 176l-20 16M84 130l-22 10M120 106l-14-20"/>
+      </g>
+      <rect width="190" height="247" fill="url(#dots)"/>
+    </symbol>
+
+    <!-- E · hai bóng người đối lưng -->
+    <symbol id="cvE" viewBox="0 0 190 247">
+      <rect width="190" height="247" fill="var(--k1)"/>
+      <path d="M0 0h95v247H0z" fill="var(--k2)" opacity=".5"/>
+      <g fill="#000" opacity=".9">
+        <ellipse cx="56" cy="96" rx="15" ry="18"/>
+        <path d="M38 118h36l9 129H29z"/>
+        <ellipse cx="134" cy="112" rx="14" ry="17"/>
+        <path d="M118 132h32l8 115h-48z"/>
+      </g>
+      <path d="M95 0v247" stroke="#fff" stroke-width="2" stroke-opacity=".5"/>
+      <path d="M150 150l26-40" stroke="var(--k2)" stroke-width="5"/>
+      <rect width="190" height="247" fill="url(#dots)"/>
+    </symbol>
+
+    <!-- F · thành phố + người đứng -->
+    <symbol id="cvF" viewBox="0 0 190 247">
+      <rect width="190" height="247" fill="var(--k1)"/>
+      <circle cx="52" cy="52" r="26" fill="var(--k2)"/>
+      <g fill="#000" opacity=".72">
+        <rect x="0" y="112" width="26" height="135"/>
+        <rect x="30" y="88" width="30" height="159"/>
+        <rect x="64" y="126" width="24" height="121"/>
+        <rect x="92" y="70" width="32" height="177"/>
+        <rect x="128" y="108" width="26" height="139"/>
+        <rect x="158" y="82" width="32" height="165"/>
+      </g>
+      <g fill="var(--k2)" opacity=".85">
+        <rect x="36" y="100" width="6" height="8"/><rect x="48" y="118" width="6" height="8"/>
+        <rect x="100" y="86" width="6" height="8"/><rect x="112" y="110" width="6" height="8"/>
+        <rect x="166" y="96" width="6" height="8"/><rect x="136" y="126" width="6" height="8"/>
+      </g>
+      <g fill="#000">
+        <ellipse cx="95" cy="196" rx="13" ry="15"/>
+        <path d="M79 214h32l5 33H74z"/>
+      </g>
+      <rect width="190" height="247" fill="url(#dots)"/>
+    </symbol>
+
+    <pattern id="dots" width="4" height="4" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r=".7" fill="#000" opacity=".22"/>
+    </pattern>
+
+    <!-- ══ TRANG TRUYỆN CHO TRÌNH ĐỌC ══ -->
+    <symbol id="pg1" viewBox="0 0 760 940">
+      <rect width="760" height="940" fill="#111"/>
+      <!-- khung lớn trên -->
+      <g>
+        <rect x="8" y="8" width="744" height="430" fill="#2A3450"/>
+        <circle cx="560" cy="130" r="78" fill="#7C9BD4" opacity=".85"/>
+        <path d="M8 438V300l150-70 130 56 170-92 150 74 144-50v220z" fill="#0C1220" opacity=".9"/>
+        <g fill="#05070C">
+          <ellipse cx="300" cy="300" rx="26" ry="32"/>
+          <path d="M272 340h56l18 98h-92z"/>
+          <path d="M330 344l86-58 10 16-88 62z"/>
+        </g>
+        <g fill="#fff" opacity=".9">
+          <path d="M60 60h330a18 18 0 0 1 18 18v56a18 18 0 0 1-18 18H128l-30 26 4-26H60a18 18 0 0 1-18-18V78a18 18 0 0 1 18-18z"/>
+        </g>
+        <text x="72" y="102" font-family="Segoe UI, sans-serif" font-size="26" font-weight="700" fill="#11121A">Ngươi thật sự định</text>
+        <text x="72" y="134" font-family="Segoe UI, sans-serif" font-size="26" font-weight="700" fill="#11121A">nghịch thiên?</text>
+      </g>
+      <!-- hai khung dưới -->
+      <g>
+        <rect x="8" y="446" width="366" height="486" fill="#42281E"/>
+        <circle cx="191" cy="620" r="112" fill="#C98757" opacity=".7"/>
+        <g fill="#120906">
+          <ellipse cx="191" cy="600" rx="52" ry="62"/>
+          <path d="M139 668h104l30 264H109z"/>
+        </g>
+        <rect x="382" y="446" width="370" height="486" fill="#16302C"/>
+        <g stroke="#63A497" stroke-width="9" opacity=".8">
+          <path d="M382 520h370M382 580h370M382 640h370M382 700h370"/>
+        </g>
+        <g fill="#05100D">
+          <ellipse cx="567" cy="700" rx="46" ry="54"/>
+          <path d="M521 760h92l26 172h-144z"/>
+        </g>
+      </g>
+      <rect width="760" height="940" fill="url(#dots)"/>
+    </symbol>
+
+    <symbol id="pg2" viewBox="0 0 760 1060">
+      <rect width="760" height="1060" fill="#111"/>
+      <g>
+        <rect x="8" y="8" width="744" height="620" fill="#2E2140"/>
+        <g stroke="#B58AD6" stroke-width="16" opacity=".65">
+          <path d="M380 300L20 60M380 300L200-40M380 300L620-40M380 300L900 90M380 300L860 560M380 300L-60 520"/>
+        </g>
+        <circle cx="380" cy="300" r="150" fill="#2E2140"/>
+        <circle cx="380" cy="300" r="150" fill="#B58AD6" opacity=".28"/>
+        <g fill="#0B0714">
+          <ellipse cx="380" cy="264" rx="42" ry="50"/>
+          <path d="M338 316h84l26 176H312z"/>
+          <path d="M422 330l112-140 20 16-114 148z"/>
+        </g>
+        <path d="M534 190l96-124" stroke="#fff" stroke-width="14"/>
+        <g fill="#fff" opacity=".92">
+          <path d="M330 470h370a18 18 0 0 1 18 18v58a18 18 0 0 1-18 18H540l-34 28 5-28H330a18 18 0 0 1-18-18v-58a18 18 0 0 1 18-18z"/>
+        </g>
+        <text x="346" y="514" font-family="Segoe UI, sans-serif" font-size="26" font-weight="700" fill="#11121A">Ta chỉ đi con đường</text>
+        <text x="346" y="546" font-family="Segoe UI, sans-serif" font-size="26" font-weight="700" fill="#11121A">của mình.</text>
+      </g>
+      <g>
+        <rect x="8" y="636" width="744" height="416" fill="#3E2318"/>
+        <g fill="#E0764B" opacity=".55">
+          <ellipse cx="200" cy="800" rx="230" ry="90"/>
+          <ellipse cx="600" cy="880" rx="200" ry="80"/>
+        </g>
+        <g fill="#150803">
+          <ellipse cx="380" cy="806" rx="40" ry="48"/>
+          <path d="M340 856h80l30 196H310z"/>
+        </g>
+      </g>
+      <rect width="760" height="1060" fill="url(#dots)"/>
+    </symbol>
+
+    <symbol id="pg3" viewBox="0 0 760 620">
+      <rect width="760" height="620" fill="#111"/>
+      <rect x="8" y="8" width="744" height="604" fill="#0E1620"/>
+      <circle cx="380" cy="250" r="160" fill="#3A6A85" opacity=".5"/>
+      <path d="M8 612V420l160-90 130 70 190-110 160 90 104-50v282z" fill="#04070C" opacity=".92"/>
+      <g fill="#04070C">
+        <ellipse cx="380" cy="360" rx="30" ry="36"/>
+        <path d="M348 404h64l22 208h-108z"/>
+      </g>
+      <g stroke="#7FB4CC" stroke-width="4" opacity=".5">
+        <path d="M120 120l60 60M640 100l-60 60M380 60v60"/>
+      </g>
+      <rect width="760" height="620" fill="url(#dots)"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="stage">
+
+  <header class="masthead">
+    <div class="eyebrow">Tài liệu thiết kế · 11.08.2026 · Giai đoạn 1 — Truyện tranh</div>
+    <h1>Giao diện web đọc truyện tranh<br><em>bố cục kiểu TruyenQQ, bỏ quảng cáo</em></h1>
+    <p>Dựng theo đúng cấu trúc trang bạn gửi: lưới bìa dày, nhãn thời gian trên bìa, cờ "Hot",
+      số chương mới nhất dưới mỗi bìa, thanh thể loại, sidebar xếp hạng. Khác ở chỗ:
+      không banner quảng cáo, không popup, không link cá cược ở chân trang.</p>
+  </header>
+
+  <div class="rule"></div>
+
+  <div class="switchbar">
+    <div class="switchgrp">
+      <div class="eyebrow">Thiết bị</div>
+      <div class="tabs" role="tablist" aria-label="Thiết bị">
+        <button class="tab vt" role="tab" aria-selected="true" aria-controls="v-desk">Máy tính</button>
+        <button class="tab vt" role="tab" aria-selected="false" aria-controls="v-phone">iPhone</button>
+      </div>
+    </div>
+    <div class="switchgrp">
+      <div class="eyebrow">Màn hình</div>
+      <div class="tabs" role="tablist" aria-label="Màn hình">
+        <button class="tab st" role="tab" aria-selected="true" data-sc="home">Trang chủ <span>01</span></button>
+        <button class="tab st" role="tab" aria-selected="false" data-sc="det">Chi tiết truyện <span>02</span></button>
+        <button class="tab st" role="tab" aria-selected="false" data-sc="read">Đọc truyện <span>03</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ MÁY TÍNH ═══════════ -->
+  <div class="view on" id="v-desk">
+    <div class="browser">
+      <div class="chrome">
+        <div class="dots"><i></i><i></i><i></i></div>
+        <div class="urlbar"><b>🔒</b> ketruyen.<s>tenmiencuaban.com</s></div>
+      </div>
+
+      <div class="site">
+        <!-- header -->
+        <div class="topnav">
+          <div class="topnav-in">
+            <div class="logo">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h12a1 1 0 0 1 1 1v19l-7-4.4L5 22V3a1 1 0 0 1 1-1z"/></svg>
+              Kệ Truyện
+            </div>
+            <nav class="mainnav">
+              <a href="#" class="sel">Trang chủ</a>
+              <a href="#">Thể loại <s>▾</s></a>
+              <a href="#">Xếp hạng <s>▾</s></a>
+              <a href="#">Đang theo dõi</a>
+              <a href="#">Lịch sử</a>
+            </nav>
+            <div class="navsearch">⌕ Tìm trong 26.615 bộ…</div>
+            <div class="who"><span class="nm">Naomi</span><span class="av">N</span></div>
+          </div>
+        </div>
+
+        <!-- genre chips -->
+        <div class="chipbar">
+          <div class="chipbar-in">
+            <div class="chips">
+              <button class="gchip sel" type="button">Tất cả</button>
+              <button class="gchip" type="button">Manhwa</button><button class="gchip" type="button">Manhua</button>
+              <button class="gchip" type="button">Manga</button><button class="gchip" type="button">Webtoon</button>
+              <button class="gchip" type="button">Action</button><button class="gchip" type="button">Adventure</button>
+              <button class="gchip" type="button">Comedy</button><button class="gchip" type="button">Drama</button>
+              <button class="gchip" type="button">Fantasy</button><button class="gchip" type="button">Romance</button>
+              <button class="gchip" type="button">Ngôn Tình</button><button class="gchip" type="button">Xuyên Không</button>
+              <button class="gchip" type="button">Chuyển Sinh</button><button class="gchip" type="button">Cổ Đại</button>
+              <button class="gchip" type="button">Truyện Màu</button><button class="gchip" type="button">Martial Arts</button>
+              <button class="gchip" type="button">Harem</button><button class="gchip" type="button">Supernatural</button>
+              <button class="gchip" type="button">School Life</button><button class="gchip" type="button">Shounen</button>
+              <button class="gchip" type="button">Shoujo</button><button class="gchip" type="button">Seinen</button>
+              <button class="gchip" type="button">Josei</button><button class="gchip" type="button">Historical</button>
+              <button class="gchip" type="button">Horror</button><button class="gchip" type="button">Mystery</button>
+              <button class="gchip" type="button">Psychological</button><button class="gchip" type="button">Sci-fi</button>
+              <button class="gchip" type="button">Mecha</button><button class="gchip" type="button">Sports</button>
+              <button class="gchip" type="button">Slice of Life</button><button class="gchip" type="button">Tragedy</button>
+              <button class="gchip" type="button">Trinh Thám</button><button class="gchip" type="button">Cooking</button>
+              <button class="gchip" type="button">Đam Mỹ</button><button class="gchip" type="button">Gender Bender</button>
+              <button class="gchip" type="button">Anime</button><button class="gchip" type="button">Comic</button>
+              <button class="gchip" type="button">Doujinshi</button><button class="gchip" type="button">Ecchi</button>
+              <button class="gchip" type="button">Live action</button><button class="gchip" type="button">Mature</button>
+              <button class="gchip" type="button">One shot</button><button class="gchip" type="button">Shoujo Ai</button>
+              <button class="gchip" type="button">Shounen Ai</button><button class="gchip" type="button">Soft Yaoi</button>
+              <button class="gchip" type="button">Soft Yuri</button><button class="gchip" type="button">Smut</button>
+              <button class="gchip" type="button">Thiếu Nhi</button><button class="gchip" type="button">Truyện scan</button>
+              <button class="gchip" type="button">Tạp chí truyện tranh</button><button class="gchip" type="button">Việt Nam</button>
+              <button class="gchip" type="button">Adult</button><button class="gchip" type="button">16+</button>
+            </div>
+            <button class="morechip" type="button" data-more>Xem tất cả ▾</button>
+          </div>
+        </div>
+
+        <!-- 01 · TRANG CHỦ -->
+        <div class="screen on" data-sc="home">
+          <div class="notice">
+            <b>✓</b> Không quảng cáo, không popup, không chuyển hướng — web riêng của bạn.
+            Cập nhật lần cuối 21:14 hôm nay.
+          </div>
+
+          <div class="wrap">
+            <div class="col-main">
+              <div class="box">
+                <div class="boxhead">
+                  <h2><i>✦</i> Truyện mới cập nhật</h2>
+                  <div class="sp"></div>
+                  <div class="sorttabs">
+                    <button type="button" aria-pressed="true">Mới nhất</button>
+                    <button type="button" aria-pressed="false">Xem nhiều</button>
+                    <button type="button" aria-pressed="false">Theo dõi</button>
+                  </div>
+                </div>
+
+                <div class="cgrid">
+                  <!-- 1 -->
+                  <div class="cc">
+                    <div class="thumb">
+                      <svg style="--k1:#2B3A5C; --k2:#E8A33C"><use href="#cvA"/></svg>
+                      <span class="when">6 giờ</span><span class="hotflag">Hot</span>
+                      <span class="newflag">Chương <b>473</b></span>
+                    </div>
+                    <div class="tt">Ta Trời Sinh Đã Là Nhân Vật Phản Diện</div>
+                    <div class="row"><span class="ch">Chương 473</span>
+                      <span class="stat"><span>◉ 72k</span><span>♥ 735</span></span></div>
+                  </div>
+                  <!-- 2 -->
+                  <div class="cc">
+                    <div class="thumb">
+                      <svg style="--k1:#4A2340; --k2:#F0A03C"><use href="#cvB"/></svg>
+                      <span class="when">11 giờ</span><span class="hotflag">Hot</span>
+                      <span class="newflag">Chương <b>545</b></span>
+                    </div>
+                    <div class="tt">Đồ Đệ Của Ta Đều Là Đại Phản Phái</div>
+                    <div class="row"><span class="ch">Chương 545</span>
+                      <span class="stat"><span>◉ 61k</span><span>♥ 612</span></span></div>
+                  </div>
+                  <!-- 3 -->
+                  <div class="cc">
+                    <div class="thumb">
+                      <svg style="--k1:#1F4A42; --k2:#E8C24A"><use href="#cvD"/></svg>
+                      <span class="when">1 ngày</span><span class="hotflag">Hot</span>
+                      <span class="newflag">Chương <b>544</b></span>
+                    </div>
+                    <div class="tt">Vạn Cổ Tối Cường Tông</div>
+                    <div class="row"><span class="ch">Chương 544</span>
+                      <span class="stat"><span>◉ 55k</span><span>♥ 480</span></span></div>
+                  </div>
+                  <!-- 4 -->
+                  <div class="cc">
+                    <div class="thumb">
+                      <svg style="--k1:#2E2A4F; --k2:#C9A0F0"><use href="#cvC"/></svg>
+                      <span class="when">2 ngày</span><span class="hotflag">Hot</span>
+                      <span class="newflag">Chương <b>694</b></span>
+                    </div>
+                    <div class="tt">Yêu Thần Ký</div>
+                    <div class="row"><span class="ch">Chương 694</span>
+                      <span class="stat"><span>◉ 98k</span><span>♥ 1.2k</span></span></div>
+                  </div>
+                  <!-- 5 -->
+                  <div class="cc">
+                    <div class="thumb">
+                      <svg style="--k1:#123A4A; --k2:#7ED0C4"><use href="#cvE"/></svg>
+                      <span class="when">2 ngày</span><span class="hotflag">Hot</span>
+                      <span class="newflag">Chương <b>893</b></span>
+                    </div>
+                    <div class="tt">Đại Quản Gia Là Ma Hoàng</div>
+                    <div class="row"><span class="ch">Chương 893</span>
+                      <span class="stat"><span>◉ 44k</span><span>♥ 390</span></span></div>
+                  </div>
+                  <!-- 6 -->
+                  <div class="cc">
+                    <div class="thumb">
+                      <svg style="--k1:#3A4A1C; --k2:#D8E86A"><use href="#cvF"/></svg>
+                      <span class="when">2 ngày</span>
+                      <span class="newflag">Chương <b>94</b></span>
+                    </div>
+                    <div class="tt">Hoạn Quan Hồi Quy: Tróc Phong Truy Nguyệt</div>
+                    <div class="row"><span class="ch">Chương 94</span>
+                      <span class="stat"><span>◉ 12k</span><span>♥ 88</span></span></div>
+                  </div>
+                  <!-- 7 -->
+                  <div class="cc">
+                    <div class="thumb">
+                      <svg style="--k1:#5A2222; --k2:#EFD9A0"><use href="#cvB"/></svg>
+                      <span class="when">3 ngày</span><span class="hotflag">Hot</span>
+                      <span class="newflag">Chương <b>157</b></span>
+                    </div>
+                    <div class="tt">Vùng Đất Ma Pháp</div>
+                    <div class="row"><span class="ch">Chương 157</span>
+                      <span class="stat"><span>◉ 30k</span><span>♥ 205</span></span></div>
+                  </div>
+                  <!-- 8 -->
+                  <div class="cc">
+                    <div class="thumb">
+                      <svg style="--k1:#1E3348; --k2:#8FD0E8"><use href="#cvF"/></svg>
+                      <span class="when">3 ngày</span><span class="hotflag">Hot</span>
+                      <span class="newflag">Chương <b>265</b></span>
+                    </div>
+                    <div class="tt">Người Chơi Mới Cấp Tối Đa</div>
+                    <div class="row"><span class="ch">Chương 265</span>
+                      <span class="stat"><span>◉ 51k</span><span>♥ 470</span></span></div>
+                  </div>
+                  <!-- 9 -->
+                  <div class="cc">
+                    <div class="thumb">
+                      <svg style="--k1:#4A3418; --k2:#F2C230"><use href="#cvA"/></svg>
+                      <span class="when">4 ngày</span><span class="hotflag">Hot</span>
+                      <span class="newflag">Chương <b>987</b></span>
+                    </div>
+                    <div class="tt">Tinh Võ Thần Quyết</div>
+                    <div class="row"><span class="ch">Chương 987</span>
+                      <span class="stat"><span>◉ 66k</span><span>♥ 540</span></span></div>
+                  </div>
+                  <!-- 10 -->
+                  <div class="cc">
+                    <div class="thumb">
+                      <svg style="--k1:#3D2438; --k2:#E77FB0"><use href="#cvC"/></svg>
+                      <span class="when">4 ngày</span>
+                      <span class="newflag">Chương <b>324</b></span>
+                    </div>
+                    <div class="tt">Ngã Lão Ma Thần</div>
+                    <div class="row"><span class="ch">Chương 324</span>
+                      <span class="stat"><span>◉ 22k</span><span>♥ 160</span></span></div>
+                  </div>
+                  <!-- 11 -->
+                  <div class="cc">
+                    <div class="thumb">
+                      <svg style="--k1:#1C3B2A; --k2:#8FD46A"><use href="#cvE"/></svg>
+                      <span class="when">5 ngày</span><span class="hotflag">Hot</span>
+                      <span class="newflag">Chương <b>118</b></span>
+                    </div>
+                    <div class="tt">Hướng Dẫn Sinh Tồn Trong Học Viện</div>
+                    <div class="row"><span class="ch">Chương 118</span>
+                      <span class="stat"><span>◉ 40k</span><span>♥ 310</span></span></div>
+                  </div>
+                  <!-- 12 -->
+                  <div class="cc">
+                    <div class="thumb">
+                      <svg style="--k1:#2A2438; --k2:#9FB0F0"><use href="#cvD"/></svg>
+                      <span class="when">5 ngày</span><span class="hotflag">Hot</span>
+                      <span class="newflag">Chương <b>563</b></span>
+                    </div>
+                    <div class="tt">Thiên Ma 3077</div>
+                    <div class="row"><span class="ch">Chương 563</span>
+                      <span class="stat"><span>◉ 35k</span><span>♥ 288</span></span></div>
+                  </div>
+                </div>
+
+                <div class="pager">
+                  <button type="button">‹</button>
+                  <button class="sel" type="button">1</button>
+                  <button type="button">2</button>
+                  <button type="button">3</button>
+                  <button type="button">4</button>
+                  <button type="button">5</button>
+                  <button type="button">…</button>
+                  <button type="button">1109</button>
+                  <button type="button">›</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- sidebar -->
+            <aside class="col-side">
+              <button class="side-btn" type="button">Kiểm tra chương mới <s>~10s</s></button>
+
+              <div class="box">
+                <div class="boxhead"><h2>Đang đọc</h2><div class="sp"></div><span class="cnt">3</span></div>
+                <div class="ranklist">
+                  <div class="rk">
+                    <span class="no">▸</span>
+                    <span class="mini"><svg style="--k1:#2B3A5C; --k2:#E8A33C"><use href="#cvA"/></svg></span>
+                    <span class="info"><span class="a">Ta Trời Sinh Đã Là Nhân Vật Phản Diện</span>
+                      <span class="b">c.466 · trang 12/33</span></span>
+                  </div>
+                  <div class="rk">
+                    <span class="no">▸</span>
+                    <span class="mini"><svg style="--k1:#4A2340; --k2:#F0A03C"><use href="#cvB"/></svg></span>
+                    <span class="info"><span class="a">Đồ Đệ Của Ta Đều Là Đại Phản Phái</span>
+                      <span class="b">c.540 · trang 4/28</span></span>
+                  </div>
+                  <div class="rk">
+                    <span class="no">▸</span>
+                    <span class="mini"><svg style="--k1:#2E2A4F; --k2:#C9A0F0"><use href="#cvC"/></svg></span>
+                    <span class="info"><span class="a">Yêu Thần Ký</span>
+                      <span class="b">c.694 · hết chương</span></span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="box">
+                <div class="boxhead"><h2>Xếp hạng tuần</h2><div class="sp"></div><span class="cnt">top 5</span></div>
+                <div class="ranklist">
+                  <div class="rk"><span class="no">1</span>
+                    <span class="mini"><svg style="--k1:#2E2A4F; --k2:#C9A0F0"><use href="#cvC"/></svg></span>
+                    <span class="info"><span class="a">Yêu Thần Ký</span><span class="b">98.402 lượt xem</span></span></div>
+                  <div class="rk"><span class="no">2</span>
+                    <span class="mini"><svg style="--k1:#2B3A5C; --k2:#E8A33C"><use href="#cvA"/></svg></span>
+                    <span class="info"><span class="a">Ta Trời Sinh Đã Là Nhân Vật Phản Diện</span><span class="b">72.819 lượt xem</span></span></div>
+                  <div class="rk"><span class="no">3</span>
+                    <span class="mini"><svg style="--k1:#4A3418; --k2:#F2C230"><use href="#cvA"/></svg></span>
+                    <span class="info"><span class="a">Tinh Võ Thần Quyết</span><span class="b">66.140 lượt xem</span></span></div>
+                  <div class="rk"><span class="no">4</span>
+                    <span class="mini"><svg style="--k1:#4A2340; --k2:#F0A03C"><use href="#cvB"/></svg></span>
+                    <span class="info"><span class="a">Đồ Đệ Của Ta Đều Là Đại Phản Phái</span><span class="b">61.008 lượt xem</span></span></div>
+                  <div class="rk"><span class="no">5</span>
+                    <span class="mini"><svg style="--k1:#1F4A42; --k2:#E8C24A"><use href="#cvD"/></svg></span>
+                    <span class="info"><span class="a">Vạn Cổ Tối Cường Tông</span><span class="b">55.371 lượt xem</span></span></div>
+                </div>
+              </div>
+
+              <div class="box">
+                <div class="boxhead"><h2>Tình trạng</h2></div>
+                <div class="sysbox">
+                  Nguồn dữ liệu: <b>bình thường</b><hr>
+                  Kiểm tra lúc 21:14<br>
+                  42 bộ theo dõi · 23 chương chưa đọc<br>
+                  Cache ảnh 0,8 / 2 GB
+                </div>
+              </div>
+            </aside>
+          </div>
+
+          <div class="foot">
+            <b>Kệ Truyện</b> — web đọc truyện riêng, chỉ dành cho người có mật khẩu.<br>
+            Nội dung lấy từ API nguồn, không lưu trữ và không phát hành lại.
+          </div>
+        </div>
+
+        <!-- 02 · CHI TIẾT -->
+        <div class="screen" data-sc="det">
+          <div class="wrap">
+            <div class="col-main">
+              <div class="box">
+                <div class="dhead">
+                  <div class="big"><svg style="--k1:#2B3A5C; --k2:#E8A33C"><use href="#cvA"/></svg></div>
+                  <div>
+                    <h1 class="dtitle">Ta Trời Sinh Đã Là Nhân Vật Phản Diện</h1>
+                    <div class="dalt">I Was Born as the Villain · 我天生就是反派</div>
+                    <div class="dmeta">
+                      <div class="r"><span>Tình trạng</span><b class="ok">Đang ra</b></div>
+                      <div class="r"><span>Cập nhật</span><b>6 giờ trước</b></div>
+                      <div class="r"><span>Thể loại</span>
+                        <span class="tagrow">
+                          <span class="tag">Manhua</span><span class="tag">Tiên hiệp</span>
+                          <span class="tag">Action</span><span class="tag">Truyện màu</span>
+                        </span>
+                      </div>
+                    </div>
+                    <div class="numrow">
+                      <div><b>473</b><span>Chương</span></div>
+                      <div class="hot"><b>7</b><span>Chưa đọc</span></div>
+                      <div><b>72.819</b><span>Lượt xem</span></div>
+                    </div>
+                    <div class="dbtns">
+                      <button class="btn" type="button">Đọc tiếp <s>c.466 · tr.12</s></button>
+                      <button class="ghost on" type="button">✓ Đang theo dõi</button>
+                      <button class="ghost" type="button">Đánh dấu đã đọc hết</button>
+                    </div>
+                  </div>
+                </div>
+                <p class="synop">Vương Lâm là một thiếu niên bình thường trong gia tộc suy tàn,
+                  bị coi là kẻ không có thiên phú tu luyện. Nhưng chính sự bình thường ấy lại che giấu
+                  một ý chí không gì bẻ gãy được — nghịch thiên mà tu, đi con đường không ai dám đi.</p>
+              </div>
+
+              <div class="box">
+                <div class="boxhead">
+                  <h2>Danh sách chương</h2><div class="sp"></div>
+                  <span class="cnt">473 chương · mới nhất 6 giờ trước</span>
+                </div>
+                <div class="chwrap">
+                  <div class="chgrid">
+                    <div class="chi fresh"><span class="n">Chương 473</span><span class="d">6 giờ</span></div>
+                    <div class="chi fresh"><span class="n">Chương 472</span><span class="d">hôm qua</span></div>
+                    <div class="chi fresh"><span class="n">Chương 471</span><span class="d">2 ngày</span></div>
+                    <div class="chi fresh"><span class="n">Chương 470</span><span class="d">4 ngày</span></div>
+                    <div class="chi fresh"><span class="n">Chương 469</span><span class="d">6 ngày</span></div>
+                    <div class="chi fresh"><span class="n">Chương 468</span><span class="d">1 tuần</span></div>
+                    <div class="chi fresh"><span class="n">Chương 467</span><span class="d">2 tuần</span></div>
+                    <div class="chi here"><span class="n">Chương 466</span><span class="d">đang đọc · tr.12</span></div>
+                    <div class="chi done"><span class="tick">✓</span><span class="n">Chương 465</span><span class="d">·</span></div>
+                    <div class="chi done"><span class="tick">✓</span><span class="n">Chương 464</span><span class="d">·</span></div>
+                    <div class="chi done"><span class="tick">✓</span><span class="n">Chương 463</span><span class="d">·</span></div>
+                    <div class="chi done"><span class="tick">✓</span><span class="n">Chương 462</span><span class="d">·</span></div>
+                    <div class="chi done"><span class="tick">✓</span><span class="n">Chương 461</span><span class="d">·</span></div>
+                    <div class="chi done"><span class="tick">✓</span><span class="n">Chương 460</span><span class="d">·</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <aside class="col-side">
+              <button class="side-btn" type="button">Kiểm tra chương mới <s>~10s</s></button>
+              <div class="box">
+                <div class="boxhead"><h2>Cùng thể loại</h2></div>
+                <div class="ranklist">
+                  <div class="rk"><span class="no">·</span>
+                    <span class="mini"><svg style="--k1:#4A3418; --k2:#F2C230"><use href="#cvA"/></svg></span>
+                    <span class="info"><span class="a">Tinh Võ Thần Quyết</span><span class="b">987 chương</span></span></div>
+                  <div class="rk"><span class="no">·</span>
+                    <span class="mini"><svg style="--k1:#1F4A42; --k2:#E8C24A"><use href="#cvD"/></svg></span>
+                    <span class="info"><span class="a">Vạn Cổ Tối Cường Tông</span><span class="b">544 chương</span></span></div>
+                  <div class="rk"><span class="no">·</span>
+                    <span class="mini"><svg style="--k1:#5A2222; --k2:#EFD9A0"><use href="#cvB"/></svg></span>
+                    <span class="info"><span class="a">Vùng Đất Ma Pháp</span><span class="b">157 chương</span></span></div>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+
+        <!-- 03 · ĐỌC TRUYỆN -->
+        <div class="screen" data-sc="read">
+          <div class="rd">
+            <div class="rdbar">
+              <button class="bk" type="button" aria-label="Quay lại">‹</button>
+              <div class="ti">
+                <div class="a">Ta Trời Sinh Đã Là Nhân Vật Phản Diện</div>
+                <div class="b">Chương 466 · 33 trang</div>
+              </div>
+              <div class="sp"></div>
+
+              <div class="pop">
+                <div class="pick">Chương 466 <s>▾</s></div>
+                <div class="popmenu chmenu">
+                  <div class="hd">Nhảy tới chương · 473 chương</div>
+                  <div class="scr">
+                    <div class="it nw">Chương 473 <span class="t">6 giờ</span></div>
+                    <div class="it nw">Chương 472 <span class="t">hôm qua</span></div>
+                    <div class="it nw">Chương 471 <span class="t">2 ngày</span></div>
+                    <div class="it nw">Chương 470 <span class="t">4 ngày</span></div>
+                    <div class="it nw">Chương 469 <span class="t">6 ngày</span></div>
+                    <div class="it nw">Chương 468 <span class="t">1 tuần</span></div>
+                    <div class="it nw">Chương 467 <span class="t">2 tuần</span></div>
+                    <div class="it cur">Chương 466 <span class="t">trang 12/33</span></div>
+                    <div class="it rd">Chương 465 <span class="t">đã đọc</span></div>
+                    <div class="it rd">Chương 464 <span class="t">đã đọc</span></div>
+                    <div class="it rd">Chương 463 <span class="t">đã đọc</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="rnav">
+                <button type="button">← Chương trước</button>
+                <button class="pri" type="button">Chương sau →</button>
+              </div>
+
+              <div class="pop">
+                <div class="pick">Cách đọc <s>▾</s></div>
+                <div class="popmenu setmenu">
+                  <div class="fl">
+                    <span>Chế độ đọc</span>
+                    <div class="seg">
+                      <button type="button" aria-pressed="true">Cuộn dọc</button>
+                      <button type="button" aria-pressed="false">Lật trang</button>
+                    </div>
+                  </div>
+                  <div class="fl">
+                    <span>Khổ ảnh</span>
+                    <div class="seg">
+                      <button type="button" aria-pressed="false">Hẹp</button>
+                      <button type="button" aria-pressed="true">Vừa</button>
+                      <button type="button" aria-pressed="false">Rộng</button>
+                      <button type="button" aria-pressed="false">Gốc</button>
+                    </div>
+                  </div>
+                  <div class="fl">
+                    <span>Nền</span>
+                    <div class="seg">
+                      <button type="button" aria-pressed="true">Mực</button>
+                      <button type="button" aria-pressed="false">Xám</button>
+                      <button type="button" aria-pressed="false">Giấy</button>
+                    </div>
+                  </div>
+                  <div class="sw2">Tự ẩn thanh công cụ khi cuộn
+                    <button class="tgl" type="button" aria-label="Bật/tắt"></button></div>
+                  <div class="sw2">Nạp trước chương sau
+                    <button class="tgl" type="button" aria-label="Bật/tắt"></button></div>
+                  <div class="sw2">Tự sang chương khi hết
+                    <button class="tgl off" type="button" aria-label="Bật/tắt"></button></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="rdstage">
+              <div class="rails">
+                <button type="button" aria-label="Chương trước">‹</button>
+                <button type="button" aria-label="Chương sau">›</button>
+              </div>
+              <div class="rdcol">
+                <div class="mpage"><span class="pn">12 / 33</span>
+                  <svg viewBox="0 0 760 940"><use href="#pg1"/></svg></div>
+                <div class="mpage"><span class="pn">13 / 33</span>
+                  <svg viewBox="0 0 760 1060"><use href="#pg2"/></svg></div>
+                <div class="mpage"><span class="pn">14 / 33</span>
+                  <svg viewBox="0 0 760 620"><use href="#pg3"/></svg></div>
+
+                <div class="endblk">
+                  <div class="lb">Hết chương 466 · còn 7 chương chưa đọc</div>
+                  <div class="bg">
+                    <button class="b1" type="button">Chương 467 →</button>
+                    <button class="b2" type="button">← Chương 465</button>
+                    <button class="b2" type="button">Danh sách chương</button>
+                  </div>
+                  <div class="lb">Đã tự đánh dấu chương 466 là đã đọc</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="rdfoot">
+              <div class="track"><i style="width:36%"></i></div>
+              <div class="row">
+                <div class="p">Trang 12 <s>/ 33</s></div>
+                <div class="p">Chương 466 <s>/ 473</s></div>
+                <div class="keys">
+                  <span><kbd>↓</kbd>cuộn</span>
+                  <span><kbd>←</kbd><kbd>→</kbd>chuyển chương</span>
+                  <span><kbd>F</kbd>toàn màn hình</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ IPHONE ═══════════ -->
+  <div class="view" id="v-phone">
+    <div class="rig">
+      <div class="phone">
+        <div class="vp">
+          <div class="notch"></div>
+
+          <!-- home -->
+          <section class="ps on" data-sc="home">
+            <div class="mbar">
+              <div class="logo">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h12a1 1 0 0 1 1 1v19l-7-4.4L5 22V3a1 1 0 0 1 1-1z"/></svg>
+              Kệ Truyện
+            </div>
+              <div class="sp"></div>
+              <button class="ib" type="button" aria-label="Tìm">⌕</button>
+              <button class="ib" type="button" aria-label="Menu">☰</button>
+            </div>
+            <div class="chipbar"><div class="chipbar-in" style="padding:8px 11px">
+              <div class="chips">
+                <button class="gchip sel" type="button">Tất cả</button>
+                <button class="gchip" type="button">Manhwa</button><button class="gchip" type="button">Manhua</button>
+                <button class="gchip" type="button">Manga</button><button class="gchip" type="button">Action</button>
+                <button class="gchip" type="button">Ngôn Tình</button><button class="gchip" type="button">Xuyên Không</button>
+                <button class="gchip" type="button">Chuyển Sinh</button><button class="gchip" type="button">Romance</button>
+                <button class="gchip" type="button">Fantasy</button><button class="gchip" type="button">Comedy</button>
+                <button class="gchip" type="button">Truyện Màu</button><button class="gchip" type="button">Webtoon</button>
+                <button class="gchip" type="button">Harem</button><button class="gchip" type="button">Horror</button>
+              </div>
+              <button class="morechip" type="button" data-more>Tất cả ▾</button>
+            </div></div>
+            <div class="scroll">
+              <div style="padding:11px 11px 0">
+                <button class="side-btn" type="button">Kiểm tra chương mới <s>~10s</s></button>
+              </div>
+              <div class="boxhead" style="border:0; padding:13px 11px 4px">
+                <h2><i>✦</i> Mới cập nhật</h2><div class="sp"></div><span class="cnt">23 mới</span>
+              </div>
+              <div class="mgrid">
+                <div class="cc"><div class="thumb">
+                  <svg style="--k1:#2B3A5C; --k2:#E8A33C"><use href="#cvA"/></svg>
+                  <span class="when">6 giờ</span><span class="hotflag">Hot</span>
+                  <span class="newflag">C. <b>473</b></span></div>
+                  <div class="tt">Ta Trời Sinh Đã Là Nhân Vật Phản Diện</div>
+                  <div class="row"><span class="ch">Chương 473</span></div></div>
+                <div class="cc"><div class="thumb">
+                  <svg style="--k1:#4A2340; --k2:#F0A03C"><use href="#cvB"/></svg>
+                  <span class="when">11 giờ</span><span class="hotflag">Hot</span>
+                  <span class="newflag">C. <b>545</b></span></div>
+                  <div class="tt">Đồ Đệ Của Ta Đều Là Đại Phản Phái</div>
+                  <div class="row"><span class="ch">Chương 545</span></div></div>
+                <div class="cc"><div class="thumb">
+                  <svg style="--k1:#1F4A42; --k2:#E8C24A"><use href="#cvD"/></svg>
+                  <span class="when">1 ngày</span><span class="hotflag">Hot</span>
+                  <span class="newflag">C. <b>544</b></span></div>
+                  <div class="tt">Vạn Cổ Tối Cường Tông</div>
+                  <div class="row"><span class="ch">Chương 544</span></div></div>
+                <div class="cc"><div class="thumb">
+                  <svg style="--k1:#2E2A4F; --k2:#C9A0F0"><use href="#cvC"/></svg>
+                  <span class="when">2 ngày</span><span class="hotflag">Hot</span>
+                  <span class="newflag">C. <b>694</b></span></div>
+                  <div class="tt">Yêu Thần Ký</div>
+                  <div class="row"><span class="ch">Chương 694</span></div></div>
+                <div class="cc"><div class="thumb">
+                  <svg style="--k1:#123A4A; --k2:#7ED0C4"><use href="#cvE"/></svg>
+                  <span class="when">2 ngày</span>
+                  <span class="newflag">C. <b>893</b></span></div>
+                  <div class="tt">Đại Quản Gia Là Ma Hoàng</div>
+                  <div class="row"><span class="ch">Chương 893</span></div></div>
+                <div class="cc"><div class="thumb">
+                  <svg style="--k1:#3A4A1C; --k2:#D8E86A"><use href="#cvF"/></svg>
+                  <span class="when">2 ngày</span>
+                  <span class="newflag">C. <b>94</b></span></div>
+                  <div class="tt">Hoạn Quan Hồi Quy</div>
+                  <div class="row"><span class="ch">Chương 94</span></div></div>
+                <div class="cc"><div class="thumb">
+                  <svg style="--k1:#5A2222; --k2:#EFD9A0"><use href="#cvB"/></svg>
+                  <span class="when">3 ngày</span><span class="hotflag">Hot</span>
+                  <span class="newflag">C. <b>157</b></span></div>
+                  <div class="tt">Vùng Đất Ma Pháp</div>
+                  <div class="row"><span class="ch">Chương 157</span></div></div>
+                <div class="cc"><div class="thumb">
+                  <svg style="--k1:#1E3348; --k2:#8FD0E8"><use href="#cvF"/></svg>
+                  <span class="when">3 ngày</span><span class="hotflag">Hot</span>
+                  <span class="newflag">C. <b>265</b></span></div>
+                  <div class="tt">Người Chơi Mới Cấp Tối Đa</div>
+                  <div class="row"><span class="ch">Chương 265</span></div></div>
+                <div class="cc"><div class="thumb">
+                  <svg style="--k1:#4A3418; --k2:#F2C230"><use href="#cvA"/></svg>
+                  <span class="when">4 ngày</span><span class="hotflag">Hot</span>
+                  <span class="newflag">C. <b>987</b></span></div>
+                  <div class="tt">Tinh Võ Thần Quyết</div>
+                  <div class="row"><span class="ch">Chương 987</span></div></div>
+              </div>
+            </div>
+            <div class="mtabs">
+              <button class="sel" type="button"><i>▤</i>Trang chủ</button>
+              <button type="button"><i>♥</i>Theo dõi</button>
+              <button type="button"><i>⌕</i>Tìm</button>
+              <button type="button"><i>◷</i>Lịch sử</button>
+            </div>
+          </section>
+
+          <!-- detail -->
+          <section class="ps" data-sc="det">
+            <div class="mbar">
+              <button class="ib" type="button" aria-label="Quay lại">‹</button>
+              <div style="font-family:var(--font-head); font-size:14px; font-weight:600">Chi tiết truyện</div>
+              <div class="sp"></div>
+              <button class="ib" type="button" aria-label="Chia sẻ">⋯</button>
+            </div>
+            <div class="scroll">
+              <div class="dhead" style="grid-template-columns:118px 1fr; padding:13px; gap:13px">
+                <div class="big"><svg style="--k1:#2B3A5C; --k2:#E8A33C"><use href="#cvA"/></svg></div>
+                <div>
+                  <h1 class="dtitle" style="font-size:18px">Ta Trời Sinh Đã Là Nhân Vật Phản Diện</h1>
+                  <div class="dalt" style="font-size:11px; margin-bottom:9px">I Was Born as the Villain</div>
+                  <div class="tagrow" style="margin-bottom:9px">
+                    <span class="tag">Manhua</span><span class="tag">Tiên hiệp</span>
+                  </div>
+                  <div class="numrow" style="gap:14px; margin:0">
+                    <div><b style="font-size:16px">473</b><span>Chương</span></div>
+                    <div class="hot"><b style="font-size:16px">7</b><span>Chưa đọc</span></div>
+                  </div>
+                </div>
+              </div>
+              <div style="padding:0 13px 13px; display:flex; gap:7px">
+                <button class="ghost on" type="button" style="flex:1; padding:9px">✓ Đang theo dõi</button>
+                <button class="ghost" type="button" style="flex:1; padding:9px">Đã đọc hết</button>
+              </div>
+              <p class="synop" style="padding:0 13px 13px; font-size:13px">Vương Lâm là một thiếu niên
+                bình thường trong gia tộc suy tàn, bị coi là kẻ không có thiên phú tu luyện. Nhưng chính
+                sự bình thường ấy lại che giấu một ý chí không gì bẻ gãy được.</p>
+              <div class="boxhead" style="border-top:1px solid var(--line); border-bottom:1px solid var(--line)">
+                <h2 style="font-size:14px">Danh sách chương</h2><div class="sp"></div><span class="cnt">473</span>
+              </div>
+              <div class="chwrap" style="padding:11px">
+                <div class="chgrid" style="grid-template-columns:1fr">
+                  <div class="chi fresh"><span class="n">Chương 473</span><span class="d">6 giờ</span></div>
+                  <div class="chi fresh"><span class="n">Chương 472</span><span class="d">hôm qua</span></div>
+                  <div class="chi fresh"><span class="n">Chương 471</span><span class="d">2 ngày</span></div>
+                  <div class="chi here"><span class="n">Chương 466</span><span class="d">đang đọc · tr.12</span></div>
+                  <div class="chi done"><span class="tick">✓</span><span class="n">Chương 465</span><span class="d">·</span></div>
+                  <div class="chi done"><span class="tick">✓</span><span class="n">Chương 464</span><span class="d">·</span></div>
+                </div>
+              </div>
+            </div>
+            <div style="padding:10px 13px 14px; border-top:1px solid var(--line); background:var(--card)">
+              <button class="btn" type="button" style="width:100%; justify-content:center">Đọc tiếp <s>c.466 · tr.12</s></button>
+            </div>
+          </section>
+
+          <!-- reader -->
+          <section class="ps" data-sc="read" style="background:var(--readerbg)">
+            <div class="rdbar" style="padding:26px 13px 10px">
+              <button class="bk" type="button" aria-label="Quay lại">‹</button>
+              <div class="ti" style="flex:1; min-width:0">
+                <div class="a" style="font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">Ta Trời Sinh Đã Là Nhân Vật Phản Diện</div>
+                <div class="b">Chương 466 · trang 12/33</div>
+              </div>
+              <div class="pick" style="padding:6px 9px; font-size:10.5px">Aa</div>
+            </div>
+            <div class="scroll" style="background:var(--readerbg)">
+              <div class="mpage" style="position:relative"><span class="pn">12 / 33</span>
+                <svg viewBox="0 0 760 940"><use href="#pg1"/></svg></div>
+              <div class="mpage" style="position:relative"><span class="pn">13 / 33</span>
+                <svg viewBox="0 0 760 1060"><use href="#pg2"/></svg></div>
+            </div>
+            <div class="rdfoot" style="position:static">
+              <div class="track"><i style="width:36%"></i></div>
+              <div class="row">
+                <div class="p">Tr. 12 <s>/ 33</s></div>
+                <div class="rnav" style="margin-left:auto">
+                  <button type="button">← Trước</button>
+                  <button class="pri" type="button">Sau →</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </div>
+
+      <div class="notes">
+        <div class="note">
+          <h3>Trên iPhone khác gì bản máy tính</h3>
+          <ul>
+            <li><b>Thanh điều hướng dưới đáy</b> — Trang chủ / Theo dõi / Tìm / Lịch sử, chạm được bằng ngón cái.</li>
+            <li><b>Lưới 3 cột</b> giữ đúng mật độ quen thuộc, ẩn số lượt xem cho khỏi rối.</li>
+            <li><b>Vuốt ngang</b> chuyển chương, <b>chạm giữa</b> ẩn/hiện thanh công cụ, <b>chụm 2 ngón</b> phóng to.</li>
+            <li><b>PWA</b> — "Thêm vào màn hình chính" là có icon riêng, mở toàn màn hình như app.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rule"></div>
+
+  <div class="noterow">
+    <div class="note">
+      <h3>Giữ đúng theo trang gốc</h3>
+      <ul>
+        <li><b>Lưới bìa dày</b>, thẻ ~150–170px, bìa tỉ lệ 190×247 — đúng như trang gốc.</li>
+        <li><b>Nhãn thời gian góc trên trái bìa</b> ("6 giờ") và <b>cờ Hot</b> góc trên phải.</li>
+        <li><b>Số chương mới nhất nằm chồng lên đáy bìa</b> — nhìn bìa là biết đã đọc tới đâu.</li>
+        <li><b>Nền xám, thẻ trắng</b>, chữ đen, link xanh — cùng tông sáng như trang gốc.</li>
+        <li><b>Thanh thể loại dạng viên</b> ngay dưới header, cuộn ngang được.</li>
+        <li><b>Phân trang kiểu số</b> ở cuối lưới, và <b>sidebar xếp hạng</b> bên phải.</li>
+      </ul>
+    </div>
+    <div class="note">
+      <h3>Bỏ đi hoặc đổi khác</h3>
+      <ul>
+        <li><b>Toàn bộ quảng cáo, popup, banner</b> và link cá cược ở chân trang.</li>
+        <li><b>Đăng ký / đăng nhập</b> → chỉ còn một tài khoản của bạn, đăng nhập một lần.</li>
+        <li>Thêm <b>nút "Kiểm tra chương mới"</b> và ô <b>tình trạng hệ thống</b> ở sidebar —
+          hai thứ trang gốc không có mà bạn cần.</li>
+        <li>Thêm <b>thanh tiến độ đọc</b> và mục <b>"Đang đọc"</b> — trang gốc chỉ có lịch sử thô.</li>
+        <li>Đánh dấu chương đã đọc bằng <b>dấu ✓ xanh</b>, chương mới bằng <b>số đỏ</b>.</li>
+      </ul>
+    </div>
+    <div class="note">
+      <h3>Về ảnh và phông chữ</h3>
+      <ul>
+        <li><b>Bìa và trang truyện là hình vẽ SVG</b> — bản mẫu này chặn ảnh từ máy chủ ngoài,
+          và tranh bìa thật có bản quyền. Khi làm web thật, ảnh lấy từ API qua <code>/img?u=…</code>
+          và hiện đúng ảnh gốc.</li>
+        <li>Trang gốc dùng phông <b>Quicksand</b> (tải từ Google Fonts). Bản mẫu dùng phông hệ thống
+          vì không tải được phông ngoài. Web thật thì tự chứa phông này được nếu bạn muốn giống hẳn.</li>
+        <li>Tên truyện, số chương, lượt xem là <b>dữ liệu thật</b> lấy từ trang nguồn để bạn
+          thấy đúng độ dài tiêu đề tiếng Việt trong ô hẹp.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="rule"></div>
+
+  <div class="note" style="margin-bottom:16px"><h3>Bảng màu</h3></div>
+  <div class="tokens">
+    <div class="sw"><div class="c" style="background:#EBEBEB"></div>
+      <div class="l"><div class="n">Nền xám</div><div class="h">#EBEBEB</div></div></div>
+    <div class="sw"><div class="c" style="background:#FFFFFF; box-shadow:inset 0 0 0 1px #DDD"></div>
+      <div class="l"><div class="n">Thẻ trắng</div><div class="h">#FFFFFF</div></div></div>
+    <div class="sw"><div class="c" style="background:#FF2853"></div>
+      <div class="l"><div class="n">Đỏ Hot</div><div class="h">#FF2853 · mới, nút chính</div></div></div>
+    <div class="sw"><div class="c" style="background:#1568C8"></div>
+      <div class="l"><div class="n">Xanh link</div><div class="h">#1568C8 · số chương</div></div></div>
+    <div class="sw"><div class="c" style="background:#17A67B"></div>
+      <div class="l"><div class="n">Xanh lá</div><div class="h">#17A67B · đã đọc</div></div></div>
+    <div class="sw"><div class="c" style="background:#0B0A0D"></div>
+      <div class="l"><div class="n">Mực</div><div class="h">#0B0A0D · trình đọc</div></div></div>
+  </div>
+
+</div>
+
+<script>
+  var vts = document.querySelectorAll('.vt');
+  vts.forEach(function (t) {
+    t.addEventListener('click', function () {
+      vts.forEach(function (x) {
+        x.setAttribute('aria-selected', String(x === t));
+        document.getElementById(x.getAttribute('aria-controls')).classList.toggle('on', x === t);
+      });
+    });
+  });
+
+  var sts = document.querySelectorAll('.st');
+  sts.forEach(function (t) {
+    t.addEventListener('click', function () {
+      var sc = t.getAttribute('data-sc');
+      sts.forEach(function (x) { x.setAttribute('aria-selected', String(x === t)); });
+      document.querySelectorAll('.screen').forEach(function (s) {
+        s.classList.toggle('on', s.getAttribute('data-sc') === sc);
+      });
+      document.querySelectorAll('.ps').forEach(function (s) {
+        s.classList.toggle('on', s.getAttribute('data-sc') === sc);
+      });
+    });
+  });
+
+  document.querySelectorAll('.sorttabs').forEach(function (g) {
+    g.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      g.querySelectorAll('button').forEach(function (x) {
+        x.setAttribute('aria-pressed', String(x === b));
+      });
+    });
+  });
+
+  document.querySelectorAll('.chips, .pager').forEach(function (g) {
+    g.addEventListener('click', function (e) {
+      var b = e.target.closest('.gchip, button'); if (!b) return;
+      g.querySelectorAll('.gchip, button').forEach(function (x) { x.classList.remove('sel'); });
+      b.classList.add('sel');
+    });
+  });
+
+  // mở / đóng dropdown chương và bảng cài đặt trong trình đọc
+  document.querySelectorAll('.pop > .pick').forEach(function (trigger) {
+    trigger.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var pop = trigger.parentElement;
+      var wasOpen = pop.classList.contains('open');
+      document.querySelectorAll('.pop.open').forEach(function (p) {
+        p.classList.remove('open');
+        p.querySelector('.pick').classList.remove('on');
+      });
+      if (!wasOpen) { pop.classList.add('open'); trigger.classList.add('on'); }
+    });
+  });
+  document.addEventListener('click', function () {
+    document.querySelectorAll('.pop.open').forEach(function (p) {
+      p.classList.remove('open');
+      p.querySelector('.pick').classList.remove('on');
+    });
+  });
+  document.querySelectorAll('.popmenu').forEach(function (m) {
+    m.addEventListener('click', function (e) { e.stopPropagation(); });
+  });
+
+  // nhóm nút chọn một trong nhiều + công tắc bật/tắt
+  document.querySelectorAll('.seg').forEach(function (g) {
+    g.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      g.querySelectorAll('button').forEach(function (x) {
+        x.setAttribute('aria-pressed', String(x === b));
+      });
+    });
+  });
+  document.querySelectorAll('.tgl').forEach(function (t) {
+    t.addEventListener('click', function () { t.classList.toggle('off'); });
+  });
+  document.querySelectorAll('.chmenu .it').forEach(function (it) {
+    it.addEventListener('click', function () {
+      it.parentElement.querySelectorAll('.it').forEach(function (x) { x.classList.remove('cur'); });
+      it.classList.add('cur');
+    });
+  });
+
+  // mở / thu gọn hàng thể loại
+  document.querySelectorAll('[data-more]').forEach(function (btn) {
+    var closedLabel = btn.textContent.trim();
+    btn.addEventListener('click', function () {
+      var chips = btn.parentElement.querySelector('.chips');
+      var open = chips.classList.toggle('open');
+      btn.textContent = open ? 'Thu gọn ▴' : closedLabel;
+    });
+  });
+</script>
