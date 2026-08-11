@@ -44,7 +44,10 @@ a { color: inherit; }
 .mainnav a { padding: 6px 10px; border-radius: 16px; color: var(--text-dim); text-decoration: none; font-size: 13.5px; white-space: nowrap; }
 .mainnav a:hover { background: var(--card-2); color: var(--text); }
 .mainnav a.sel { color: var(--hot); background: var(--hot-soft); font-weight: 600; }
-.navsearch { background: var(--card-2); border: 1px solid var(--line); border-radius: 20px; padding: 7px 13px; font-size: 13px; color: var(--text-faint); width: 200px; flex: 0 0 auto; text-decoration: none; white-space: nowrap; overflow: hidden; }
+.navsearch-form { flex: 0 0 auto; margin: 0; }
+.navsearch { background: var(--card-2); border: 1px solid var(--line); border-radius: 20px; padding: 7px 13px; font-size: 13px; color: var(--text); width: 200px; font-family: inherit; }
+.navsearch::placeholder { color: var(--text-faint); }
+.navsearch:focus { outline: none; border-color: var(--hot); background: var(--card); }
 .who { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; padding-left: 13px; border-left: 1px solid var(--line); }
 .who .av { width: 27px; height: 27px; border-radius: 50%; background: var(--hot-soft); display: grid; place-items: center; font-size: 12px; font-weight: 700; color: var(--hot); }
 .who .nm { font-size: 12.5px; color: var(--text-dim); }

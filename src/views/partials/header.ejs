@@ -9,6 +9,8 @@
     <a href="/" class="<%= active==='following'?'sel':'' %>">Đang theo dõi</a>
     <a href="/status" class="<%= active==='status'?'sel':'' %>">Tình trạng</a>
   </nav>
-  <a class="navsearch" href="/search">⌕ Tìm truyện…</a>
+  <form class="navsearch-form" action="/search" method="get" role="search">
+    <input class="navsearch" name="q" value="<%= typeof q !== 'undefined' ? q : '' %>" placeholder="⌕ Tìm truyện…" autocomplete="off">
+  </form>
   <div class="who"><span class="nm">Bạn</span><span class="av">N</span></div>
 </div></div>

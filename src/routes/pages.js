@@ -13,23 +13,37 @@ export function relTime(iso) {
 export function mountPages(app) {
   const svc = () => app.locals.services;
 
-  app.get('/', (req, res) => {
+  app.get('/', async (req, res) => {
     const items = svc().library.listFollowed().map(c => ({
       ...c, thumbUrl: c.thumb_url, when: relTime(c.updated_at_source),
       latestChapter: c.last_chapter_seen,
     }));
     const reading = items.filter(c => c.progress);
-    res.render('home', { title: 'Kệ Truyện', active: 'home', items, reading, search: false, browse: false });
+    let recent = [];
+    try {
+      const home = await svc().source.home();
+      recent = home.items.map(c => ({ ...c, when: relTime(c.updatedAt) }));
+    } catch { /* API tạm lỗi — vẫn hiện phần theo dõi */ }
+    res.render('home', {
+      title: 'Kệ Truyện', active: 'home', items, reading, recent,
+      categories: [], q: '', search: false, browse: false,
+    });
   });
 
   app.get('/following', (req, res) => res.redirect('/'));
 
-  app.get('/browse', (req, res) => res.render('home', {
-    title: 'Duyệt truyện', active: 'browse', items: [], reading: [], browse: true, search: false,
-  }));
+  app.get('/browse', async (req, res) => {
+    let categories = [];
+    try { categories = await svc().source.categories(); } catch { /* để trống nếu lỗi */ }
+    res.render('home', {
+      title: 'Duyệt truyện', active: 'browse', items: [], reading: [], recent: [],
+      categories, q: '', browse: true, search: false,
+    });
+  });
 
   app.get('/search', (req, res) => res.render('home', {
-    title: 'Tìm truyện', active: '', items: [], reading: [], search: true, browse: false,
+    title: 'Tìm truyện', active: '', items: [], reading: [], recent: [],
+    categories: [], q: req.query.q || '', search: true, browse: false,
   }));
 
   app.get('/status', (req, res) => res.render('status', { title: 'Tình trạng', active: 'status' }));

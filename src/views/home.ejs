@@ -5,33 +5,66 @@
 <link rel="manifest" href="/public/manifest.webmanifest"><link rel="stylesheet" href="/public/css/styles.css">
 <title><%= title %></title>
 </head><body>
-<%- include('partials/header', { active }) %>
+<%- include('partials/header', { active, q }) %>
+
+<% if (browse && categories.length) { %>
+<div class="chipbar"><div class="chipbar-in">
+  <div class="chips" id="chips">
+    <button class="gchip sel" type="button" data-type="truyen-moi">Tất cả</button>
+    <% categories.forEach(cat => { %>
+      <button class="gchip" type="button" data-cat="<%= cat.slug %>"><%= cat.name %></button>
+    <% }) %>
+  </div>
+  <button class="morechip" type="button" data-more>Xem tất cả ▾</button>
+</div></div>
+<% } %>
+
 <div class="wrap">
   <div class="col-main">
-    <% if (reading && reading.length) { %>
-    <div class="box">
-      <div class="boxhead"><h2>Đang đọc</h2><div class="sp"></div><span class="cnt"><%= reading.length %></span></div>
-      <div class="cgrid">
-        <% reading.forEach(comic => { %><%- include('partials/comic-card', { comic }) %><% }) %>
+    <% if (search) { %>
+      <div class="box">
+        <div class="boxhead"><h2><i>✦</i> Tìm truyện</h2></div>
+        <div style="padding:12px"><input id="q" class="field" placeholder="Nhập tên truyện…" style="width:100%" value="<%= q %>" autofocus></div>
+        <div class="cgrid" id="grid"></div>
+        <div id="hint" style="padding:0 16px 20px; color:var(--text-faint)">Gõ tên truyện để tìm trong 26.000+ bộ.</div>
       </div>
-    </div>
-    <% } %>
-    <div class="box">
-      <div class="boxhead"><h2><i>✦</i> <%= search ? 'Tìm truyện' : (browse ? 'Duyệt truyện' : 'Đang theo dõi') %></h2>
-        <div class="sp"></div>
-        <% if (!search && !browse) { %><button class="side-btn" id="checkNew" type="button" style="width:auto;padding:8px 14px">Kiểm tra chương mới</button><% } %>
+    <% } else if (browse) { %>
+      <div class="box">
+        <div class="boxhead"><h2><i>✦</i> Duyệt truyện</h2><div class="sp"></div><span class="cnt" id="browseLabel">Mới cập nhật</span></div>
+        <div class="cgrid" id="grid"><div style="padding:24px 16px; color:var(--text-faint)">Đang tải…</div></div>
+        <div class="pager" id="pager"></div>
       </div>
-      <% if (search) { %><div style="padding:12px"><input id="q" class="field" placeholder="Nhập tên truyện…" style="width:100%" autofocus></div><% } %>
-      <div class="cgrid" id="grid">
-        <% items.forEach(comic => { %><%- include('partials/comic-card', { comic }) %><% }) %>
-      </div>
-      <% if (!items.length && !search) { %>
-        <div style="padding:26px 16px; color:var(--text-faint); text-align:center">
-          <%= browse ? 'Đang tải…' : 'Chưa theo dõi truyện nào. Vào "Tìm truyện" để thêm.' %>
+    <% } else { %>
+      <% if (reading && reading.length) { %>
+      <div class="box">
+        <div class="boxhead"><h2>Đang đọc</h2><div class="sp"></div><span class="cnt"><%= reading.length %></span></div>
+        <div class="cgrid">
+          <% reading.forEach(comic => { %><%- include('partials/comic-card', { comic }) %><% }) %>
         </div>
+      </div>
       <% } %>
-    </div>
+      <% if (items && items.length) { %>
+      <div class="box">
+        <div class="boxhead"><h2>Đang theo dõi</h2><div class="sp"></div><span class="cnt"><%= items.length %></span>
+          <button class="side-btn" id="checkNew" type="button" style="width:auto;padding:8px 14px;margin-left:10px">Kiểm tra chương mới</button></div>
+        <div class="cgrid">
+          <% items.forEach(comic => { %><%- include('partials/comic-card', { comic }) %><% }) %>
+        </div>
+      </div>
+      <% } %>
+      <div class="box">
+        <div class="boxhead"><h2><i>✦</i> Truyện mới cập nhật</h2></div>
+        <% if (recent && recent.length) { %>
+        <div class="cgrid">
+          <% recent.forEach(comic => { %><%- include('partials/comic-card', { comic }) %><% }) %>
+        </div>
+        <% } else { %>
+        <div style="padding:24px 16px; color:var(--text-faint)">Không tải được danh sách từ nguồn. Thử lại sau.</div>
+        <% } %>
+      </div>
+    <% } %>
   </div>
+
   <aside class="col-side">
     <button class="side-btn" id="checkNewSide" type="button">Kiểm tra chương mới</button>
     <div class="box"><div class="boxhead"><h2>Tình trạng</h2></div>
