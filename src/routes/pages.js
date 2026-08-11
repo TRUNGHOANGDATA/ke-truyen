@@ -36,7 +36,7 @@ export function mountPages(app) {
       ]);
       recent = (home.items || []).slice(0, 12).map(c => ({ ...c, when: relTime(c.updatedAt) }));
       genres = HOME_GENRES.map((g, i) => ({
-        ...g, items: (cats[i]?.items || []).slice(0, 6).map(c => ({ ...c, when: relTime(c.updatedAt) })),
+        ...g, items: (cats[i]?.items || []).slice(0, 12).map(c => ({ ...c, when: relTime(c.updatedAt) })),
       })).filter(g => g.items.length);
 
       // Gợi ý: trộn nhiều thể loại (ưu tiên thể loại bạn hay theo dõi), loại bỏ truyện đã theo

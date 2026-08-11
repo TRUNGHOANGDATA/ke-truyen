@@ -36,9 +36,17 @@ test('home renders followed + recent-from-API section', async () => {
   const res = await agent.get('/');
   assert.equal(res.status, 200);
   assert.match(res.text, /Kệ Truyện/);
-  assert.match(res.text, /Truyện mới cập nhật/);
+  assert.match(res.text, /Truyện tranh mới cập nhật/);
   assert.match(res.text, /Truyện Mới X/); // came from source.home()
-  assert.match(res.text, /Ngôn Tình/);     // genre suggestion rail
+  assert.match(res.text, /Ngôn Tình/);     // genre rail
+});
+
+test('home does not show the followed grid (moved to /following tab)', async () => {
+  const agent = await authed();
+  await agent.post('/api/follow').send({ slug: 'tien-nghich' });
+  const res = await agent.get('/');
+  // no followed grid heading on home; only the reading section + genres
+  assert.doesNotMatch(res.text, /Xem tất cả \(1\)/); // old followed-grid seemore
 });
 
 test('browse page renders genre chips from categories', async () => {

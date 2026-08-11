@@ -51,30 +51,23 @@
     <% } else { %>
       <%- include('partials/hero', { featured }) %>
 
-      <!-- Đang đọc: luôn hiện để dễ tìm -->
+      <!-- Trang chủ chỉ tập trung truyện đang đọc dở + gợi ý -->
       <div class="box">
-        <div class="boxhead"><h2>Đang đọc</h2><div class="sp"></div><span class="cnt"><%= reading.length %></span></div>
+        <div class="boxhead"><h2>Đang đọc dở</h2><div class="sp"></div>
+          <% if (items && items.length) { %><a class="seemore" href="/following">Truyện theo dõi (<%= items.length %>) →</a><% } %>
+          <span class="cnt" style="margin-left:10px"><%= reading.length %></span></div>
         <% if (reading.length) { %>
         <div class="cgrid">
           <% reading.forEach(comic => { %><%- include('partials/followed-card', { comic }) %><% }) %>
         </div>
         <% } else { %>
-        <div class="emptymsg">Chưa có truyện đang đọc. Mở một truyện bất kỳ và đọc — nó sẽ tự xuất hiện ở đây kèm vị trí đã đọc.</div>
+        <div class="emptymsg">Chưa có truyện đang đọc dở. Mở một truyện bất kỳ và đọc — nó sẽ tự xuất hiện ở đây kèm vị trí đã đọc.<br>
+          Xem truyện đang theo dõi ở tab <a href="/following">Đang theo dõi</a>.</div>
         <% } %>
       </div>
 
-      <% if (items && items.length) { %>
       <div class="box">
-        <div class="boxhead"><h2>Đang theo dõi</h2><div class="sp"></div>
-          <a class="seemore" href="/following">Xem tất cả (<%= items.length %>) →</a></div>
-        <div class="cgrid">
-          <% items.slice(0, 12).forEach(comic => { %><%- include('partials/followed-card', { comic }) %><% }) %>
-        </div>
-      </div>
-      <% } %>
-
-      <div class="box">
-        <div class="boxhead"><h2>Truyện mới cập nhật</h2><div class="sp"></div><a class="seemore" href="/browse">Xem tất cả →</a></div>
+        <div class="boxhead"><h2>Truyện tranh mới cập nhật</h2><div class="sp"></div><a class="seemore" href="/browse">Xem tất cả →</a></div>
         <% if (recent && recent.length) { %>
         <div class="cgrid">
           <% recent.forEach(comic => { %><%- include('partials/comic-card', { comic }) %><% }) %>
