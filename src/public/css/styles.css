@@ -410,6 +410,17 @@ a.link { text-decoration: none; }
 .savetext.done { color: var(--ok); }
 .savetext.err { color: var(--hot); }
 
+/* ============ TRANG ĐỌC TRÊN ĐIỆN THOẠI ============
+   Thanh trên cùng dễ tràn ngang vì 2 nút chương dài -> ẩn chữ, chỉ chừa mũi tên. */
+.rd { overflow-x: hidden; }
+@media (max-width: 620px) {
+  .rdbar { gap: 8px; padding: 8px 12px; }
+  .rnav { gap: 6px; flex: 0 0 auto; }
+  .rnav button { padding: 8px 11px; }
+  .rnav .lbl { display: none; }        /* chỉ còn ← và → */
+  .rdbar .ti .a { font-size: 14px; }
+}
+
 /* ============ HEADER TRÊN ĐIỆN THOẠI ============
    Đặt cuối file để thắng các quy tắc "POLISH" phía trên.
    Header xuống dòng: hàng 1 logo + avatar, hàng 2 menu (cuộn ngang nếu chật),

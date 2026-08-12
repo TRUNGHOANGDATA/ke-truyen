@@ -9,8 +9,8 @@
   <div class="ti"><div class="a"><%= name %></div><div class="b">Chương <%= chapterName %> · <%= images.length %> trang</div></div>
   <div class="sp"></div>
   <div class="rnav">
-    <% if (prev) { %><a class="link" href="/doc/<%= slug %>/<%= encodeURIComponent(prev) %>"><button type="button">← Chương trước</button></a><% } %>
-    <% if (next) { %><a class="link" href="/doc/<%= slug %>/<%= encodeURIComponent(next) %>"><button class="pri" type="button">Chương sau →</button></a><% } %>
+    <% if (prev) { %><a class="link" href="/doc/<%= slug %>/<%= encodeURIComponent(prev) %>"><button type="button">←<span class="lbl"> Chương trước</span></button></a><% } %>
+    <% if (next) { %><a class="link" href="/doc/<%= slug %>/<%= encodeURIComponent(next) %>"><button class="pri" type="button"><span class="lbl">Chương sau </span>→</button></a><% } %>
   </div>
 </div>
 
