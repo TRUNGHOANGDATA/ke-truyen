@@ -7,7 +7,7 @@
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-export function createArchive({ db, drive, source, fetchFn = fetch, politeDelayMs = 250 }) {
+export function createArchive({ db, drive, source, fetchFn = fetch, politeDelayMs = 250, imgRetryDelayMs = 600 }) {
   const IMG_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36';
 
   const getArchived = db.prepare('SELECT drive_id, bytes FROM archive WHERE src_url=?');
@@ -49,29 +49,56 @@ export function createArchive({ db, drive, source, fetchFn = fetch, politeDelayM
     };
   }
 
-  /** Lưu một chương; trả số byte đã thêm mới */
-  async function archiveChapter(slug, chapter, refererFor) {
+  /** Tải một ảnh, thử lại vài lần (CDN thỉnh thoảng chặn hotlink 403/429) */
+  async function fetchImageOnce(url, refererFor, tries = 3) {
+    const ref = refererFor ? refererFor(url) : undefined;
+    let last;
+    for (let i = 0; i < tries; i++) {
+      try {
+        const res = await fetchFn(url, {
+          headers: { 'User-Agent': IMG_UA, ...(ref ? { Referer: ref } : {}), Accept: 'image/*,*/*;q=0.8' },
+          signal: AbortSignal.timeout(30000),
+        });
+        if (res.ok) {
+          const contentType = res.headers.get('content-type') || 'image/jpeg';
+          return { buf: Buffer.from(await res.arrayBuffer()), contentType };
+        }
+        last = new Error(`HTTP ${res.status}`);
+      } catch (e) { last = e; }
+      await sleep(imgRetryDelayMs * (i + 1));
+    }
+    throw last;
+  }
+
+  /**
+   * Lưu một chương; gọi onImage(byteVừaThêm) sau mỗi ảnh.
+   * Ảnh nào tải mãi không được thì BỎ QUA (ghi vào skipped) chứ không giết cả truyện.
+   * @returns {{ added:number, skipped:number }}
+   */
+  async function archiveChapter(slug, chapter, refererFor, onImage = () => {}) {
+    const chapName = chapter.chapter_name ?? chapter.name;
     const { images } = await source.chapter(chapter.api_url ?? chapter.apiUrl);
-    const folder = await drive.ensureFolder(`truyen/${slug}/${chapter.chapter_name ?? chapter.name}`);
-    let added = 0;
+    const folder = await drive.ensureFolder(`truyen/${slug}/${chapName}`);
+    let added = 0, skipped = 0;
     for (const img of images) {
       if (cancelled.has(slug)) break;
       if (lookup(img.url)) continue;                      // đã lưu rồi
-      const ref = refererFor ? refererFor(img.url) : undefined;
-      const res = await fetchFn(img.url, {
-        headers: { 'User-Agent': IMG_UA, ...(ref ? { Referer: ref } : {}), Accept: 'image/*,*/*;q=0.8' },
-      });
-      if (!res.ok) throw new Error(`tải ảnh lỗi ${res.status} (trang ${img.page + 1})`);
-      const contentType = res.headers.get('content-type') || 'image/jpeg';
-      const buf = Buffer.from(await res.arrayBuffer());
-      const ext = (contentType.split('/')[1] || 'jpg').replace('jpeg', 'jpg').split(';')[0];
+      let dl;
+      try {
+        dl = await fetchImageOnce(img.url, refererFor);
+      } catch {
+        skipped++;                                        // bỏ qua ảnh lỗi, đi tiếp
+        continue;
+      }
+      const ext = (dl.contentType.split('/')[1] || 'jpg').replace('jpeg', 'jpg').split(';')[0];
       const name = `${String(img.page).padStart(3, '0')}.${ext}`;
-      const up = await drive.upload({ name, parentId: folder, buffer: buf, mimeType: contentType });
-      putArchived.run(img.url, slug, chapter.chapter_name ?? chapter.name, img.page, up.id, up.size, Date.now());
+      const up = await drive.upload({ name, parentId: folder, buffer: dl.buf, mimeType: dl.contentType });
+      putArchived.run(img.url, slug, chapName, img.page, up.id, up.size, Date.now());
       added += up.size;
+      onImage(up.size);
       await sleep(politeDelayMs);
     }
-    return added;
+    return { added, skipped };
   }
 
   /** Lưu cả truyện, chạy nền. Gọi lại khi đang chạy thì bỏ qua. */
@@ -80,23 +107,44 @@ export function createArchive({ db, drive, source, fetchFn = fetch, politeDelayM
     running.add(slug);
     cancelled.delete(slug);
 
-    const list = chapters || db.prepare(
+    let list = chapters || db.prepare(
       'SELECT * FROM chapters WHERE comic_slug=? ORDER BY order_index'
     ).all(slug);
+    // Chưa mở/theo dõi truyện này thì DB chưa có mục lục -> lấy từ nguồn
+    if (!list.length) {
+      try {
+        const detail = await source.detail(slug);
+        list = detail.chapters.map((c, i) => ({
+          comic_slug: slug, chapter_name: c.name, api_url: c.apiUrl, order_index: i,
+        }));
+      } catch (err) {
+        setJob(slug, { state: 'error', total: 0, done: 0, bytes: 0, message: 'Không tải được mục lục: ' + (err.message || err) });
+        running.delete(slug);
+        return jobOf(slug);
+      }
+    }
 
     setJob(slug, { state: 'running', total: list.length, done: 0, bytes: 0 });
-    let bytes = 0, done = 0;
+    let bytes = 0, done = 0, skipped = 0;
     try {
       for (const ch of list) {
         if (cancelled.has(slug)) {
           setJob(slug, { state: 'cancelled', total: list.length, done, bytes });
           return jobOf(slug);
         }
-        bytes += await archiveChapter(slug, ch, refererFor);
+        // cập nhật bytes ngay sau mỗi ảnh cho thanh tiến trình nhích đều
+        let lastTick = 0;
+        const r = await archiveChapter(slug, ch, refererFor, (b) => {
+          bytes += b;
+          const now = Date.now();
+          if (now - lastTick > 500) { lastTick = now; setJob(slug, { state: 'running', total: list.length, done, bytes }); }
+        });
+        skipped += r.skipped;
         done++;
         setJob(slug, { state: 'running', total: list.length, done, bytes });
       }
-      setJob(slug, { state: 'done', total: list.length, done, bytes });
+      const msg = skipped ? `Đã lưu xong, ${skipped} ảnh lỗi bị bỏ qua (bấm Lưu lại để thử tải nốt).` : null;
+      setJob(slug, { state: 'done', total: list.length, done, bytes, message: msg });
     } catch (err) {
       setJob(slug, { state: 'error', total: list.length, done, bytes, message: String(err.message || err) });
     } finally {

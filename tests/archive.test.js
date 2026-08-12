@@ -44,7 +44,7 @@ function setup({ imagesPerChapter = 2, failOn = null, bytes = 100 } = {}) {
     };
   };
 
-  return { db, uploaded, archive: createArchive({ db, drive, source, fetchFn, politeDelayMs: 0 }) };
+  return { db, uploaded, archive: createArchive({ db, drive, source, fetchFn, politeDelayMs: 0, imgRetryDelayMs: 1 }) };
 }
 
 test('lưu cả truyện: upload đủ ảnh và ghi chỉ mục', async () => {
@@ -90,12 +90,13 @@ test('cộng dồn dung lượng đã lưu', async () => {
   assert.equal(archive.stats().bytes, 4 * 500);
 });
 
-test('tải ảnh lỗi thì job chuyển sang error kèm lý do, không làm sập server', async () => {
+test('ảnh lỗi bị bỏ qua chứ không giết cả truyện; job vẫn done và báo số ảnh lỗi', async () => {
+  // chương 2 mọi ảnh đều 500 -> bỏ qua, nhưng chương 1 lưu bình thường
   const { archive } = setup({ failOn: '/2/' });
   const job = await archive.archiveComic('s');
-  assert.equal(job.state, 'error');
-  assert.match(job.message, /tải ảnh lỗi 500/);
-  assert.equal(job.done_chapters, 1, 'chương 1 vẫn phải lưu xong');
+  assert.equal(job.state, 'done', 'không được để một ảnh lỗi làm hỏng cả job');
+  assert.equal(job.done_chapters, 2);
+  assert.match(job.message, /ảnh lỗi bị bỏ qua/);
 });
 
 test('huỷ giữa chừng thì job ở trạng thái cancelled, giữ phần đã lưu', async () => {
@@ -134,4 +135,34 @@ test('job() trả trạng thái đã lưu trong DB', async () => {
   assert.equal(archive.job('s'), null);
   await archive.archiveComic('s');
   assert.equal(archive.job('s').state, 'done');
+});
+
+test('lưu được truyện chưa có mục lục trong DB (tự lấy từ nguồn)', async () => {
+  const db = openDb(':memory:');
+  createSchema(db);
+  // KHÔNG chèn chapters -> buộc phải lấy từ source.detail
+  const uploaded = [];
+  const b = Buffer.alloc(50, 1);
+  const archive = createArchive({
+    db,
+    drive: { configured: true, async ensureFolder(p) { return 'f:' + p; },
+             async upload({ buffer }) { uploaded.push(1); return { id: 'd' + uploaded.length, size: buffer.byteLength }; } },
+    source: {
+      async detail(slug) {
+        return { slug, name: 'X', chapters: [
+          { name: '1', title: '', apiUrl: 'https://qq/s-chap-1', order: 0 },
+          { name: '2', title: '', apiUrl: 'https://qq/s-chap-2', order: 1 },
+        ] };
+      },
+      async chapter() { return { images: [{ page: 0, url: `https://cdn/${uploaded.length}.jpg` }] }; },
+    },
+    fetchFn: async () => ({ ok: true, status: 200,
+      arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength),
+      headers: { get: () => 'image/jpeg' } }),
+    politeDelayMs: 0,
+  });
+  const job = await archive.archiveComic('moi-toanh');
+  assert.equal(job.state, 'done');
+  assert.equal(job.total_chapters, 2, 'phải lấy được 2 chương từ nguồn');
+  assert.equal(uploaded.length, 2);
 });

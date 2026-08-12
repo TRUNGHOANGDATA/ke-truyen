@@ -91,3 +91,27 @@ test('trang không còn lộ host CDN trong mã nguồn', async () => {
   const res = await agent.get('/');
   assert.doesNotMatch(res.text, /img\?u=/, 'không được dùng dạng URL thô nữa');
 });
+
+test('ảnh đã lưu Drive vẫn đọc được kể cả khi NGUỒN GỐC chết', async () => {
+  const db = openDb(':memory:');
+  createSchema(db);
+  const srcUrl = 'https://i178.truyenvua.com/1/2/0.jpg';
+  // giả lập: ảnh này đã được lưu lên Drive trước đó
+  db.prepare(`INSERT INTO archive (src_url, comic_slug, chapter_name, image_page, drive_id, bytes, created_at)
+              VALUES (?,?,?,?,?,?,?)`).run(srcUrl, 's', '1', 0, 'drive-file-1', 3, Date.now());
+
+  const app = buildApp({
+    passwordHash: hash, sessionSecret: 't', db,
+    cacheDir: mkdtempSync(join(tmpdir(), 'imgc-')),
+    // nguồn gốc coi như đã chết
+    imageFetchFn: async () => { throw new Error('nguồn chết'); },
+    // Drive giả: trả nội dung đã lưu
+    drive: { configured: true, async download() { return { buf: Buffer.from('anh-tu-drive'), contentType: 'image/jpeg' }; } },
+  });
+
+  const agent = request.agent(app);
+  await agent.post('/login').type('form').send({ password: 'secret123' });
+  const res = await agent.get('/img?i=' + packImg(srcUrl)).buffer(true);
+  assert.equal(res.status, 200, 'phải phục vụ được từ Drive dù nguồn chết');
+  assert.equal(res.body.toString(), 'anh-tu-drive');
+});
