@@ -8,9 +8,9 @@ import { createImageCache } from './cache/imageCache.js';
 import { mountImageProxy, packImg } from './routes/image.js';
 import { openDb } from './db/index.js';
 import { createSchema } from './db/migrations.js';
-import { createSource } from './source/otruyen.js';
-import { createTruyenQQSource } from './source/truyenqq.js';
 import { withCache } from './source/cached.js';
+import { createSettings } from './services/settings.js';
+import { createSourceManager } from './services/source-manager.js';
 import { createLibrary } from './services/library.js';
 import { createUpdates } from './services/updates.js';
 import { createDrive } from './storage/drive.js';
@@ -19,14 +19,6 @@ import { mountApi } from './routes/api.js';
 import { mountPages } from './routes/pages.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-
-/** Chọn nguồn truyện theo config.SOURCE */
-function buildSource() {
-  if (config.SOURCE === 'otruyen') {
-    return createSource({ base: config.OTRUYEN_BASE, cdnBase: config.CDN_IMAGE_BASE });
-  }
-  return createTruyenQQSource({ base: config.TRUYENQQ_BASE });
-}
 
 export function buildApp(deps = {}) {
   const passwordHash = deps.passwordHash ?? config.PASSWORD_HASH;
@@ -61,7 +53,14 @@ export function buildApp(deps = {}) {
   app.use(requireAuth);
 
   const db = deps.db ?? (() => { const d = openDb(config.DB_PATH); createSchema(d); return d; })();
-  const source = deps.source ?? withCache(db, buildSource());
+
+  // Cấu hình sửa được trong web (nguồn + domain), nạp mặc định từ .env lần đầu.
+  const settings = createSettings(db);
+  settings.seedDefaults({ source: config.SOURCE, truyenqq_base: config.TRUYENQQ_BASE });
+
+  // Nguồn động: đổi nguồn/domain lúc chạy không cần restart. Test vẫn inject deps.source được.
+  const manager = createSourceManager({ db, settings, config, probeFetch: deps.probeFetch });
+  const source = deps.source ?? manager.source;
   const library = createLibrary(db);
   const updates = createUpdates({ library, source });
 
@@ -84,7 +83,7 @@ export function buildApp(deps = {}) {
   });
 
   mountApi(app, { source, library, updates, cacheDir, archive, drive, refererFor });
-  app.locals.services = { db, source, library, updates, archive, drive };
+  app.locals.services = { db, source, library, updates, archive, drive, settings, manager };
   mountPages(app);
 
   return app;

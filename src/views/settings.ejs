@@ -4,7 +4,46 @@
 <meta name="robots" content="noindex, nofollow"><link rel="stylesheet" href="/public/css/styles.css"><title><%= title %></title>
 </head><body>
 <%- include('partials/header', { active }) %>
-<div class="wrap"><div class="col-main"><div class="box">
+<div class="wrap"><div class="col-main">
+
+<div class="box">
+  <div class="boxhead"><h2>Nguồn truyện</h2></div>
+  <div style="padding:14px; display:flex; flex-direction:column; gap:14px; max-width:520px">
+    <label style="display:flex; flex-direction:column; gap:6px">
+      <span>Nguồn đang dùng</span>
+      <select id="source" class="field">
+        <option value="truyenqq" <%= source==='truyenqq'?'selected':'' %>>TruyenQQ (crawl, cập nhật từng phút)</option>
+        <option value="otruyen" <%= source==='otruyen'?'selected':'' %>>OTruyen (API — đã ngừng cập nhật)</option>
+      </select>
+    </label>
+
+    <label style="display:flex; flex-direction:column; gap:6px">
+      <span>Domain TruyenQQ (khi trang nguồn đổi tên miền)</span>
+      <input id="domain" class="field" type="text" value="<%= domain %>" placeholder="https://truyenqq...com">
+      <small style="color:#888">Web tự dò domain sống khi cái hiện tại chết. Chỉ cần nhập tay nếu có domain mới toanh chưa có trong danh sách.</small>
+    </label>
+
+    <div style="display:flex; gap:10px">
+      <button class="btn" id="saveSrc" type="button" style="justify-content:center">Lưu nguồn</button>
+      <button class="btn" id="saveDom" type="button" style="justify-content:center">Kiểm tra & lưu domain</button>
+    </div>
+
+    <% if (mirrors && mirrors.length) { %>
+    <div>
+      <small style="color:#888">Domain dự phòng đã cài sẵn:</small>
+      <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px">
+        <% mirrors.forEach(m => { %>
+          <span class="tag <%= m===domain ? 'tag-on' : '' %>"><%= m.replace(/^https?:\/\//,'') %><%= m===domain ? ' ✓' : '' %></span>
+        <% }) %>
+      </div>
+    </div>
+    <% } %>
+
+    <div class="sysbox" id="srcOut"></div>
+  </div>
+</div>
+
+<div class="box">
   <div class="boxhead"><h2>Đổi mật khẩu</h2></div>
   <div style="padding:14px; display:flex; flex-direction:column; gap:10px; max-width:420px">
     <input id="cur" class="field" type="password" placeholder="Mật khẩu hiện tại" autocomplete="current-password">
@@ -15,6 +54,25 @@
 </div></div></div>
 <script type="module">
   import { api } from '/public/js/common.js';
+  const srcOut = document.getElementById('srcOut');
+
+  document.getElementById('saveSrc').addEventListener('click', async () => {
+    srcOut.textContent = 'Đang lưu…';
+    try {
+      const r = await api('/settings/source', { method: 'POST', body: JSON.stringify({ source: document.getElementById('source').value }) });
+      srcOut.textContent = 'Đã đổi nguồn sang ' + r.source + '. Tải lại trang để thấy truyện mới.';
+    } catch (e) { srcOut.textContent = 'Lỗi: ' + e.message; }
+  });
+
+  document.getElementById('saveDom').addEventListener('click', async () => {
+    srcOut.textContent = 'Đang kiểm tra domain…';
+    try {
+      const r = await api('/settings/domain', { method: 'POST', body: JSON.stringify({ domain: document.getElementById('domain').value }) });
+      srcOut.textContent = 'Domain sống, đã lưu: ' + r.domain;
+      document.getElementById('domain').value = r.domain;
+    } catch (e) { srcOut.textContent = 'Lỗi: ' + e.message; }
+  });
+
   document.getElementById('save').addEventListener('click', async () => {
     const out = document.getElementById('out');
     try {

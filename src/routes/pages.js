@@ -1,3 +1,5 @@
+import { config } from '../config.js';
+
 export function relTime(iso) {
   if (!iso) return '';
   const then = new Date(iso).getTime();
@@ -149,7 +151,35 @@ export function mountPages(app) {
 
   app.get('/status', (req, res) => res.render('status', { title: 'Tình trạng', active: 'status' }));
 
-  app.get('/settings', (req, res) => res.render('settings', { title: 'Cài đặt', active: '' }));
+  app.get('/settings', (req, res) => {
+    const { settings, manager } = svc();
+    res.render('settings', {
+      title: 'Cài đặt', active: '',
+      source: settings.get('source', 'truyenqq'),
+      domain: manager.resolver.current(),
+      mirrors: config.TRUYENQQ_MIRRORS,
+    });
+  });
+
+  // Đổi nguồn truyện (truyenqq | otruyen)
+  app.post('/settings/source', (req, res) => {
+    try {
+      const name = svc().manager.setSource(String(req.body.source || ''));
+      res.json({ ok: true, source: name });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+  });
+
+  // Đổi domain TruyenQQ thủ công — kiểm tra sống trước khi lưu
+  app.post('/settings/domain', async (req, res) => {
+    const { manager } = svc();
+    let base = String(req.body.domain || '').trim();
+    if (base && !/^https?:\/\//i.test(base)) base = 'https://' + base;
+    try { new URL(base); } catch { return res.status(400).json({ error: 'Địa chỉ không hợp lệ' }); }
+    const alive = await manager.resolver.check(base);
+    if (!alive) return res.status(400).json({ error: 'Domain không phản hồi hoặc không phải trang TruyenQQ' });
+    const saved = manager.applyDomain(base);
+    res.json({ ok: true, domain: saved });
+  });
 
   app.get('/truyen/:slug', async (req, res) => {
     try {

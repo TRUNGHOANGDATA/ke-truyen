@@ -87,6 +87,7 @@ export function createTruyenQQSource({
   retries = 2,
   retryDelayMs = 600,
   politeDelayMs = 400,
+  reprobe = null,       // async () => domain mới khi domain hiện tại chết
 } = {}) {
   const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36';
   let lastCall = 0;
@@ -97,7 +98,7 @@ export function createTruyenQQSource({
     lastCall = Date.now();
   }
 
-  async function fetchText(url, init = {}) {
+  async function attemptFetch(url, init = {}) {
     let lastErr;
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
@@ -116,6 +117,21 @@ export function createTruyenQQSource({
       }
     }
     throw lastErr;
+  }
+
+  async function fetchText(url, init = {}) {
+    try {
+      return await attemptFetch(url, init);
+    } catch (err) {
+      if (!reprobe) throw err;
+      // Domain có thể đã đổi -> dò lại; nếu ra domain mới thì đổi URL và thử lại một lần.
+      let nb;
+      try { nb = await reprobe(); } catch { throw err; }
+      if (!nb || nb === base) throw err;
+      const swapped = url.startsWith(base) ? nb + url.slice(base.length) : url;
+      base = nb;
+      return await attemptFetch(swapped, init);
+    }
   }
 
   const load = async (url, init) => cheerio.load(await fetchText(url, init));
@@ -166,6 +182,10 @@ export function createTruyenQQSource({
   return {
     id: 'truyenqq',
     label: 'TruyenQQ',
+
+    /** Đổi domain đang dùng (khi sửa tay ở trang Cài đặt). */
+    setBase(nb) { if (nb) base = nb.replace(/\/+$/, ''); },
+    getBase() { return base; },
 
     async home() {
       const { items } = await listPage('/truyen-moi-cap-nhat', 1);

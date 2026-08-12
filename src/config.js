@@ -16,6 +16,11 @@ export const config = {
   // Nguồn truyện: 'truyenqq' (crawl, cập nhật từng phút) hoặc 'otruyen' (API, đã ngừng cập nhật)
   SOURCE: process.env.SOURCE || 'truyenqq',
   TRUYENQQ_BASE: process.env.TRUYENQQ_BASE || 'https://truyenqqko.com',
+  // Các domain TruyenQQ hay xoay vòng; domain sống sẽ được tự dò và ghi nhớ.
+  // Thêm domain mới qua .env: TRUYENQQ_MIRRORS=a.com,b.com (hoặc nhập trong trang Cài đặt).
+  TRUYENQQ_MIRRORS: (process.env.TRUYENQQ_MIRRORS ||
+    'https://truyenqqko.com,https://truyenqqto.com,https://truyenqqgo.com,https://truyenqqviet.com,https://truyenqqvn.com,https://truyenqq.com,https://truyenqqmoi.com'
+  ).split(',').map(s => s.trim().replace(/\/+$/, '')).filter(Boolean),
   // Google Drive — lưu ảnh chương để đọc lâu dài (xem README phần "Lưu offline")
   DRIVE_CLIENT_ID: process.env.DRIVE_CLIENT_ID || '',
   DRIVE_CLIENT_SECRET: process.env.DRIVE_CLIENT_SECRET || '',
