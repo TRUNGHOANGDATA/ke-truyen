@@ -1,8 +1,16 @@
 import { api } from './common.js';
 
+/** Gói URL ảnh (base64url) để mã trang không lộ host CDN của nguồn */
+function imgSrc(url) {
+  if (!url) return '';
+  const b64 = btoa(unescape(encodeURIComponent(url)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return `/img?i=${b64}`;
+}
+
 function cardHtml(c) {
   return `<a class="cc" href="/truyen/${c.slug}">
-    <div class="thumb"><img loading="lazy" src="/img?u=${encodeURIComponent(c.thumbUrl || '')}" alt="">
+    <div class="thumb"><img loading="lazy" src="${imgSrc(c.thumbUrl)}" alt="">
       ${c.latestChapter ? `<span class="newflag">Chương <b>${c.latestChapter}</b></span>` : ''}</div>
     <div class="tt">${c.name}</div>
     ${c.latestChapter ? `<div class="row"><span class="ch">Chương ${c.latestChapter}</span></div>` : ''}

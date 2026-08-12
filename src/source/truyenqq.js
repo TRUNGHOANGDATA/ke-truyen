@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { cleanSynopsis, scrubBrands } from './clean.js';
 
 /**
  * Nguồn TruyenQQ (crawl HTML).
@@ -252,14 +253,15 @@ export function createTruyenQQSource({
       const $img = $(SEL.detailCover).first();
       return {
         slug,
-        name: $(SEL.title).first().text().trim(),
-        origin: $(SEL.otherName).first().text().trim(),
-        content: $(SEL.synopsis).first().html() || '',
+        name: scrubBrands($(SEL.title).first().text().trim()),
+        origin: scrubBrands($(SEL.otherName).first().text().trim()),
+        // Bỏ thẻ HTML + đoạn SEO/quảng bá + tên nguồn
+        content: cleanSynopsis($(SEL.synopsis).first().html() || ''),
         status: /hoàn/i.test(statusText) ? 'completed' : 'ongoing',
         thumbUrl: abs(base, $img.attr('src') || $img.attr('data-fb') || ''),
         categories: $(SEL.genres).map((_, a) => $(a).text().trim()).get().filter(Boolean),
-        // "TruyenQQ" ở ô tác giả nghĩa là nguồn không biết tác giả
-        author: /^truyenqq$|đang cập nhật/i.test(authorText) ? '' : authorText,
+        // Ô tác giả ghi tên trang nguồn nghĩa là không rõ tác giả
+        author: /^truyenqq|đang cập nhật/i.test(authorText) ? '' : scrubBrands(authorText),
         updatedAt: chapters.at(-1)?.updatedAt || null,
         chapters,
       };

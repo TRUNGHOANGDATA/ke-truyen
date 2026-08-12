@@ -38,6 +38,6 @@ test('reader renders images through /img and shows next chapter', async () => {
   await agent.post('/api/follow').send({ slug: 's' });
   const res = await agent.get('/doc/s/1');
   assert.equal(res.status, 200);
-  assert.match(res.text, /\/img\?u=/);
+  assert.match(res.text, /\/img\?i=/); // URL ảnh đã gói, không lộ host CDN
   assert.match(res.text, /Chương 2/); // next-chapter control
 });

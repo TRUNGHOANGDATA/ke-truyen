@@ -1,6 +1,6 @@
 <a class="cc" href="/truyen/<%= comic.slug %>">
   <div class="thumb">
-    <img loading="lazy" src="/img?u=<%= encodeURIComponent(comic.thumbUrl || '') %>" alt="<%= comic.name %>">
+    <img loading="lazy" src="<%= img(comic.thumbUrl) %>" alt="<%= comic.name %>">
     <% if (comic.when) { %><span class="when"><%= comic.when %></span><% } %>
     <% if (comic.unread) { %><span class="hotflag"><%= comic.unread %></span><% } %>
     <% if (comic.latestChapter) { %><span class="newflag">Chương <b><%= comic.latestChapter %></b></span><% } %>

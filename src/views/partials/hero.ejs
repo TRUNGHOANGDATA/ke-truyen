@@ -2,12 +2,12 @@
 <div class="hero" id="hero">
   <div class="hero-slides">
     <% featured.forEach((f, i) => { %>
-      <% const img = '/img?u=' + encodeURIComponent(f.thumbUrl || '');
+      <% const cover = img(f.thumbUrl);
          const href = f.progress ? ('/doc/' + f.slug + '/' + encodeURIComponent(f.progress.chapterName)) : ('/truyen/' + f.slug); %>
       <div class="slide<%= i === 0 ? ' on' : '' %>">
-        <div class="slide-bg" style="background-image:url('<%= img %>')"></div>
+        <div class="slide-bg" style="background-image:url('<%= cover %>')"></div>
         <div class="slide-in">
-          <a class="slide-cover" href="/truyen/<%= f.slug %>"><img src="<%= img %>" alt="<%= f.name %>"></a>
+          <a class="slide-cover" href="/truyen/<%= f.slug %>"><img src="<%= cover %>" alt="<%= f.name %>"></a>
           <div class="slide-meta">
             <div class="slide-tags">
               <span class="stag stag-hot">🔥 Đang hot</span>

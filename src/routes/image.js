@@ -1,3 +1,12 @@
+/**
+ * Gói URL ảnh lại để mã trang không lộ host CDN của nguồn.
+ * Chỉ là base64url (không phải bảo mật) — mục đích là không hiện thẳng ra.
+ */
+export const packImg = (url) => Buffer.from(String(url || ''), 'utf8').toString('base64url');
+export const unpackImg = (s) => {
+  try { return Buffer.from(String(s || ''), 'base64url').toString('utf8'); } catch { return ''; }
+};
+
 export function isAllowedHost(url, allowSuffixes) {
   let host;
   try { host = new URL(url).hostname; } catch { return false; }
@@ -6,7 +15,8 @@ export function isAllowedHost(url, allowSuffixes) {
 
 export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes, refererFor }) {
   app.get('/img', async (req, res) => {
-    const url = req.query.u;
+    // ?i= là URL đã gói (mặc định); ?u= giữ lại cho tương thích
+    const url = req.query.i ? unpackImg(req.query.i) : req.query.u;
     if (!url || !isAllowedHost(url, allowSuffixes)) return res.status(403).end();
 
     const cached = cache.get(url);

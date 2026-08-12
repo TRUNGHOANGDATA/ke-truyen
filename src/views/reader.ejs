@@ -32,7 +32,7 @@
   <% images.forEach(img => { %>
     <div class="mpage" data-page="<%= img.page %>">
       <span class="pn"><%= img.page + 1 %> / <%= images.length %></span>
-      <img loading="lazy" data-src="/img?u=<%= encodeURIComponent(img.url) %>" alt="trang <%= img.page + 1 %>">
+      <img loading="lazy" data-src="<%= imgProxy(img.url) %>" alt="trang <%= img.page + 1 %>">
     </div>
   <% }) %>
   <div class="endblk">

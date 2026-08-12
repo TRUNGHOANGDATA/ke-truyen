@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { config, IMAGE_HOSTS, refererFor } from './config.js';
 import { requireAuth, mountAuth } from './routes/auth.js';
 import { createImageCache } from './cache/imageCache.js';
-import { mountImageProxy } from './routes/image.js';
+import { mountImageProxy, packImg } from './routes/image.js';
 import { openDb } from './db/index.js';
 import { createSchema } from './db/migrations.js';
 import { createSource } from './source/otruyen.js';
@@ -44,6 +44,11 @@ export function buildApp(deps = {}) {
     sameSite: 'lax',
     httpOnly: true,
   }));
+
+  // Helper cho template: img(url) -> /img?i=... (không lộ host CDN của nguồn)
+  // imgProxy là alias cho chỗ biến vòng lặp đã chiếm tên `img` (reader.ejs)
+  app.locals.img = (url) => (url ? `/img?i=${packImg(url)}` : '');
+  app.locals.imgProxy = app.locals.img;
 
   app.use('/public', express.static(join(__dirname, 'public')));
   app.get('/healthz', (req, res) => res.json({ ok: true }));

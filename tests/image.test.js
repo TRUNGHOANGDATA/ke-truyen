@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { openDb } from '../src/db/index.js';
 import { createSchema } from '../src/db/migrations.js';
 import { buildApp } from '../src/app.js';
-import { isAllowedHost } from '../src/routes/image.js';
+import { isAllowedHost, packImg, unpackImg } from '../src/routes/image.js';
 import { IMAGE_HOSTS, refererFor } from '../src/config.js';
 
 const hash = bcrypt.hashSync('secret123', 10);
@@ -67,4 +67,27 @@ test('proxy chấp nhận host ảnh của TruyenQQ', () => {
   assert.ok(isAllowedHost('https://s135.hinhhinh.com/a.jpg', IMAGE_HOSTS));
   assert.ok(isAllowedHost('https://i178.truyenvua.com/a.jpg', IMAGE_HOSTS));
   assert.ok(!isAllowedHost('https://evil.com/a.jpg', IMAGE_HOSTS));
+});
+
+test('packImg / unpackImg khớp nhau', () => {
+  const url = 'https://s135.hinhhinh.com/3755/951/0.jpg?gt=hdfgdfg';
+  const packed = packImg(url);
+  assert.doesNotMatch(packed, /hinhhinh|https/, 'URL gói lại không được lộ host');
+  assert.equal(unpackImg(packed), url);
+});
+
+test('/img nhận URL đã gói (?i=) và vẫn chặn host lạ', async () => {
+  const agent = request.agent(agentApp());
+  await agent.post('/login').type('form').send({ password: 'secret123' });
+  const ok = await agent.get('/img?i=' + packImg('https://i178.truyenvua.com/1/2/0.jpg'));
+  assert.equal(ok.status, 200);
+  const bad = await agent.get('/img?i=' + packImg('https://evil.com/a.jpg'));
+  assert.equal(bad.status, 403);
+});
+
+test('trang không còn lộ host CDN trong mã nguồn', async () => {
+  const agent = request.agent(agentApp());
+  await agent.post('/login').type('form').send({ password: 'secret123' });
+  const res = await agent.get('/');
+  assert.doesNotMatch(res.text, /img\?u=/, 'không được dùng dạng URL thô nữa');
 });
