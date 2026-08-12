@@ -15,9 +15,11 @@ if (!clientId || !clientSecret) {
   console.error('\nCách lấy CLIENT_ID / CLIENT_SECRET:');
   console.error('  1. Vào https://console.cloud.google.com/ → tạo project mới');
   console.error('  2. APIs & Services → Library → bật "Google Drive API"');
-  console.error('  3. APIs & Services → OAuth consent screen → chọn External, thêm email của bạn vào Test users');
-  console.error('  4. Credentials → Create credentials → OAuth client ID → loại "Desktop app"');
-  console.error('  5. Copy Client ID và Client secret rồi chạy lại lệnh này');
+  console.error('  3. OAuth consent screen → chọn External → điền tên app + email → Save');
+  console.error('  4. QUAN TRỌNG: bấm "PUBLISH APP" (In production). Nếu để "Testing",');
+  console.error('     refresh token hết hạn sau 7 ngày. Scope drive.file không cần Google xét duyệt.');
+  console.error('  5. Credentials → Create credentials → OAuth client ID → loại "Desktop app"');
+  console.error('  6. Copy Client ID và Client secret rồi chạy lại lệnh này');
   process.exit(1);
 }
 
@@ -34,6 +36,7 @@ const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchP
 
 console.log('\n1) Mở link này trên trình duyệt và bấm đồng ý:\n');
 console.log(authUrl);
+console.log('\n   (Nếu hiện "app chưa xác minh": bấm Advanced → Go to … (unsafe) — app của chính bạn.)');
 console.log('\n2) Google sẽ hiện một mã. Dán mã đó vào đây.\n');
 
 const rl = createInterface({ input, output });

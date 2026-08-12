@@ -47,6 +47,11 @@ try {
   ok('Xoá được file thử', true);
 } catch (e) {
   ok('Kết nối Drive', false, e.message);
+  if (/invalid_grant|expired|revoked/i.test(e.message)) {
+    console.error('\n  → Refresh token đã hết hạn/bị thu hồi.');
+    console.error('    Thường do OAuth app còn ở chế độ "Testing" (token chỉ sống 7 ngày).');
+    console.error('    Sửa: PUBLISH APP sang "In production", rồi chạy lại node scripts/drive-auth.js');
+  }
 }
 
 console.log(fail ? `\n${fail} bước THẤT BẠI.` : '\nDrive đã sẵn sàng. Vào trang truyện bấm "Lưu offline".');

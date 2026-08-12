@@ -30,17 +30,25 @@ một bộ manhua dài 1.281 chương ≈ 14 GB. **2 TB chứa được ~230.000
 
 1. Vào [Google Cloud Console](https://console.cloud.google.com/) → tạo project mới
 2. *APIs & Services → Library* → bật **Google Drive API**
-3. *OAuth consent screen* → chọn **External**, thêm email của bạn vào **Test users**
-4. *Credentials → Create credentials → OAuth client ID* → loại **Desktop app** → copy Client ID + Client secret
+3. *OAuth consent screen* → chọn **External** → điền tên app + email → Save
+4. **Quan trọng: bấm "PUBLISH APP" để chuyển trạng thái sang "In production".**
+   - Nếu để nguyên **"Testing"**, Google cho refresh token **hết hạn sau 7 ngày** → cứ ~1 tuần web mất kết nối Drive, phải chạy lại `drive:auth`.
+   - Web chỉ xin quyền `drive.file` (không nhạy cảm) nên publish **không cần Google xét duyệt** — bấm là xong ngay.
+5. *Credentials → Create credentials → OAuth client ID* → loại **Desktop app** → copy Client ID + Client secret
 5. Lấy refresh token (bạn tự bấm đồng ý trên trang Google, script không thấy mật khẩu của bạn):
    ```bash
    node scripts/drive-auth.js <CLIENT_ID> <CLIENT_SECRET>
    ```
+   > Lúc bấm đồng ý, app chưa được Google xác minh nên hiện màn hình cảnh báo:
+   > bấm **"Advanced" → "Go to … (unsafe)"**. Đây là app của chính bạn nên an toàn.
 6. Dán 3 dòng `DRIVE_*` mà script in ra vào `.env`
 7. Kiểm tra kết nối:
    ```bash
    npm run drive:check
    ```
+
+Nếu một ngày `drive:check` báo lỗi *invalid_grant* / token bị thu hồi (thường do quên
+publish app, hoặc bạn đổi mật khẩu Google), chỉ cần chạy lại bước 5–6 để lấy token mới.
 
 **Dùng:** vào trang một truyện → bấm **⬇ Lưu offline**. Thanh tiến trình hiện số chương và
 dung lượng; bấm lại để dừng, bấm nữa để tiếp tục đúng chỗ dở (ảnh đã lưu không tải lại).
