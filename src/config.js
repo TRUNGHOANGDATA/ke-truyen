@@ -16,6 +16,11 @@ export const config = {
   // Nguồn truyện: 'truyenqq' (crawl, cập nhật từng phút) hoặc 'otruyen' (API, đã ngừng cập nhật)
   SOURCE: process.env.SOURCE || 'truyenqq',
   TRUYENQQ_BASE: process.env.TRUYENQQ_BASE || 'https://truyenqqko.com',
+  // Google Drive — lưu ảnh chương để đọc lâu dài (xem README phần "Lưu offline")
+  DRIVE_CLIENT_ID: process.env.DRIVE_CLIENT_ID || '',
+  DRIVE_CLIENT_SECRET: process.env.DRIVE_CLIENT_SECRET || '',
+  DRIVE_REFRESH_TOKEN: process.env.DRIVE_REFRESH_TOKEN || '',
+  DRIVE_FOLDER_ID: process.env.DRIVE_FOLDER_ID || 'root',
 };
 
 /** Host ảnh được phép đi qua proxy /img (chặn dùng làm proxy mở) */

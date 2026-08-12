@@ -39,6 +39,29 @@ export function createSchema(db) {
     );
 
     CREATE INDEX IF NOT EXISTS idx_chapters_comic ON chapters(comic_slug, order_index);
+
+    -- Ảnh đã lưu lên Google Drive. Khoá theo URL gốc để proxy tra được ngay.
+    CREATE TABLE IF NOT EXISTS archive (
+      src_url TEXT PRIMARY KEY,
+      comic_slug TEXT NOT NULL,
+      chapter_name TEXT NOT NULL,
+      image_page INTEGER NOT NULL,
+      drive_id TEXT NOT NULL,
+      bytes INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_archive_comic ON archive(comic_slug, chapter_name);
+
+    -- Trạng thái lưu offline theo từng truyện
+    CREATE TABLE IF NOT EXISTS archive_jobs (
+      comic_slug TEXT PRIMARY KEY,
+      state TEXT NOT NULL,              -- queued | running | done | error | cancelled
+      done_chapters INTEGER NOT NULL DEFAULT 0,
+      total_chapters INTEGER NOT NULL DEFAULT 0,
+      bytes INTEGER NOT NULL DEFAULT 0,
+      message TEXT,
+      updated_at INTEGER NOT NULL
+    );
   `);
 
   // Tách "có trong thư viện" khỏi "đang theo dõi": mở một truyện để đọc cũng

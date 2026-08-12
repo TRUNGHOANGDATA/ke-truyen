@@ -15,6 +15,43 @@ Chọn bằng biến `SOURCE` trong `.env`:
 Đổi nguồn thì slug truyện khác nhau, nên thư viện (truyện theo dõi, vị trí đọc) coi như
 bắt đầu lại. Chi tiết trong tài liệu thiết kế, mục 5b.
 
+## Lưu offline lên Google Drive (không bắt buộc)
+
+Mặc định web **không lưu ảnh** — chỉ lưu mục lục + vị trí đọc, ảnh lấy trực tiếp từ nguồn
+và cache tạm 2 GB trên đĩa. Nếu nguồn chết thì thư viện thành danh sách trỏ vào chỗ trống
+(đã xảy ra một lần với nguồn cũ).
+
+Bật lưu offline để giữ ảnh vĩnh viễn trên Drive của bạn:
+
+**Dung lượng thực đo:** trung bình **~9 MB/chương**. Một bộ manhwa 111 chương ≈ 1,1 GB;
+một bộ manhua dài 1.281 chương ≈ 14 GB. **2 TB chứa được ~230.000 chương** — thoải mái.
+
+**Cài một lần:**
+
+1. Vào [Google Cloud Console](https://console.cloud.google.com/) → tạo project mới
+2. *APIs & Services → Library* → bật **Google Drive API**
+3. *OAuth consent screen* → chọn **External**, thêm email của bạn vào **Test users**
+4. *Credentials → Create credentials → OAuth client ID* → loại **Desktop app** → copy Client ID + Client secret
+5. Lấy refresh token (bạn tự bấm đồng ý trên trang Google, script không thấy mật khẩu của bạn):
+   ```bash
+   node scripts/drive-auth.js <CLIENT_ID> <CLIENT_SECRET>
+   ```
+6. Dán 3 dòng `DRIVE_*` mà script in ra vào `.env`
+7. Kiểm tra kết nối:
+   ```bash
+   npm run drive:check
+   ```
+
+**Dùng:** vào trang một truyện → bấm **⬇ Lưu offline**. Thanh tiến trình hiện số chương và
+dung lượng; bấm lại để dừng, bấm nữa để tiếp tục đúng chỗ dở (ảnh đã lưu không tải lại).
+Ảnh xếp trên Drive theo `truyen/<slug>/<chương>/000.jpg`.
+
+Khi đọc, web lấy ảnh theo thứ tự: **cache đĩa → Drive → nguồn gốc**. Nên chương đã lưu vẫn
+đọc được dù nguồn có sập. Xem dung lượng đã dùng ở trang **Tình trạng**.
+
+Chỉ xin quyền `drive.file` — web chỉ thấy được file do chính nó tạo, không đọc được dữ liệu
+khác trong Drive của bạn.
+
 ## Chạy thử trên máy (dev)
 
 ```bash

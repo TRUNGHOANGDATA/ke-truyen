@@ -13,6 +13,8 @@ import { createTruyenQQSource } from './source/truyenqq.js';
 import { withCache } from './source/cached.js';
 import { createLibrary } from './services/library.js';
 import { createUpdates } from './services/updates.js';
+import { createDrive } from './storage/drive.js';
+import { createArchive } from './services/archive.js';
 import { mountApi } from './routes/api.js';
 import { mountPages } from './routes/pages.js';
 
@@ -58,21 +60,31 @@ export function buildApp(deps = {}) {
   // everything below requires auth
   app.use(requireAuth);
 
+  const db = deps.db ?? (() => { const d = openDb(config.DB_PATH); createSchema(d); return d; })();
+  const source = deps.source ?? withCache(db, buildSource());
+  const library = createLibrary(db);
+  const updates = createUpdates({ library, source });
+
+  const drive = deps.drive ?? createDrive({
+    clientId: config.DRIVE_CLIENT_ID,
+    clientSecret: config.DRIVE_CLIENT_SECRET,
+    refreshToken: config.DRIVE_REFRESH_TOKEN,
+    rootFolderId: config.DRIVE_FOLDER_ID,
+  });
+  const archive = createArchive({ db, drive, source, fetchFn: deps.imageFetchFn ?? fetch });
+
   const cache = createImageCache({ dir: cacheDir, maxBytes: 2 * 1024 * 1024 * 1024 });
   mountImageProxy(app, {
     fetchFn: deps.imageFetchFn ?? fetch,
     cache,
     allowSuffixes: IMAGE_HOSTS,
     refererFor,
+    archive,
+    drive,
   });
 
-  const db = deps.db ?? (() => { const d = openDb(config.DB_PATH); createSchema(d); return d; })();
-  const source = deps.source ?? withCache(db, buildSource());
-  const library = createLibrary(db);
-  const updates = createUpdates({ library, source });
-
-  mountApi(app, { source, library, updates, cacheDir });
-  app.locals.services = { db, source, library, updates };
+  mountApi(app, { source, library, updates, cacheDir, archive, drive, refererFor });
+  app.locals.services = { db, source, library, updates, archive, drive };
   mountPages(app);
 
   return app;

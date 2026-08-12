@@ -40,6 +40,11 @@
             <a class="ghost" href="/doc/<%= detail.slug %>/<%= encodeURIComponent(last.name) %>">Chương mới nhất</a>
           <% } %>
           <button class="ghost <%= followed?'on':'' %>" id="followBtn" data-slug="<%= detail.slug %>"><%= followed ? '✓ Đang theo dõi' : '+ Theo dõi' %></button>
+          <button class="ghost" id="saveBtn" data-slug="<%= detail.slug %>" data-total="<%= detail.chapters.length %>">⬇ Lưu offline</button>
+        </div>
+        <div class="savebar" id="saveBar" hidden>
+          <div class="savetrack"><i id="saveFill"></i></div>
+          <div class="savetext" id="saveText"></div>
         </div>
       </div>
     </div>

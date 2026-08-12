@@ -9,7 +9,7 @@ function dirSize(dir) {
   } catch { return 0; }
 }
 
-export function mountApi(app, { source, library, updates, cacheDir }) {
+export function mountApi(app, { source, library, updates, cacheDir, archive, drive, refererFor }) {
   app.get('/api/library', (req, res) => res.json({ items: library.listFollowed() }));
 
   app.get('/api/search', async (req, res) => {
@@ -61,13 +61,47 @@ export function mountApi(app, { source, library, updates, cacheDir }) {
     } catch (e) { res.status(502).json({ error: String(e.message || e) }); }
   });
 
-  app.get('/api/status', (req, res) => {
-    const items = library.listFollowed();
+  // ---- Lưu offline lên Google Drive ----
+  app.post('/api/archive', (req, res) => {
+    if (!drive?.configured) {
+      return res.status(400).json({ error: 'Chưa cấu hình Google Drive (xem README)' });
+    }
+    const { slug } = req.body;
+    if (!slug) return res.status(400).json({ error: 'thiếu slug' });
+    if (archive.isRunning(slug)) return res.json({ ok: true, already: true, job: archive.job(slug) });
+    // chạy nền, không giữ request
+    archive.archiveComic(slug, { refererFor }).catch(() => {});
+    res.json({ ok: true, started: true });
+  });
+
+  app.post('/api/archive/cancel', (req, res) => {
+    archive.cancel(req.body.slug);
+    res.json({ ok: true });
+  });
+
+  app.get('/api/archive/status', (req, res) => {
+    const slug = req.query.slug;
     res.json({
+      configured: !!drive?.configured,
+      job: slug ? archive.job(slug) : null,
+      savedChapters: slug ? archive.chaptersSaved(slug) : null,
+      stats: archive.stats(),
+    });
+  });
+
+  app.get('/api/status', async (req, res) => {
+    const items = library.listFollowed();
+    const out = {
       followedCount: items.length,
       unreadTotal: items.reduce((a, c) => a + (c.unread || 0), 0),
       cacheBytes: cacheDir ? dirSize(cacheDir) : 0,
       lastCheck: null,
-    });
+      archive: archive ? archive.stats() : null,
+      drive: { configured: !!drive?.configured, used: null, total: null },
+    };
+    if (drive?.configured) {
+      try { Object.assign(out.drive, await drive.quota()); } catch { /* bỏ qua nếu Drive lỗi */ }
+    }
+    res.json(out);
   });
 }

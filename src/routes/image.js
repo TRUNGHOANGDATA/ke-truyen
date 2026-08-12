@@ -13,17 +13,31 @@ export function isAllowedHost(url, allowSuffixes) {
   return allowSuffixes.some(s => host === s || host.endsWith('.' + s) || host.endsWith(s));
 }
 
-export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes, refererFor }) {
+export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes, refererFor, archive, drive }) {
   app.get('/img', async (req, res) => {
     // ?i= là URL đã gói (mặc định); ?u= giữ lại cho tương thích
     const url = req.query.i ? unpackImg(req.query.i) : req.query.u;
     if (!url || !isAllowedHost(url, allowSuffixes)) return res.status(403).end();
 
-    const cached = cache.get(url);
-    if (cached) {
-      res.set('Content-Type', cached.contentType);
+    const send = (buf, contentType) => {
+      res.set('Content-Type', contentType);
       res.set('Cache-Control', 'public, max-age=604800');
-      return res.end(cached.buf);
+      res.end(buf);
+    };
+
+    const cached = cache.get(url);
+    if (cached) return send(cached.buf, cached.contentType);
+
+    // Đã lưu trên Drive thì đọc từ đó — nguồn có chết vẫn đọc được
+    if (archive && drive?.configured) {
+      const saved = archive.lookup(url);
+      if (saved) {
+        try {
+          const { buf, contentType } = await drive.download(saved.drive_id);
+          cache.put(url, buf, contentType);
+          return send(buf, contentType);
+        } catch { /* Drive lỗi thì rơi xuống lấy từ nguồn */ }
+      }
     }
     try {
       const referer = refererFor ? refererFor(url) : new URL(url).origin + '/';
@@ -39,9 +53,7 @@ export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes, re
       const contentType = upstream.headers.get('content-type') || 'image/jpeg';
       const buf = Buffer.from(await upstream.arrayBuffer());
       cache.put(url, buf, contentType);
-      res.set('Content-Type', contentType);
-      res.set('Cache-Control', 'public, max-age=604800');
-      res.end(buf);
+      send(buf, contentType);
     } catch {
       res.status(502).end();
     }

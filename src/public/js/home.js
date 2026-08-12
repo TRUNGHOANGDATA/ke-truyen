@@ -171,3 +171,63 @@ if (chips) {
   });
   load(1);
 }
+
+/* ---------- Lưu offline lên Google Drive (trang chi tiết) ---------- */
+const saveBtn = document.getElementById('saveBtn');
+if (saveBtn) {
+  const bar = document.getElementById('saveBar');
+  const fill = document.getElementById('saveFill');
+  const text = document.getElementById('saveText');
+  const slug = saveBtn.dataset.slug;
+  let timer;
+
+  const mb = (b) => (b / 1048576).toFixed(0);
+
+  function render(st) {
+    const job = st.job;
+    if (!job && !st.savedChapters) { bar.hidden = true; return; }
+    bar.hidden = false;
+    const total = job?.total_chapters || Number(saveBtn.dataset.total) || 0;
+    const done = job?.done_chapters ?? st.savedChapters ?? 0;
+    fill.style.width = total ? Math.min(100, done / total * 100) + '%' : '0%';
+    text.className = 'savetext';
+    if (job?.state === 'running') {
+      text.textContent = `Đang lưu ${done}/${total} chương · ${mb(job.bytes)} MB`;
+      saveBtn.textContent = '■ Dừng lưu';
+      saveBtn.dataset.mode = 'cancel';
+    } else {
+      clearInterval(timer);
+      saveBtn.dataset.mode = '';
+      saveBtn.textContent = '⬇ Lưu offline';
+      if (job?.state === 'done') { text.className = 'savetext done'; text.textContent = `Đã lưu ${done}/${total} chương · ${mb(job.bytes)} MB trên Drive`; }
+      else if (job?.state === 'error') { text.className = 'savetext err'; text.textContent = `Lỗi: ${job.message}`; }
+      else if (job?.state === 'cancelled') text.textContent = `Đã dừng ở ${done}/${total} chương — bấm Lưu để tiếp tục`;
+      else if (st.savedChapters) text.textContent = `Đã lưu ${st.savedChapters} chương`;
+    }
+  }
+
+  async function poll() {
+    try { render(await api('/api/archive/status?slug=' + encodeURIComponent(slug))); } catch {}
+  }
+
+  saveBtn.addEventListener('click', async () => {
+    if (saveBtn.dataset.mode === 'cancel') {
+      await api('/api/archive/cancel', { method: 'POST', body: JSON.stringify({ slug }) }).catch(() => {});
+      return poll();
+    }
+    bar.hidden = false;
+    text.className = 'savetext';
+    text.textContent = 'Đang bắt đầu…';
+    try {
+      await api('/api/archive', { method: 'POST', body: JSON.stringify({ slug }) });
+      clearInterval(timer);
+      timer = setInterval(poll, 1500);
+      poll();
+    } catch (e) {
+      text.className = 'savetext err';
+      text.textContent = e.message;
+    }
+  });
+
+  poll(); // hiện trạng thái đã lưu sẵn (nếu có)
+}

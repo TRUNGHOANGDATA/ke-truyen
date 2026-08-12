@@ -400,3 +400,12 @@ a.link { text-decoration: none; }
   .dtitle { font-size: 22px; }
   .dsyn { padding: 16px; }
 }
+
+/* ============ LƯU OFFLINE (Google Drive) ============ */
+.savebar { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; max-width: 460px; }
+.savetrack { height: 6px; border-radius: 999px; background: var(--card-2); overflow: hidden; }
+.savetrack i { display: block; height: 100%; width: 0; border-radius: 999px;
+  background: linear-gradient(90deg, var(--hot), var(--hot-2)); transition: width .3s ease; }
+.savetext { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-dim); }
+.savetext.done { color: var(--ok); }
+.savetext.err { color: var(--hot); }

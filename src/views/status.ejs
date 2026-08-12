@@ -15,10 +15,24 @@
 <script type="module">
   import { api } from '/public/js/common.js';
   const el = document.getElementById('status');
+  const gb = (b) => (b / 1073741824).toFixed(1);
+  const mb = (b) => (b / 1048576).toFixed(0);
   try {
     const s = await api('/api/status');
-    el.innerHTML = `Nguồn: OTruyen API<br>Đang theo dõi: ${s.followedCount} bộ<br>` +
-      `Chương chưa đọc: ${s.unreadTotal}<br>Cache ảnh: ${(s.cacheBytes/1e6).toFixed(1)} MB / 2000 MB`;
+    let html = `Đang theo dõi: ${s.followedCount} bộ<br>` +
+      `Chương chưa đọc: ${s.unreadTotal}<br>` +
+      `Cache ảnh tạm: ${mb(s.cacheBytes)} MB / 2000 MB<hr>`;
+    if (s.drive?.configured) {
+      html += `Lưu offline: <b>đã bật</b><br>` +
+        `Đã lưu: ${s.archive.comics} truyện · ${s.archive.images} ảnh · ${gb(s.archive.bytes)} GB<br>`;
+      if (s.drive.total) {
+        html += `Drive: dùng ${gb(s.drive.used)} / ${gb(s.drive.total)} GB ` +
+          `(còn ${gb(s.drive.total - s.drive.used)} GB)`;
+      }
+    } else {
+      html += `Lưu offline: chưa bật — xem README để nối Google Drive`;
+    }
+    el.innerHTML = html;
   } catch (e) { el.textContent = 'Lỗi: ' + e.message; }
 </script>
 </body></html>
