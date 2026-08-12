@@ -195,7 +195,6 @@ a.link { text-decoration: none; }
 @media (max-width: 1020px) {
   .wrap { grid-template-columns: 1fr; }
   .dhead { grid-template-columns: 150px 1fr; }
-  .navsearch { display: none; }
 }
 @media (max-width: 760px) {
   .dhead { grid-template-columns: 1fr; }
@@ -410,3 +409,17 @@ a.link { text-decoration: none; }
 .savetext { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-dim); }
 .savetext.done { color: var(--ok); }
 .savetext.err { color: var(--hot); }
+
+/* ============ HEADER TRÊN ĐIỆN THOẠI ============
+   Đặt cuối file để thắng các quy tắc "POLISH" phía trên.
+   Header xuống dòng: hàng 1 logo + avatar, hàng 2 menu (cuộn ngang nếu chật),
+   hàng 3 ô tìm kiếm rộng hết ngang. */
+@media (max-width: 760px) {
+  .topnav-in { flex-wrap: wrap; height: auto; gap: 8px 10px; padding-top: 8px; padding-bottom: 8px; }
+  .logo { order: 1; }
+  .who { order: 2; margin-left: auto; padding-left: 0; border-left: none; }
+  .mainnav { order: 3; flex: 1 0 100%; gap: 4px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .mainnav::-webkit-scrollbar { display: none; }
+  .navsearch-form { order: 4; flex: 1 0 100%; margin: 0; }
+  .navsearch { display: block; width: 100%; box-sizing: border-box; }
+}
