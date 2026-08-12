@@ -46,6 +46,26 @@ test('setSource xóa api_cache', () => {
   assert.equal(db.prepare('SELECT COUNT(*) n FROM api_cache').get().n, 0);
 });
 
+test('reprobe áp dụng domain sống lên nguồn đang chạy và xóa cache', async () => {
+  let setTo = null;
+  const { mgr, db } = setup({
+    makeResolver: () => ({ current: () => 'https://x.com', setCurrent() {}, reprobe: async () => 'https://alive.com' }),
+    makeTruyenQQ: ({ base }) => ({ id: 'truyenqq', base, setBase(b) { setTo = b; }, async home() { return { base }; } }),
+  });
+  db.prepare('INSERT INTO api_cache (cache_key, payload, expires_at) VALUES (?,?,?)').run('k', '{}', Date.now() + 1e9);
+  const found = await mgr.reprobe();
+  assert.equal(found, 'https://alive.com');
+  assert.equal(setTo, 'https://alive.com');
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM api_cache').get().n, 0);
+});
+
+test('reprobe ném lỗi khi resolver không tìm được domain', async () => {
+  const { mgr } = setup({
+    makeResolver: () => ({ current: () => 'https://x.com', setCurrent() {}, reprobe: async () => { throw new Error('chết hết'); } }),
+  });
+  await assert.rejects(() => mgr.reprobe(), /chết hết/);
+});
+
 test('applyDomain gọi setBase trên nguồn TruyenQQ đang chạy', async () => {
   let setTo = null;
   const { mgr } = setup({

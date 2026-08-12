@@ -23,9 +23,10 @@
       <small style="color:#888">Web tự dò domain sống khi cái hiện tại chết. Chỉ cần nhập tay nếu có domain mới toanh chưa có trong danh sách.</small>
     </label>
 
-    <div style="display:flex; gap:10px">
+    <div style="display:flex; gap:10px; flex-wrap:wrap">
       <button class="btn" id="saveSrc" type="button" style="justify-content:center">Lưu nguồn</button>
       <button class="btn" id="saveDom" type="button" style="justify-content:center">Kiểm tra & lưu domain</button>
+      <button class="ghost" id="reprobe" type="button" style="justify-content:center">↻ Tự dò lại ngay</button>
     </div>
 
     <% if (mirrors && mirrors.length) { %>
@@ -71,6 +72,15 @@
       srcOut.textContent = 'Domain sống, đã lưu: ' + r.domain;
       document.getElementById('domain').value = r.domain;
     } catch (e) { srcOut.textContent = 'Lỗi: ' + e.message; }
+  });
+
+  document.getElementById('reprobe').addEventListener('click', async () => {
+    srcOut.textContent = 'Đang dò các domain TruyenQQ…';
+    try {
+      const r = await api('/settings/reprobe', { method: 'POST' });
+      srcOut.textContent = 'Đã tìm được domain sống: ' + r.domain;
+      document.getElementById('domain').value = r.domain;
+    } catch (e) { srcOut.textContent = 'Không dò được domain nào sống: ' + e.message; }
   });
 
   document.getElementById('save').addEventListener('click', async () => {

@@ -73,5 +73,13 @@ export function createSourceManager({
       clearCache();
       return resolver.current();
     },
+
+    /** Dò lại ngay: tìm domain sống trong danh sách, áp dụng, xóa cache. Ném lỗi nếu tất cả chết. */
+    async reprobe() {
+      const found = await resolver.reprobe();
+      if (raw && typeof raw.setBase === 'function') raw.setBase(found);
+      clearCache();
+      return found;
+    },
   };
 }

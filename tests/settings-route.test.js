@@ -71,3 +71,20 @@ test('POST /settings/domain từ chối domain chết (probe giả trả lỗi)'
   const res = await a.post('/settings/domain').send({ domain: 'https://chet.example' });
   assert.equal(res.status, 400);
 });
+
+test('POST /settings/reprobe tìm được domain sống (probe giả)', async () => {
+  const probeFetch = async () => ({ ok: true, status: 200, async text() { return PAGE_OK; } });
+  const a = request.agent(app({ probeFetch }));
+  await login(a);
+  const res = await a.post('/settings/reprobe');
+  assert.equal(res.status, 200);
+  assert.ok(res.body.domain, 'trả về domain sống');
+});
+
+test('POST /settings/reprobe báo 502 khi mọi domain chết', async () => {
+  const probeFetch = async () => { throw new Error('mạng chết'); };
+  const a = request.agent(app({ probeFetch }));
+  await login(a);
+  const res = await a.post('/settings/reprobe');
+  assert.equal(res.status, 502);
+});

@@ -181,6 +181,14 @@ export function mountPages(app) {
     res.json({ ok: true, domain: saved });
   });
 
+  // Tự dò lại domain sống ngay lập tức
+  app.post('/settings/reprobe', async (req, res) => {
+    try {
+      const domain = await svc().manager.reprobe();
+      res.json({ ok: true, domain });
+    } catch (e) { res.status(502).json({ error: e.message }); }
+  });
+
   app.get('/truyen/:slug', async (req, res) => {
     try {
       const detail = await svc().source.detail(req.params.slug);
