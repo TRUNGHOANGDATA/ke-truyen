@@ -2,10 +2,13 @@ services:
   app:
     build: .
     restart: unless-stopped
-    env_file: .env
+    # Đọc .env bằng node --env-file (đọc nguyên văn) thay vì env_file của Compose,
+    # vì Compose nội suy dấu $ làm hỏng bcrypt hash trong PASSWORD_HASH.
+    command: node --env-file=.env src/server.js
     volumes:
       - ./data:/app/data
       - ./cache:/app/cache
+      - ./.env:/app/.env:ro
     expose:
       - "3000"
   caddy:
