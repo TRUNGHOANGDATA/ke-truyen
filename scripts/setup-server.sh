@@ -25,6 +25,19 @@ if [ ! -f .env ]; then
   exit 0
 fi
 
+# Mở cổng 80/443 trên tường lửa của máy — ảnh Oracle Ubuntu chặn sẵn mọi cổng trừ SSH,
+# đây là lý do phổ biến nhất khiến web "không vào được" dù container đã chạy.
+if command -v iptables >/dev/null 2>&1; then
+  echo "Opening firewall ports 80/443…"
+  for p in 80 443; do
+    sudo iptables -C INPUT -p tcp --dport "$p" -j ACCEPT 2>/dev/null || \
+      sudo iptables -I INPUT -p tcp --dport "$p" -j ACCEPT
+  done
+  # Lưu để giữ sau khi khởi động lại
+  sudo netfilter-persistent save 2>/dev/null || \
+    sudo sh -c 'iptables-save > /etc/iptables/rules.v4' 2>/dev/null || true
+fi
+
 docker compose up -d --build
 echo ""
 echo "Up. Once your domain's DNS points to this server, open https://${DOMAIN:-your-domain}"
