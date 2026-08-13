@@ -1,7 +1,9 @@
 node_modules/
 .env
-data/
-cache/
+# Phải neo ở gốc bằng dấu "/": viết "data/" hoặc "cache/" thì git khớp mọi cấp,
+# loại luôn src/cache/ -> clone về thiếu file, app crash ERR_MODULE_NOT_FOUND.
+/data/
+/cache/
 *.log
 
 # SSH keys (không bao giờ commit)
