@@ -62,6 +62,15 @@ DOMAIN=truyen.tenmien.com bash scripts/setup-server.sh
 Lần chạy đầu script sẽ: cài Docker (nếu chưa có) → tạo `.env` từ `.env.example` → tự sinh
 `SESSION_SECRET` ngẫu nhiên → **dừng lại** và nhắc bạn điền nốt. Đó là hành vi đúng.
 
+> **Vừa cài Docker xong thì tài khoản của bạn chưa có quyền gọi Docker.** Cho vào nhóm
+> `docker` một lần rồi đăng nhập lại (thoát SSH vào lại):
+> ```bash
+> sudo usermod -aG docker $USER
+> ```
+> Không muốn đăng xuất thì thêm `sudo` vào mọi lệnh docker, và gọi script kiểu
+> `sudo DOMAIN=truyen.tenmien.com bash scripts/setup-server.sh` (viết `sudo bash ...` không
+> thôi sẽ mất biến `DOMAIN`).
+
 ### 3b. Máy 1 GB RAM: bật swap trước
 
 `better-sqlite3` biên dịch native, 1 GB RAM sẽ bị OOM khi build. Máy ≥ 2 GB thì bỏ qua bước này.
@@ -178,6 +187,12 @@ docker compose up -d --build
 
 **Sao lưu:** chỉ cần copy thư mục `data/` đi nơi khác. Không có gì khác cần giữ.
 
+App có sẵn việc tự bảo trì mỗi 24 giờ: chép `app.db` sang `data/backups/app-<ngày>.db` rồi
+dọn cache ảnh quá 2 GB. Lưu ý ba điểm: lần đầu chỉ chạy **sau 24 giờ** container sống liên
+tục (khởi động lại là đếm lại từ đầu), bản cũ **không tự xoá** nên thỉnh thoảng dọn tay
+`data/backups/`, và đây là bản chép nóng — muốn bản sao chắc chắn toàn vẹn thì
+`docker compose stop app` rồi mới copy.
+
 **Đổi mật khẩu:** đăng nhập → trang **Cài đặt** → mục đổi mật khẩu → nó in ra hash mới →
 dán vào `PASSWORD_HASH=` trong `.env` → `docker compose restart app`. (Cố ý làm thủ công:
 app không tự ghi đè file cấu hình.)
@@ -205,6 +220,10 @@ Gần như luôn là tường lửa. Kiểm tra Security Group/Firewall ở bả
 **Đăng nhập báo sai mật khẩu dù chắc chắn đúng**
 `PASSWORD_HASH` trong `.env` bị hỏng — kiểm tra không có dấu nháy bao quanh, dấu `$` còn
 nguyên, và hash nằm gọn trên **một dòng**.
+
+**`permission denied ... /var/run/docker.sock`**
+Tài khoản chưa thuộc nhóm `docker` (hay gặp ngay sau khi script cài Docker xong).
+`sudo usermod -aG docker $USER` rồi thoát SSH vào lại — hoặc tạm thời thêm `sudo` phía trước.
 
 **Build lỗi / máy treo lúc `docker compose build`**
 Hết RAM khi biên dịch `better-sqlite3` → bật swap (mục 3b).
