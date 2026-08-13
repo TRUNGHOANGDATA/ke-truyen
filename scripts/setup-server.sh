@@ -18,7 +18,7 @@ if [ ! -f .env ]; then
   echo ""
   echo "Next steps:"
   echo "  1. Generate a password hash:"
-  echo "       docker compose run --rm app node scripts/hash-password.js 'E521satan'"
+  echo "       docker compose run --rm app node scripts/hash-password.js 'MAT-KHAU-CUA-BAN'"
   echo "  2. Paste it into .env as PASSWORD_HASH="
   echo "  3. Set DOMAIN= in .env to your real domain (DNS A-record must point here)"
   echo "  4. Re-run this script."

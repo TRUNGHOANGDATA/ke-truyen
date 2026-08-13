@@ -4,7 +4,7 @@ Web đọc **truyện tranh** tiếng Việt, cá nhân (1-2 người), không q
 nguồn (TruyenQQ), có tùy chọn lưu ảnh lên Google Drive để đọc lâu dài. Toàn bộ sau một
 mật khẩu đăng nhập. Giao diện clone TruyenQQ nhưng bỏ hết quảng cáo/branding.
 
-- **Đang chạy thật:** https://truyen.tradadata.com (Oracle VM, Singapore). Xem [DEPLOY.md](DEPLOY.md).
+- **Triển khai:** Docker + Caddy trên bất kỳ VPS Ubuntu nào. Xem [HUONG-DAN-DEPLOY.md](HUONG-DAN-DEPLOY.md).
 - **Ngôn ngữ:** UI + comment code bằng tiếng Việt.
 - **Phase 2 (chưa làm):** truyện chữ (text novel).
 
@@ -78,9 +78,9 @@ settings/api_cache/archive/archive_jobs.
 `node scripts/hash-password.js '<pass>'`), `SOURCE`, `TRUYENQQ_BASE`, `TRUYENQQ_MIRRORS`,
 `DRIVE_CLIENT_ID/SECRET/REFRESH_TOKEN`, `DRIVE_FOLDER_ID`, `DOMAIN`. **`.env` không commit** (gitignore).
 
-## Triển khai (Docker + Caddy trên Oracle Always Free)
-Chi tiết đầy đủ: [DEPLOY.md](DEPLOY.md). Máy chủ hiện tại: Oracle VM `ke-truyen` (Singapore,
-Ubuntu 22.04, user `ubuntu`), IP `161.118.241.44`, deploy bằng scp tarball (không có git remote).
+## Triển khai (Docker + Caddy, chạy được trên mọi VPS Ubuntu)
+Chi tiết đầy đủ: [HUONG-DAN-DEPLOY.md](HUONG-DAN-DEPLOY.md). Bản cũ chạy trên Oracle Always
+Free (1 OCPU/1GB) — hướng dẫn riêng cho Oracle giữ ở [docs/DEPLOY-oracle-cu.md](docs/DEPLOY-oracle-cu.md).
 
 **Bẫy đã gặp — nhớ kỹ khi deploy:**
 1. **Đóng gói tar phải neo exclude ở gốc:** dùng `--exclude=./cache --exclude=./data`, KHÔNG dùng `--exclude=cache` (sẽ lỡ loại luôn `src/cache/` → app crash `ERR_MODULE_NOT_FOUND`).
@@ -88,9 +88,9 @@ Ubuntu 22.04, user `ubuntu`), IP `161.118.241.44`, deploy bằng scp tarball (kh
 3. Máy 1GB RAM cần **swap** trước khi `docker compose build` (better-sqlite3 biên dịch nặng).
 4. Oracle Ubuntu chặn sẵn cổng — phải mở **cả** Security List (Console) **và** iptables trên máy (script [scripts/setup-server.sh](scripts/setup-server.sh) tự mở 80/443).
 
-**Cập nhật lên máy chủ:** sửa code local → tar (neo exclude đúng) → scp → trên server
-`cd ~/ke-truyen && tar xzf ... && sed -i 's|^DOMAIN=.*|DOMAIN=truyen.tradadata.com|' .env
-&& sudo docker compose up -d --build`. Dữ liệu ở `data/` + `cache/` (volume) không mất.
+**Cập nhật lên máy chủ:** đẩy code mới lên (git pull hoặc scp — nhớ neo exclude đúng) rồi
+`cd ~/ke-truyen && sudo docker compose up -d --build`. Dữ liệu ở `data/` + `cache/` (bind
+mount) không mất; `.env` trên máy chủ giữ nguyên, không ghi đè.
 
 ## Git
 - Branch chính: `main` (đang làm trên `master`). Commit message tiếng Việt không dấu, kết thúc `Co-Authored-By: Claude ...`.

@@ -66,30 +66,30 @@ khác trong Drive của bạn.
 npm install
 cp .env.example .env
 # tạo hash mật khẩu và dán vào .env (PASSWORD_HASH=)
-node scripts/hash-password.js 'E521satan'
+node scripts/hash-password.js 'MAT-KHAU-CUA-BAN'
 node --env-file=.env src/server.js
-# mở http://localhost:3000  (mật khẩu: E521satan)
+# mở http://localhost:3000  (mật khẩu: MAT-KHAU-CUA-BAN)
 ```
 
 Chạy test: `npm test` · Kiểm tra API thật: `node --env-file=.env scripts/smoke-live.js`
 
-## Triển khai lên VPS (Oracle Always Free)
+## Triển khai lên VPS
+
+Xem **[HUONG-DAN-DEPLOY.md](HUONG-DAN-DEPLOY.md)** — hướng dẫn đầy đủ từng bước cho một
+máy Ubuntu bất kỳ (Docker + Caddy, HTTPS tự động bằng Let's Encrypt). Tóm tắt:
 
 1. Trỏ **A-record** của tên miền về IP máy chủ.
-2. Trên VPS:
+2. Trên VPS, trong thư mục dự án:
    ```bash
-   git clone <repo> web-truyen && cd web-truyen
-   DOMAIN=truyen.example.com ./scripts/setup-server.sh
+   DOMAIN=truyen.example.com bash scripts/setup-server.sh
    ```
-3. Tạo hash mật khẩu và dán vào `.env`:
+3. Tạo hash mật khẩu, dán vào `.env` (`PASSWORD_HASH=`), đặt `DOMAIN=`:
    ```bash
-   docker compose run --rm app node scripts/hash-password.js 'E521satan'
+   docker compose run --rm app node scripts/hash-password.js 'mat-khau-ban-chon'
    ```
-   Mở `.env`, đặt `PASSWORD_HASH=...` và `DOMAIN=...`.
-4. Chạy lại: `DOMAIN=truyen.example.com ./scripts/setup-server.sh`
-5. Mở `https://truyen.example.com`, đăng nhập, rồi vào **Cài đặt → Đổi mật khẩu**.
+4. Chạy lại lệnh ở bước 2 → mở `https://truyen.example.com`.
 
-Caddy tự xin và gia hạn chứng chỉ HTTPS (Let's Encrypt).
+Hướng dẫn cũ dành riêng cho Oracle Always Free: [docs/DEPLOY-oracle-cu.md](docs/DEPLOY-oracle-cu.md).
 
 ## Khôi phục / rebuild
 

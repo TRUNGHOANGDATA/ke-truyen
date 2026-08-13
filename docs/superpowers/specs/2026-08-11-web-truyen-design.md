@@ -242,7 +242,7 @@ Bố cục **theo kiểu TruyenQQ** (trang người dùng quen dùng), nhưng **
 
 Một mật khẩu duy nhất cho cả web; **không đăng nhập thì không xem được bất cứ trang nào**, kể cả endpoint proxy ảnh (chặn ở tầng middleware, mọi request đều qua kiểm tra phiên đăng nhập).
 
-- Mật khẩu ban đầu: `E521satan`, lưu dạng **băm bcrypt** trong file `.env` (loại khỏi git) — không lưu chữ thường ở bất kỳ đâu.
+- Mật khẩu ban đầu: `MAT-KHAU-CUA-BAN`, lưu dạng **băm bcrypt** trong file `.env` (loại khỏi git) — không lưu chữ thường ở bất kỳ đâu.
 - Đăng nhập bằng phiên (session cookie) ký bảo mật, **ghi nhớ dài hạn** (nhập một lần rồi thôi).
 - Có trang **đổi mật khẩu** trong phần cài đặt (khuyến nghị đổi sau khi web chạy, vì mật khẩu ban đầu đã xuất hiện trong hội thoại).
 - Chặn công cụ tìm kiếm index (`robots.txt` + header `noindex`).

@@ -14,7 +14,7 @@
 - **Node.js 20 LTS.** Use built-in global `fetch` (no `node-fetch` dependency). Use built-in `node:test` runner (no Jest/Mocha).
 - **Single process.** Web server, source client, and image proxy run in one Node process. No separate worker, no external DB server, no Redis.
 - **No background scheduler.** The OTruyen API is only called in response to a user action (opening a page, pressing "Kiểm tra chương mới", opening a comic). No cron, no `setInterval` polling of the source.
-- **Auth gate on everything.** Every route except the login page and static CSS/JS/icons requires an authenticated session — including the `/img` image proxy. Initial password is `E521satan`, stored only as a **bcrypt hash** in `.env` (which is git-ignored). Never store or log the plaintext.
+- **Auth gate on everything.** Every route except the login page and static CSS/JS/icons requires an authenticated session — including the `/img` image proxy. Initial password is `MAT-KHAU-CUA-BAN`, stored only as a **bcrypt hash** in `.env` (which is git-ignored). Never store or log the plaintext.
 - **UI is fixed.** Follow `docs/superpowers/specs/mockups/manga-ui.html` exactly for layout, colors, and typography. Palette: bg `#EBEBEB`, card `#FFFFFF`, accent/hot `#FF2853`, link `#1568C8`, read/ok `#17A67B`, reader bg `#0B0A0D`. System fonts, no ALL-CAPS (breaks Vietnamese diacritics), monospace for numbers.
 - **OTruyen API** base URL: `https://otruyenapi.com/v1/api`. Image CDN for covers: `https://img.otruyenapi.com`. Be polite: max 3 concurrent requests to the source, retry with backoff on failure.
 - **Dependency injection for network.** Every module that calls `fetch` accepts a `fetchFn` parameter (defaulting to global `fetch`) so tests run offline against saved fixtures — never hitting the real API in CI.
@@ -2549,7 +2549,7 @@ if [ ! -f .env ]; then
   SECRET=$(head -c 32 /dev/urandom | base64)
   sed -i "s|SESSION_SECRET=.*|SESSION_SECRET=${SECRET}|" .env
   echo "DOMAIN=${DOMAIN:-change-me.example.com}" >> .env
-  echo "Generate a password hash: docker compose run --rm app node scripts/hash-password.js 'E521satan'"
+  echo "Generate a password hash: docker compose run --rm app node scripts/hash-password.js 'MAT-KHAU-CUA-BAN'"
   echo "Then paste it into .env as PASSWORD_HASH= and re-run this script."
   exit 0
 fi
@@ -2560,7 +2560,7 @@ echo "Up. Open https://${DOMAIN:-your-domain} once DNS points here."
 
 - [ ] **Step 7: Create `README.md`** with setup steps
 
-Document: (1) point domain A-record to VPS IP, (2) `git clone`, (3) `DOMAIN=... ./scripts/setup-server.sh`, (4) generate hash with `docker compose run --rm app node scripts/hash-password.js 'E521satan'`, paste into `.env`, (5) re-run script, (6) recovery: rebuild by re-running the script — data survives in `./data` (and `./data/backups`). Note the reader should change the password via `/settings` after first login.
+Document: (1) point domain A-record to VPS IP, (2) `git clone`, (3) `DOMAIN=... ./scripts/setup-server.sh`, (4) generate hash with `docker compose run --rm app node scripts/hash-password.js 'MAT-KHAU-CUA-BAN'`, paste into `.env`, (5) re-run script, (6) recovery: rebuild by re-running the script — data survives in `./data` (and `./data/backups`). Note the reader should change the password via `/settings` after first login.
 
 - [ ] **Step 8: Local acceptance (no real domain)**
 

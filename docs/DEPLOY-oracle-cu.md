@@ -132,8 +132,8 @@ nano .env
 Trong thư mục `ke-truyen` trên máy chủ:
 
 ```bash
-# Tạo mã băm cho mật khẩu đăng nhập E521satan:
-docker compose run --rm app node scripts/hash-password.js 'E521satan'
+# Tạo mã băm cho mật khẩu đăng nhập MAT-KHAU-CUA-BAN:
+docker compose run --rm app node scripts/hash-password.js 'MAT-KHAU-CUA-BAN'
 ```
 Copy dòng kết quả dán vào `PASSWORD_HASH=` trong `.env` (bước 5c). Rồi:
 
@@ -147,7 +147,7 @@ lệnh trên**. Lần này nó sẽ:
 - Caddy tự xin chứng chỉ HTTPS (Let's Encrypt).
 
 Chờ ~1–2 phút rồi mở `https://truyen.tenmien.com` trên điện thoại/máy tính → nhập mật
-khẩu `E521satan`. Xong!
+khẩu `MAT-KHAU-CUA-BAN`. Xong!
 
 ---
 
