@@ -75,3 +75,48 @@ test('applyDomain gọi setBase trên nguồn TruyenQQ đang chạy', async () =
   mgr.applyDomain('https://new.com');
   assert.equal(setTo, 'https://new.com');
 });
+
+// --- gộp nguồn: TruyenQQ chính + OTruyen bổ sung ---
+
+function setupMerge(overrides = {}) {
+  return setup({
+    makeTruyenQQ: ({ base }) => ({
+      base, setBase(b) { this.base = b; },
+      async home() { return { items: [] }; },
+      async search() { return { items: [{ name: 'Có Sẵn', slug: 'co-san' }] }; },
+      async detail(slug) { return { slug, name: 'qq' }; },
+    }),
+    makeOtruyen: () => ({
+      async home() { return { items: [] }; },
+      async search() { return { items: [{ name: 'Bộ Thiếu', slug: 'bo-thieu' }] }; },
+      async detail(slug) { return { slug, name: 'ot' }; },
+    }),
+    ...overrides,
+  });
+}
+
+test('nguồn truyenqq mặc định được bổ sung bằng kho otruyen', async () => {
+  const { mgr } = setupMerge();
+  const { items } = await mgr.source.search('x');
+  assert.deepEqual(items.map(i => i.slug), ['co-san', 'ot~bo-thieu']);
+  // slug có tiền tố đi về đúng adapter bổ sung
+  assert.equal((await mgr.source.detail('ot~bo-thieu')).name, 'ot');
+  assert.equal((await mgr.source.detail('co-san')).name, 'qq');
+});
+
+test('settings supplement=0 thì tắt bổ sung, chỉ còn nguồn chính', async () => {
+  const db = openDb(':memory:');
+  createSchema(db);
+  const settings = createSettings(db);
+  settings.set('supplement', '0');
+  const { mgr } = setupMerge({ db, settings });
+  const { items } = await mgr.source.search('x');
+  assert.deepEqual(items.map(i => i.slug), ['co-san']);
+});
+
+test('đổi sang otruyen làm nguồn chính thì không bổ sung, slug không tiền tố', async () => {
+  const { mgr } = setupMerge();
+  mgr.setSource('otruyen');
+  const { items } = await mgr.source.search('x');
+  assert.deepEqual(items.map(i => i.slug), ['bo-thieu']);
+});

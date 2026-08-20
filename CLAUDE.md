@@ -37,6 +37,7 @@ categories/byCategory/detail/chapter`.
 - [src/source/cached.js](src/source/cached.js) `withCache` — cache home/list/byCategory/categories trong bảng `api_cache` (TTL 30', stale-fallback khi nguồn lỗi).
 - [src/source/clean.js](src/source/clean.js) — `cleanSynopsis`/`scrubBrands` bỏ HTML + đoạn SEO + tên nguồn.
 - [src/services/source-manager.js](src/services/source-manager.js) `createSourceManager` — chọn/đổi nguồn + domain **lúc chạy** (không cần restart); trả về facade (Proxy) ủy quyền. Đổi nguồn thì xóa `api_cache`.
+- [src/source/merged.js](src/source/merged.js) `withSupplement` — **gộp nguồn**: TruyenQQ chính, kho OTruyen bổ sung những bộ TruyenQQ KHÔNG có (so tên qua [title-key.js](src/source/title-key.js), bỏ dấu + hạ chữ). Slug bổ sung mang tiền tố `ot~` để `detail()` về đúng adapter và thư viện không lẫn slug; slug TruyenQQ giữ nguyên nên dữ liệu cũ không phải migrate. `chapter()` nhận URL nên định tuyến **theo host** (`otruyencdn.com`/`otruyenapi.com`). Nguồn bổ sung lỗi thì bỏ qua, không làm chết nguồn chính. Trang chủ + danh sách thể loại chỉ lấy từ nguồn chính; thể loại dịch slug giữa hai nguồn qua tên. Tắt bằng `settings` `supplement=0`.
 - [src/source/domain-resolver.js](src/source/domain-resolver.js) — **tự bắt domain TruyenQQ** khi nó nhảy tên miền: dò danh sách mirror (`config.TRUYENQQ_MIRRORS`), gặp domain sống thì ghi nhớ vào `settings`. `truyenqq.js` gọi `reprobe` khi request lỗi rồi thử lại.
 
 **Cấu hình sửa được trong web:** [src/services/settings.js](src/services/settings.js) bọc bảng
