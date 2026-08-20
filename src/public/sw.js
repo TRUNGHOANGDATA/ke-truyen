@@ -1,4 +1,4 @@
-const SHELL = 'shell-v2';
+const SHELL = 'shell-v3';
 const ASSETS = ['/public/css/styles.css', '/public/js/common.js', '/public/js/home.js', '/public/js/reader.js'];
 
 self.addEventListener('install', (e) => {

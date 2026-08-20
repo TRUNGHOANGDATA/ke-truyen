@@ -14,14 +14,30 @@ const io = new IntersectionObserver((entries) => {
   for (const e of entries) {
     if (!e.isIntersecting) continue;
     const idx = imgs.indexOf(e.target);
-    for (let i = idx; i < Math.min(imgs.length, idx + 4); i++) {
+    for (let i = idx; i < Math.min(imgs.length, idx + 6); i++) {
       const im = imgs[i];
       if (im.dataset.src) { im.src = im.dataset.src; delete im.dataset.src; }
     }
     io.unobserve(e.target);
   }
-}, { rootMargin: '800px 0px' });
+}, { rootMargin: '1600px 0px' });
 imgs.forEach(im => io.observe(im));
+
+// Do ti le tu vai trang dau roi ap cho nhung trang chua tai (bien --pg-ar trong CSS),
+// de luc anh tai xong o chua no khong doi kich thuoc -> het rung khi dang cuon.
+const ratios = [];
+function markLoaded(im) {
+  im.dataset.ok = '1';
+  if (ratios.length < 3 && im.naturalWidth && im.naturalHeight) {
+    ratios.push(im.naturalWidth / im.naturalHeight);
+    const sorted = [...ratios].sort((a, b) => a - b);
+    pages.style.setProperty('--pg-ar', String(sorted[Math.floor(sorted.length / 2)]));
+  }
+}
+imgs.forEach(im => {
+  if (im.complete && im.naturalWidth) markLoaded(im);
+  else im.addEventListener('load', () => markLoaded(im), { once: true });
+});
 
 // jump to saved page
 if (startPage > 0 && imgs[startPage]) {
