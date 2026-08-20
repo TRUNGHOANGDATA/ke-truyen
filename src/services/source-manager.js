@@ -72,6 +72,21 @@ export function createSourceManager({
       return name;
     },
 
+    /** Đang bật bổ sung truyện từ kho OTruyen? */
+    supplementOn: () => settings.get("supplement", "1") !== "0",
+
+    /**
+     * Bật/tắt bổ sung. Dựng lại nguồn + xóa cache vì kết quả đã cache là bản
+     * ĐÃ gộp, không tắt cache thì bấm tắt vẫn thấy truyện bổ sung.
+     * Chỉ có tác dụng khi nguồn chính là truyenqq.
+     */
+    setSupplement(on) {
+      settings.set("supplement", on ? "1" : "0");
+      build(settings.get("source", "truyenqq"));
+      clearCache();
+      return on;
+    },
+
     /** Đổi domain TruyenQQ thủ công (đã kiểm tra sống ở tầng route). */
     applyDomain(base) {
       resolver.setCurrent(base);

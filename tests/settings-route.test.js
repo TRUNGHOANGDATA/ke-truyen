@@ -88,3 +88,27 @@ test('POST /settings/reprobe báo 502 khi mọi domain chết', async () => {
   const res = await a.post('/settings/reprobe');
   assert.equal(res.status, 502);
 });
+
+test('bật/tắt bổ sung qua POST /settings/supplement', async () => {
+  const a = request.agent(app());
+  await login(a);
+
+  const off = await a.post('/settings/supplement').send({ on: false });
+  assert.equal(off.status, 200);
+  assert.equal(off.body.supplement, false);
+
+  const on = await a.post('/settings/supplement').send({ on: true });
+  assert.equal(on.body.supplement, true);
+});
+
+test('trang /settings hiện ô tick bổ sung theo trạng thái đang lưu', async () => {
+  const a = request.agent(app());
+  await login(a);
+
+  const bat = await a.get('/settings');           // mặc định là bật
+  assert.match(bat.text, /id="sup"[^>]*checked/);
+
+  await a.post('/settings/supplement').send({ on: false });
+  const tat = await a.get('/settings');
+  assert.doesNotMatch(tat.text, /id="sup"[^>]*checked/);
+});

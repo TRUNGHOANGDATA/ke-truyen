@@ -17,6 +17,13 @@
       </select>
     </label>
 
+    <label style="display:flex; gap:9px; align-items:flex-start">
+      <input id="sup" type="checkbox" <%= supplement ? "checked" : "" %> style="margin-top:3px; flex:0 0 auto">
+      <span>Bổ sung truyện từ kho OTruyen
+        <br><small style="color:#888">Ô tìm kiếm và các dải thể loại sẽ chèn thêm những bộ TruyenQQ không có; bộ nào TruyenQQ đã có thì bỏ. Kho này đã ngừng cập nhật từ 11/06/2026 nên chỉ thêm truyện cũ. Chỉ có tác dụng khi nguồn chính là TruyenQQ.</small>
+      </span>
+    </label>
+
     <label style="display:flex; flex-direction:column; gap:6px">
       <span>Domain TruyenQQ (khi trang nguồn đổi tên miền)</span>
       <input id="domain" class="field" type="text" value="<%= domain %>" placeholder="https://truyenqq...com">
@@ -63,6 +70,20 @@
       const r = await api('/settings/source', { method: 'POST', body: JSON.stringify({ source: document.getElementById('source').value }) });
       srcOut.textContent = 'Đã đổi nguồn sang ' + r.source + '. Tải lại trang để thấy truyện mới.';
     } catch (e) { srcOut.textContent = 'Lỗi: ' + e.message; }
+  });
+
+  document.getElementById('sup').addEventListener('change', async (e) => {
+    const on = e.target.checked;
+    srcOut.textContent = on ? 'Đang bật bổ sung…' : 'Đang tắt bổ sung…';
+    try {
+      const r = await api('/settings/supplement', { method: 'POST', body: JSON.stringify({ on }) });
+      srcOut.textContent = r.supplement
+        ? 'Đã bật bổ sung từ kho OTruyen. Tải lại trang để thấy.'
+        : 'Đã tắt, chỉ còn truyện từ TruyenQQ. Tải lại trang để thấy.';
+    } catch (err) {
+      e.target.checked = !on;            // trả ô tick về đúng trạng thái thật
+      srcOut.textContent = 'Lỗi: ' + err.message;
+    }
   });
 
   document.getElementById('saveDom').addEventListener('click', async () => {

@@ -158,6 +158,7 @@ export function mountPages(app) {
       source: settings.get('source', 'truyenqq'),
       domain: manager.resolver.current(),
       mirrors: config.TRUYENQQ_MIRRORS,
+      supplement: manager.supplementOn(),
     });
   });
 
@@ -167,6 +168,13 @@ export function mountPages(app) {
       const name = svc().manager.setSource(String(req.body.source || ''));
       res.json({ ok: true, source: name });
     } catch (e) { res.status(400).json({ error: e.message }); }
+  });
+
+  // Bật/tắt bổ sung truyện từ kho OTruyen
+  app.post("/settings/supplement", (req, res) => {
+    const raw = req.body.on;
+    const on = raw === true || raw === 1 || raw === "1" || raw === "true" || raw === "on";
+    res.json({ ok: true, supplement: svc().manager.setSupplement(on) });
   });
 
   // Đổi domain TruyenQQ thủ công — kiểm tra sống trước khi lưu
