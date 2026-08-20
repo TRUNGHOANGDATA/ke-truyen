@@ -6,7 +6,7 @@ mật khẩu đăng nhập. Giao diện clone TruyenQQ nhưng bỏ hết quảng
 
 - **Triển khai:** Docker + Caddy trên bất kỳ VPS Ubuntu nào. Xem [HUONG-DAN-DEPLOY.md](HUONG-DAN-DEPLOY.md).
 - **Ngôn ngữ:** UI + comment code bằng tiếng Việt.
-- **Phase 2 (chưa làm):** truyện chữ (text novel).
+- **Phase 2 (đã có MVP):** truyện chữ (text novel) — nguồn truyenfull, xem mục Truyện chữ bên dưới.
 
 ## Lệnh hay dùng
 ```bash
@@ -38,6 +38,7 @@ categories/byCategory/detail/chapter`.
 - [src/source/clean.js](src/source/clean.js) — `cleanSynopsis`/`scrubBrands` bỏ HTML + đoạn SEO + tên nguồn.
 - [src/services/source-manager.js](src/services/source-manager.js) `createSourceManager` — chọn/đổi nguồn + domain **lúc chạy** (không cần restart); trả về facade (Proxy) ủy quyền. Đổi nguồn thì xóa `api_cache`.
 - [src/source/merged.js](src/source/merged.js) `withSupplement` — **gộp nguồn**: TruyenQQ chính, kho OTruyen bổ sung những bộ TruyenQQ KHÔNG có (so tên qua [title-key.js](src/source/title-key.js), bỏ dấu + hạ chữ). Slug bổ sung mang tiền tố `ot~` để `detail()` về đúng adapter và thư viện không lẫn slug; slug TruyenQQ giữ nguyên nên dữ liệu cũ không phải migrate. `chapter()` nhận URL nên định tuyến **theo host** (`otruyencdn.com`/`otruyenapi.com`). Nguồn bổ sung lỗi thì bỏ qua, không làm chết nguồn chính. Trang chủ + danh sách thể loại chỉ lấy từ nguồn chính; thể loại dịch slug giữa hai nguồn qua tên. Tắt bằng `settings` `supplement=0`.
+- [src/source/truyenfull.js](src/source/truyenfull.js) `createTruyenfullSource` — **nguồn truyện CHỮ (Phase 2)**, crawl HTML. Cùng bộ phương thức nhưng item mang `kind:'novel'` và `chapter()` trả `{paragraphs,title}` (đoạn văn) thay vì ảnh. Mục lục gộp mọi trang `/{slug}/trang-N/` (đọc `#total-page`, tải song song theo lô). Là **trục riêng** với truyện tranh: wire thẳng trong [app.js](src/app.js) là `novelSource`, KHÔNG qua source-manager/merge. Slug lưu kèm tiền tố `tf~` (chống trùng slug trong bảng dùng chung + là tín hiệu "đây là truyện chữ"); `app.locals.detailUrl` bóc tiền tố để thẻ truyện link đúng `/chu/...`. Route: `/chu` (duyệt/tìm), `/chu/:slug` (chi tiết), `/doc-chu/:slug/:chapter` (đọc). Reader chữ [reader-novel.ejs](src/views/reader-novel.ejs) + [reader-novel.js](src/public/js/reader-novel.js): nền giấy, căn đều, chỉnh cỡ chữ (nhớ localStorage), lưu vị trí đọc theo **% cuộn** (tái dùng cột `image_page`). Theo dõi qua `/api/novel/follow`; unfollow/progress dùng chung API (slug đã có tiền tố).
 - [src/source/domain-resolver.js](src/source/domain-resolver.js) — **tự bắt domain TruyenQQ** khi nó nhảy tên miền: dò danh sách mirror (`config.TRUYENQQ_MIRRORS`), gặp domain sống thì ghi nhớ vào `settings`. `truyenqq.js` gọi `reprobe` khi request lỗi rồi thử lại.
 
 **Cấu hình sửa được trong web:** [src/services/settings.js](src/services/settings.js) bọc bảng

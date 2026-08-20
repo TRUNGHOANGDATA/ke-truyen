@@ -9,7 +9,7 @@ function dirSize(dir) {
   } catch { return 0; }
 }
 
-export function mountApi(app, { source, library, updates, cacheDir, archive, drive, refererFor }) {
+export function mountApi(app, { source, novelSource, library, updates, cacheDir, archive, drive, refererFor }) {
   app.get('/api/library', (req, res) => res.json({ items: library.listFollowed() }));
 
   app.get('/api/search', async (req, res) => {
@@ -33,6 +33,17 @@ export function mountApi(app, { source, library, updates, cacheDir, archive, dri
   app.post('/api/follow', async (req, res) => {
     try {
       const detail = await source.detail(req.body.slug);
+      library.follow(detail);
+      res.json({ ok: true, followed: true });
+    } catch (e) { res.status(502).json({ error: String(e.message || e) }); }
+  });
+
+  // Theo dõi truyện chữ: slug sạch từ URL /chu/:slug, lưu kèm tiền tố "tf~".
+  app.post('/api/novel/follow', async (req, res) => {
+    try {
+      const clean = String(req.body.slug || '');
+      const detail = await novelSource.detail(clean);
+      detail.slug = 'tf~' + clean;
       library.follow(detail);
       res.json({ ok: true, followed: true });
     } catch (e) { res.status(502).json({ error: String(e.message || e) }); }

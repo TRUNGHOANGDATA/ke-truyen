@@ -438,3 +438,15 @@ a.link { text-decoration: none; }
   .navsearch-form { order: 4; flex: 1 0 100%; margin: 0; }
   .navsearch { display: block; width: 100%; box-sizing: border-box; }
 }
+
+/* ===== Đọc truyện chữ ===== */
+.txt-btn { background: rgba(255,255,255,.12); color: #fff; border: 0; border-radius: 6px; padding: 6px 9px; font-family: var(--font-mono); font-size: 12px; cursor: pointer; }
+.txt-btn:hover { background: rgba(255,255,255,.22); }
+.rdstage.novel { background: #EDE7DA; padding-bottom: 60px; }           /* nền giấy, dịu mắt */
+.novel-col { max-width: 720px; margin: 0 auto; padding: 26px 20px 40px; color: #23201A; font-family: var(--font-prose); }
+.novel-h { font-family: var(--font-head); font-size: 22px; font-weight: 700; margin: 0 0 4px; color: #1a1712; }
+.novel-ch { font-family: var(--font-mono); font-size: 13px; color: #6a6455; margin: 0 0 22px; padding-bottom: 14px; border-bottom: 1px solid #D8CFBB; }
+.novel-col p { font-size: var(--novel-fs, 19px); line-height: 1.85; margin: 0 0 1.05em; text-align: justify; text-justify: inter-word; word-break: break-word; }
+.novel-col .endblk { margin-top: 34px; padding-top: 20px; border-top: 1px solid #D8CFBB; text-align: center; }
+.novel-col .endblk .lb { font-family: var(--font-mono); font-size: 13px; color: #6a6455; margin-bottom: 12px; }
+.novel-col .endblk .bg { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }

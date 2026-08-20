@@ -1,5 +1,5 @@
-const SHELL = 'shell-v3';
-const ASSETS = ['/public/css/styles.css', '/public/js/common.js', '/public/js/home.js', '/public/js/reader.js'];
+const SHELL = 'shell-v4';
+const ASSETS = ['/public/css/styles.css', '/public/js/common.js', '/public/js/home.js', '/public/js/reader.js', '/public/js/reader-novel.js'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(SHELL).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));

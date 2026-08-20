@@ -21,6 +21,8 @@ export const config = {
   TRUYENQQ_MIRRORS: (process.env.TRUYENQQ_MIRRORS ||
     'https://truyenqqko.com,https://truyenqqto.com,https://truyenqqgo.com,https://truyenqqviet.com,https://truyenqqvn.com,https://truyenqq.com,https://truyenqqmoi.com'
   ).split(',').map(s => s.trim().replace(/\/+$/, '')).filter(Boolean),
+  // Nguồn truyện chữ (Phase 2): truyenfull, crawl HTML
+  TRUYENFULL_BASE: process.env.TRUYENFULL_BASE || "https://truyenfull.live",
   // Google Drive — lưu ảnh chương để đọc lâu dài (xem README phần "Lưu offline")
   DRIVE_CLIENT_ID: process.env.DRIVE_CLIENT_ID || '',
   DRIVE_CLIENT_SECRET: process.env.DRIVE_CLIENT_SECRET || '',
@@ -34,6 +36,8 @@ export const IMAGE_HOSTS = [
   'img.otruyenapi.com', 'otruyencdn.com',
   // TruyenQQ (bìa + ảnh chương)
   'truyenvua.com', 'hinhhinh.com', 'tintruyen.net', 'truyenqqko.com',
+  // Truyện chữ (chỉ ảnh bìa)
+  'static.truyenfull.live', 'truyenfull.live', 'truyenfull.vn',
 ];
 
 /**

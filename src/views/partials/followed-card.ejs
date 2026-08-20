@@ -4,7 +4,7 @@
           data-action="<%= clearMode ? 'clear' : 'unfollow' %>"
           title="<%= clearMode ? 'Xoá khỏi đang đọc dở' : 'Bỏ theo dõi' %>"
           aria-label="<%= clearMode ? 'Xoá khỏi đang đọc dở' : 'Bỏ theo dõi' %>">✕</button>
-  <a class="cc" href="/truyen/<%= comic.slug %>">
+  <a class="cc" href="<%= detailUrl(comic.slug) %>">
     <div class="thumb">
       <img loading="lazy" src="<%= img(comic.thumbUrl) %>" alt="<%= comic.name %>">
       <% if (comic.progress) { %><span class="when">Đang đọc</span><% } %>

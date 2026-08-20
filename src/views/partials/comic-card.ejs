@@ -1,4 +1,4 @@
-<a class="cc" href="/truyen/<%= comic.slug %>">
+<a class="cc" href="<%= detailUrl(comic.slug) %>">
   <div class="thumb">
     <img loading="lazy" src="<%= img(comic.thumbUrl) %>" alt="<%= comic.name %>">
     <% if (comic.when) { %><span class="when"><%= comic.when %></span><% } %>

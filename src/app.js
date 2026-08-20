@@ -11,6 +11,7 @@ import { createSchema } from './db/migrations.js';
 import { withCache } from './source/cached.js';
 import { createSettings } from './services/settings.js';
 import { createSourceManager } from './services/source-manager.js';
+import { createTruyenfullSource } from './source/truyenfull.js';
 import { createLibrary } from './services/library.js';
 import { createUpdates } from './services/updates.js';
 import { createDrive } from './storage/drive.js';
@@ -61,6 +62,8 @@ export function buildApp(deps = {}) {
   // Nguồn động: đổi nguồn/domain lúc chạy không cần restart. Test vẫn inject deps.source được.
   const manager = createSourceManager({ db, settings, config, probeFetch: deps.probeFetch });
   const source = deps.source ?? manager.source;
+  // Nguồn truyện chữ (Phase 2) — trục riêng, không trộn vào facade truyện tranh.
+  const novelSource = deps.novelSource ?? createTruyenfullSource({ base: config.TRUYENFULL_BASE });
   const library = createLibrary(db);
   const updates = createUpdates({ library, source });
 
@@ -82,8 +85,11 @@ export function buildApp(deps = {}) {
     drive,
   });
 
-  mountApi(app, { source, library, updates, cacheDir, archive, drive, refererFor });
-  app.locals.services = { db, source, library, updates, archive, drive, settings, manager };
+  mountApi(app, { source, novelSource, library, updates, cacheDir, archive, drive, refererFor });
+  app.locals.services = { db, source, novelSource, library, updates, archive, drive, settings, manager };
+
+  // Link chi tiết theo loại: slug truyện chữ mang tiền tố "tf~" -> /chu/...
+  app.locals.detailUrl = (slug) => (String(slug).startsWith('tf~') ? '/chu/' + slug.slice(3) : '/truyen/' + slug);
   mountPages(app);
 
   return app;

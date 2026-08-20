@@ -252,4 +252,73 @@ export function mountPages(app) {
       res.status(502).send('Lỗi tải chương: ' + (e.message || e));
     }
   });
+
+  // ===== TRUYỆN CHỮ (Phase 2) — trục riêng, slug lưu kèm tiền tố "tf~" =====
+  const PFX = 'tf~';
+
+  // Duyệt / tìm truyện chữ
+  app.get('/chu', async (req, res) => {
+    const q = String(req.query.q || '').trim();
+    let items = [], err = false;
+    try {
+      const r = q ? await svc().novelSource.search(q) : await svc().novelSource.home();
+      items = (r.items || []).map(c => ({ ...c, slug: PFX + c.slug, when: relTime(c.updatedAt) }));
+    } catch { err = true; }
+    res.render('novels', { title: q ? `Tìm: ${q}` : 'Truyện chữ', active: 'chu', items, q, err });
+  });
+
+  // Chi tiết một truyện chữ
+  app.get('/chu/:slug', async (req, res) => {
+    const clean = req.params.slug;
+    const pslug = PFX + clean;
+    try {
+      const detail = await svc().novelSource.detail(clean);
+      detail.slug = pslug; // lưu + định tuyến bằng slug có tiền tố
+      res.render('novel-detail', {
+        title: detail.name, active: 'chu', detail, clean,
+        followed: svc().library.isFollowed(pslug),
+        progress: svc().library.getProgress(pslug),
+      });
+    } catch (e) {
+      res.status(502).render('status', { title: 'Lỗi', active: '' });
+    }
+  });
+
+  // Đọc một chương truyện chữ
+  app.get('/doc-chu/:slug/:chapter', async (req, res) => {
+    const clean = req.params.slug;
+    const pslug = PFX + clean;
+    const chapterName = decodeURIComponent(req.params.chapter);
+    const svcs = svc();
+    try {
+      let chapters = svcs.library.chaptersOf(pslug);
+      let detail = null;
+      if (!chapters.length) {
+        detail = await svcs.novelSource.detail(clean);
+        detail.slug = pslug;
+        chapters = detail.chapters.map((c, i) => ({ comic_slug: pslug, chapter_name: c.name,
+          chapter_title: c.title, api_url: c.apiUrl, order_index: i }));
+      }
+      const idx = chapters.findIndex(c => c.chapter_name === chapterName);
+      if (idx === -1) return res.status(404).send('Không tìm thấy chương');
+      const cur = chapters[idx];
+      const { paragraphs, title } = await svcs.novelSource.chapter(cur.api_url);
+      const prev = idx > 0 ? chapters[idx - 1].chapter_name : null;
+      const next = idx < chapters.length - 1 ? chapters[idx + 1].chapter_name : null;
+      const progress = svcs.library.getProgress(pslug);
+      // Truyện chữ: tái dùng cột image_page để lưu % vị trí cuộn (0–100).
+      const startPercent = (progress && progress.chapterName === chapterName) ? progress.imagePage : 0;
+      const row = svcs.library.listTracked().find(c => c.slug === pslug);
+      if (!detail && !row) { detail = await svcs.novelSource.detail(clean); detail.slug = pslug; }
+      if (detail) svcs.library.remember(detail);
+      const name = detail?.name || row?.name || clean;
+      res.render('reader-novel', {
+        title: `${name} — Chương ${chapterName}`,
+        slug: pslug, clean, name, chapterName, chapterTitle: title, paragraphs,
+        prev, next, startPercent, total: chapters.length, index: idx,
+      });
+    } catch (e) {
+      res.status(502).send('Lỗi tải chương: ' + (e.message || e));
+    }
+  });
 }

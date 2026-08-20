@@ -82,10 +82,17 @@ document.addEventListener('click', async (e) => {
 /* ---------- Theo dõi / bỏ theo dõi (trang chi tiết) ---------- */
 const fb = document.getElementById('followBtn');
 fb?.addEventListener('click', async () => {
-  const slug = fb.dataset.slug;
   const on = fb.classList.contains('on');
+  // Truyện chữ: follow qua endpoint riêng (nhận slug sạch, tự thêm tiền tố);
+  // unfollow dùng chung nhưng cần slug ĐÃ có tiền tố.
+  const isNovel = fb.dataset.novel === '1';
+  const followReq = isNovel
+    ? { url: '/api/novel/follow', slug: fb.dataset.slug }
+    : { url: '/api/follow', slug: fb.dataset.slug };
+  const unfollowSlug = isNovel ? fb.dataset.pslug : fb.dataset.slug;
   try {
-    await api(on ? '/api/unfollow' : '/api/follow', { method: 'POST', body: JSON.stringify({ slug }) });
+    if (on) await api('/api/unfollow', { method: 'POST', body: JSON.stringify({ slug: unfollowSlug }) });
+    else await api(followReq.url, { method: 'POST', body: JSON.stringify({ slug: followReq.slug }) });
     fb.classList.toggle('on');
     fb.textContent = on ? '+ Theo dõi' : '✓ Đang theo dõi';
   } catch (e) { alert('Lỗi: ' + e.message); }
