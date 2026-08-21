@@ -13,7 +13,9 @@
  */
 import { titleKey } from './title-key.js';
 
-const SUP_HOSTS = /(?:^|\.)(otruyencdn\.com|otruyenapi\.com)$/;
+// chapter() nhận URL trang đọc; định tuyến về nguồn bổ sung theo host.
+// NetTruyen (nettruyen.id) là kho bổ sung hiện tại; giữ host OTruyen cũ cho dữ liệu cũ.
+const SUP_HOSTS = /(?:^|\.)(nettruyen\.id|otruyencdn\.com|otruyenapi\.com)$/;
 
 export function withSupplement(primary, secondary, {
   prefix = 'ot~',

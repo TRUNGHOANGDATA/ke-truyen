@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="vi"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow"><meta name="color-scheme" content="light">
+<link rel="stylesheet" href="/public/css/styles.css"><title><%= title %></title>
+</head><body>
+<%- include('partials/header', { active: '' }) %>
+<div class="wrap"><div class="col-main">
+  <div class="box">
+    <div class="boxhead"><h2>Không đọc được chương</h2></div>
+    <div style="padding:20px 16px; display:flex; flex-direction:column; gap:14px; max-width:560px">
+      <p style="margin:0; color:var(--text-dim); line-height:1.6"><%= message %></p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap">
+        <a class="btn" href="<%= backUrl %>">← Danh sách chương</a>
+        <a class="ghost" href="/">Trang chủ</a>
+      </div>
+    </div>
+  </div>
+</div></div>
+</body></html>

@@ -5,7 +5,7 @@
  * Trả về một `source` (facade) ủy quyền về nguồn hiện hành, nên các nơi khác
  * (routes, archive, api) giữ nguyên tham chiếu này kể cả khi người dùng đổi nguồn.
  */
-import { createSource } from '../source/otruyen.js';
+import { createNetTruyenSource } from '../source/nettruyen.js';
 import { createTruyenQQSource } from '../source/truyenqq.js';
 import { createDomainResolver } from '../source/domain-resolver.js';
 import { withCache } from '../source/cached.js';
@@ -19,7 +19,7 @@ export function createSourceManager({
   wrap = withCache,
   probeFetch,               // fetch riêng cho việc dò domain (tiện test)
   makeTruyenQQ = createTruyenQQSource,
-  makeOtruyen = createSource,
+  makeSupplement = createNetTruyenSource,
   makeResolver = createDomainResolver,
   combine = withSupplement,
 } = {}) {
@@ -30,15 +30,17 @@ export function createSourceManager({
 
   let raw, active;
 
-  const newOtruyen = () => makeOtruyen({ base: config.OTRUYEN_BASE, cdnBase: config.CDN_IMAGE_BASE });
+  // Kho bổ sung nay crawl NetTruyen (OTruyen API đã chết phần đọc chương).
+  // Giữ tên settings 'otruyen' cho tương thích lịch sử.
+  const newSupplement = () => makeSupplement({ base: config.NETTRUYEN_BASE });
 
   function buildRaw(name) {
-    if (name === 'otruyen') return newOtruyen();
+    if (name === 'otruyen') return newSupplement();
     const qq = makeTruyenQQ({ base: resolver.current(), reprobe: () => resolver.reprobe() });
-    // TruyenQQ làm nguồn chính, kho OTruyen bổ sung những bộ TruyenQQ không có.
-    // Tắt được bằng settings: supplement=0 (vd khi kho bổ sung chết hẳn).
+    // TruyenQQ làm nguồn chính, kho NetTruyen bổ sung những bộ TruyenQQ không có.
+    // Tắt được bằng settings: supplement=0.
     if (settings.get('supplement', '1') === '0') return qq;
-    return combine(qq, newOtruyen());
+    return combine(qq, newSupplement());
   }
 
   function build(name) {

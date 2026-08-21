@@ -249,7 +249,14 @@ export function mountPages(app) {
         categories, author: detail?.author || '', status: detail?.status || row?.status || '',
       });
     } catch (e) {
-      res.status(502).send('Lỗi tải chương: ' + (e.message || e));
+      // Không lộ URL/host nguồn ra trang lỗi (giữ quy ước scrubBrands).
+      res.status(502).render('reader-error', {
+        title: 'Không đọc được chương',
+        message: slug.startsWith('ot~')
+          ? 'Bộ này lấy từ kho bổ sung, hiện máy chủ nguồn không phản hồi nên tạm thời không đọc được. Bạn thử lại sau, hoặc tìm bộ tương tự ở nguồn chính.'
+          : 'Nguồn truyện tạm thời không phản hồi. Bạn thử tải lại sau ít phút.',
+        backUrl: '/truyen/' + slug,
+      });
     }
   });
 
@@ -334,7 +341,11 @@ export function mountPages(app) {
         prev, next, startPercent, total: chapters.length, index: idx,
       });
     } catch (e) {
-      res.status(502).send('Lỗi tải chương: ' + (e.message || e));
+      res.status(502).render('reader-error', {
+        title: 'Không đọc được chương',
+        message: 'Nguồn truyện chữ tạm thời không phản hồi. Bạn thử tải lại sau ít phút.',
+        backUrl: '/chu/' + clean,
+      });
     }
   });
 }

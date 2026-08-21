@@ -15,7 +15,7 @@ function setup(overrides = {}) {
     wrap: (_db, raw) => raw,                       // bỏ cache cho dễ test
     makeResolver: () => ({ current: () => 'https://a.com', setCurrent() {}, reprobe: async () => 'https://a.com' }),
     makeTruyenQQ: ({ base }) => ({ id: 'truyenqq', base, setBase(b) { this.base = b; }, async home() { return { src: 'qq', base: this.base }; } }),
-    makeOtruyen: () => ({ id: 'otruyen', async home() { return { src: 'ot' }; } }),
+    makeSupplement: () => ({ id: 'otruyen', async home() { return { src: 'ot' }; } }),
     ...overrides,
   });
   return { db, settings, mgr };
@@ -86,7 +86,7 @@ function setupMerge(overrides = {}) {
       async search() { return { items: [{ name: 'Có Sẵn', slug: 'co-san' }] }; },
       async detail(slug) { return { slug, name: 'qq' }; },
     }),
-    makeOtruyen: () => ({
+    makeSupplement: () => ({
       async home() { return { items: [] }; },
       async search() { return { items: [{ name: 'Bộ Thiếu', slug: 'bo-thieu' }] }; },
       async detail(slug) { return { slug, name: 'ot' }; },

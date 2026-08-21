@@ -21,6 +21,8 @@ export const config = {
   TRUYENQQ_MIRRORS: (process.env.TRUYENQQ_MIRRORS ||
     'https://truyenqqko.com,https://truyenqqto.com,https://truyenqqgo.com,https://truyenqqviet.com,https://truyenqqvn.com,https://truyenqq.com,https://truyenqqmoi.com'
   ).split(',').map(s => s.trim().replace(/\/+$/, '')).filter(Boolean),
+  // Nguồn bổ sung truyện tranh: NetTruyen (thay OTruyen API đã chết phần đọc chương)
+  NETTRUYEN_BASE: process.env.NETTRUYEN_BASE || "https://nettruyen.id",
   // Nguồn truyện chữ (Phase 2): truyenfull, crawl HTML
   TRUYENFULL_BASE: process.env.TRUYENFULL_BASE || "https://truyenfull.live",
   // Google Drive — lưu ảnh chương để đọc lâu dài (xem README phần "Lưu offline")
@@ -32,8 +34,9 @@ export const config = {
 
 /** Host ảnh được phép đi qua proxy /img (chặn dùng làm proxy mở) */
 export const IMAGE_HOSTS = [
-  // OTruyen
-  'img.otruyenapi.com', 'otruyencdn.com',
+  // OTruyen / NetTruyen (kho bổ sung: bìa + ảnh chương)
+  'img.otruyenapi.com', 'otruyencdn.com', 'sv1.otruyencdn.com',
+  'nettruyen-api.clubc.org', 'images.truyenonline.cc', 'truyenonline.cc', 'nettruyen.id',
   // TruyenQQ (bìa + ảnh chương)
   'truyenvua.com', 'hinhhinh.com', 'tintruyen.net', 'truyenqqko.com',
   // Truyện chữ (chỉ ảnh bìa; nhiều host: CDN riêng, 8cache, ảnh Google Drive)
