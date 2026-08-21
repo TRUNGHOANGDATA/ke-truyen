@@ -63,7 +63,8 @@ export function buildApp(deps = {}) {
   const manager = createSourceManager({ db, settings, config, probeFetch: deps.probeFetch });
   const source = deps.source ?? manager.source;
   // Nguồn truyện chữ (Phase 2) — trục riêng, không trộn vào facade truyện tranh.
-  const novelSource = deps.novelSource ?? createTruyenfullSource({ base: config.TRUYENFULL_BASE });
+  // Bọc cache home/list/byCategory/categories như nguồn tranh (detail/chapter/search vẫn tươi).
+  const novelSource = deps.novelSource ?? withCache(db, createTruyenfullSource({ base: config.TRUYENFULL_BASE }), { keyPrefix: 'nv:' });
   const library = createLibrary(db);
   const updates = createUpdates({ library, source });
 

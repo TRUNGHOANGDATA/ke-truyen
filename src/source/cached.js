@@ -7,7 +7,8 @@ const MIN = 60 * 1000;
  * - Nếu nguồn lỗi mà còn dữ liệu cũ trong cache thì dùng dữ liệu cũ
  *   (thà hiện hơi cũ còn hơn trang trắng).
  */
-export function withCache(db, source, { ttlMs = 30 * MIN } = {}) {
+export function withCache(db, source, { ttlMs = 30 * MIN, keyPrefix = '' } = {}) {
+  const K = (k) => keyPrefix + k;
   const getRow = db.prepare('SELECT payload, expires_at FROM api_cache WHERE cache_key=?');
   const putRow = db.prepare(`
     INSERT INTO api_cache (cache_key, payload, expires_at) VALUES (?,?,?)
@@ -35,10 +36,11 @@ export function withCache(db, source, { ttlMs = 30 * MIN } = {}) {
   return {
     ...source,
     // v2: đổi khoá để bỏ bản cache cũ (trước đây thiếu tham số sắp xếp)
-    home: () => cached('home:v2', () => source.home()),
-    list: (type = 'truyen-moi', page = 1) => cached(`list:v2:${type}:${page}`, () => source.list(type, page)),
-    byCategory: (slug, page = 1) => cached(`cat:v2:${slug}:${page}`, () => source.byCategory(slug, page)),
-    categories: () => cached('categories', () => source.categories(), 24 * 60 * MIN),
+    // keyPrefix tách cache theo nguồn (nguồn tranh vs truyện chữ dùng chung bảng api_cache).
+    home: () => cached(K('home:v2'), () => source.home()),
+    list: (type = 'truyen-moi', page = 1) => cached(K(`list:v2:${type}:${page}`), () => source.list(type, page)),
+    byCategory: (slug, page = 1) => cached(K(`cat:v2:${slug}:${page}`), () => source.byCategory(slug, page)),
+    categories: () => cached(K('categories'), () => source.categories(), 24 * 60 * MIN),
     // detail / chapter / search giữ nguyên: cần dữ liệu mới nhất
   };
 }

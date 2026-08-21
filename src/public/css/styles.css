@@ -450,3 +450,11 @@ a.link { text-decoration: none; }
 .novel-col .endblk { margin-top: 34px; padding-top: 20px; border-top: 1px solid #D8CFBB; text-align: center; }
 .novel-col .endblk .lb { font-family: var(--font-mono); font-size: 13px; color: #6a6455; margin-bottom: 12px; }
 .novel-col .endblk .bg { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+/* Phân trang kiểu link (dùng ở /chu truyện chữ) */
+.pager .pgbtn { height: 32px; display: inline-flex; align-items: center; padding: 0 12px; background: var(--card-2); border: 1px solid var(--line); border-radius: var(--r); font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); text-decoration: none; }
+.pager .pgbtn:hover { background: var(--hot-soft); color: var(--hot); }
+.pager .pgnow { height: 32px; display: inline-flex; align-items: center; padding: 0 12px; font-family: var(--font-mono); font-size: 12px; color: var(--text-faint); }
+/* Nhãn phân biệt truyện chữ trên thẻ (thư viện + đang đọc dở) */
+.cc .kindflag { position: absolute; top: 0; left: 0; z-index: 4; background: #6D4AFF; color: #fff; font-size: 9.5px; font-weight: 700; letter-spacing: .02em; padding: 3px 7px; border-bottom-right-radius: 5px; font-family: var(--font-mono); }
+/* Nếu vừa có nhãn "Chữ" vừa có badge "Đang đọc"/thời gian ở góc trái thì đẩy badge xuống */
+.thumb:has(.kindflag) .when { top: 20px; }

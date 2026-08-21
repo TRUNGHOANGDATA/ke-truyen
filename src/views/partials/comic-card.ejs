@@ -1,5 +1,6 @@
 <a class="cc" href="<%= detailUrl(comic.slug) %>">
   <div class="thumb">
+    <% if (String(comic.slug).startsWith("tf~")) { %><span class="kindflag">Chữ</span><% } %>
     <img loading="lazy" src="<%= img(comic.thumbUrl) %>" alt="<%= comic.name %>">
     <% if (comic.when) { %><span class="when"><%= comic.when %></span><% } %>
     <% if (comic.unread) { %><span class="hotflag"><%= comic.unread %></span><% } %>

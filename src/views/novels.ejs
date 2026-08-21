@@ -7,10 +7,22 @@
 </head><body>
 <%- include('partials/header', { active, q }) %>
 
+<% if (cats && cats.length && !q) { %>
+<div class="chipbar"><div class="chipbar-in">
+  <div class="chips" id="chips">
+    <a class="gchip <%= !category ? 'sel' : '' %>" href="/chu">Tất cả</a>
+    <% cats.forEach(cat => { %>
+      <a class="gchip <%= category===cat.slug ? 'sel' : '' %>" href="/chu?category=<%= cat.slug %>"><%= cat.name %></a>
+    <% }) %>
+  </div>
+  <button class="morechip" type="button" data-more>Xem tất cả ▾</button>
+</div></div>
+<% } %>
+
 <div class="wrap"><div class="col-main">
   <div class="box">
     <div class="boxhead"><h2>Truyện chữ</h2><div class="sp"></div>
-      <span class="cnt"><%= q ? `Kết quả cho "${q}"` : 'Mới cập nhật' %></span></div>
+      <span class="cnt"><%= q ? `Kết quả cho "${q}"` : (catName || 'Mới cập nhật') %></span></div>
 
     <form class="navsearch-form" action="/chu" method="get" role="search" style="padding:14px 16px 0">
       <input class="field" name="q" value="<%= q %>" placeholder="⌕ Tìm truyện chữ…" autocomplete="off" style="width:100%">
@@ -24,7 +36,17 @@
       <div class="cgrid">
         <% items.forEach(comic => { %><%- include('partials/comic-card', { comic }) %><% }) %>
       </div>
+
+      <% if (paged) { %>
+        <% const base = category ? `/chu?category=${category}&` : '/chu?'; %>
+        <div class="pager">
+          <% if (page > 1) { %><a class="pgbtn" href="<%= base %>page=<%= page - 1 %>">← Trang trước</a><% } %>
+          <span class="pgnow">Trang <%= page %></span>
+          <% if (hasMore) { %><a class="pgbtn" href="<%= base %>page=<%= page + 1 %>">Trang sau →</a><% } %>
+        </div>
+      <% } %>
     <% } %>
   </div>
 </div></div>
+<script type="module" src="/public/js/home.js"></script>
 </body></html>

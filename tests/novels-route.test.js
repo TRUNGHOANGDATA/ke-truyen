@@ -22,9 +22,13 @@ const novelDetail = {
   ],
 };
 
+const oneItem = [{ kind: 'novel', slug: 'dai-chua-te', name: 'Đại Chúa Tể', thumbUrl: novelDetail.thumbUrl, latestChapter: '2' }];
 const novelSource = {
-  async home() { return { items: [{ kind: 'novel', slug: 'dai-chua-te', name: 'Đại Chúa Tể', thumbUrl: novelDetail.thumbUrl, latestChapter: '2' }] }; },
-  async search(q) { return { items: q ? [{ kind: 'novel', slug: 'dai-chua-te', name: 'Đại Chúa Tể', thumbUrl: novelDetail.thumbUrl }] : [] }; },
+  async home() { return { items: oneItem }; },
+  async list() { return { items: oneItem }; },
+  async categories() { return [{ name: 'Tiên Hiệp', slug: 'tien-hiep' }, { name: 'Kiếm Hiệp', slug: 'kiem-hiep' }]; },
+  async byCategory(slug) { return { items: slug === 'tien-hiep' ? oneItem : [] }; },
+  async search(q) { return { items: q ? oneItem : [] }; },
   async detail() { return structuredClone(novelDetail); },
   async chapter() { return { title: 'Chương 1: Bắc Linh viện', paragraphs: ['Đoạn một.', 'Đoạn hai.'] }; },
 };
@@ -93,4 +97,32 @@ test('theo dõi truyện chữ qua /api/novel/follow rồi bỏ theo dõi', asyn
 
   const u = await a.post('/api/unfollow').send({ slug: 'tf~dai-chua-te' });
   assert.equal(u.status, 200);
+});
+
+test('/chu hiện chip thể loại và lọc theo thể loại', async () => {
+  const a = await authed();
+  const all = await a.get('/chu');
+  assert.match(all.text, /href="\/chu\?category=tien-hiep"/);   // chip thể loại
+  assert.match(all.text, /Tiên Hiệp/);
+
+  const filtered = await a.get('/chu?category=tien-hiep');
+  assert.equal(filtered.status, 200);
+  assert.match(filtered.text, /Đại Chúa Tể/);
+
+  const empty = await a.get('/chu?category=kiem-hiep');
+  assert.match(empty.text, /Không tìm thấy|Chưa có truyện/);
+});
+
+test('thẻ truyện chữ có nhãn "Chữ" phân biệt với truyện tranh', async () => {
+  const a = await authed();
+  const res = await a.get('/chu');
+  assert.match(res.text, /class="kindflag">Chữ</);
+});
+
+test('truyện chữ đang đọc dở ở trang chủ mang nhãn "Chữ"', async () => {
+  const a = await authed();
+  await a.get('/doc-chu/dai-chua-te/1');   // tạo tiến độ đọc
+  await a.post('/api/progress').send({ slug: 'tf~dai-chua-te', chapter: '1', page: 10 });
+  const home = await a.get('/');
+  assert.match(home.text, /class="kindflag">Chữ</);
 });

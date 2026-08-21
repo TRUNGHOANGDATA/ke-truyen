@@ -256,15 +256,31 @@ export function mountPages(app) {
   // ===== TRUYỆN CHỮ (Phase 2) — trục riêng, slug lưu kèm tiền tố "tf~" =====
   const PFX = 'tf~';
 
-  // Duyệt / tìm truyện chữ
+  // Duyệt / tìm / lọc thể loại truyện chữ
   app.get('/chu', async (req, res) => {
     const q = String(req.query.q || '').trim();
-    let items = [], err = false;
+    const category = String(req.query.category || '').trim();
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const ns = svc().novelSource;
+
+    let items = [], err = false, cats = [], catName = '';
+    try { cats = await ns.categories(); } catch { /* để trống nếu lỗi */ }
     try {
-      const r = q ? await svc().novelSource.search(q) : await svc().novelSource.home();
+      let r;
+      if (q) r = await ns.search(q);
+      else if (category) r = await ns.byCategory(category, page);
+      else r = await ns.list('truyen-moi', page);
       items = (r.items || []).map(c => ({ ...c, slug: PFX + c.slug, when: relTime(c.updatedAt) }));
+      catName = (cats.find(c => c.slug === category) || {}).name || '';
     } catch { err = true; }
-    res.render('novels', { title: q ? `Tìm: ${q}` : 'Truyện chữ', active: 'chu', items, q, err });
+
+    // Phân trang chỉ áp cho duyệt/lọc (tìm kiếm trả 1 trang).
+    const paged = !q;
+    res.render('novels', {
+      title: q ? `Tìm: ${q}` : (catName ? `Truyện chữ · ${catName}` : 'Truyện chữ'),
+      active: 'chu', items, q, err, cats, category, catName, page, paged,
+      hasMore: paged && items.length > 0,
+    });
   });
 
   // Chi tiết một truyện chữ

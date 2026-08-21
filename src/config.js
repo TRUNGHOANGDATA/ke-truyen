@@ -36,8 +36,9 @@ export const IMAGE_HOSTS = [
   'img.otruyenapi.com', 'otruyencdn.com',
   // TruyenQQ (bìa + ảnh chương)
   'truyenvua.com', 'hinhhinh.com', 'tintruyen.net', 'truyenqqko.com',
-  // Truyện chữ (chỉ ảnh bìa)
+  // Truyện chữ (chỉ ảnh bìa; nhiều host: CDN riêng, 8cache, ảnh Google Drive)
   'static.truyenfull.live', 'truyenfull.live', 'truyenfull.vn',
+  'truyenngan.8cache.com', '8cache.com', 'lh3.googleusercontent.com',
 ];
 
 /**
