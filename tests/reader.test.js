@@ -41,3 +41,12 @@ test('reader renders images through /img and shows next chapter', async () => {
   assert.match(res.text, /\/img\?i=/); // URL ảnh đã gói, không lộ host CDN
   assert.match(res.text, /Chương 2/); // next-chapter control
 });
+
+test('/api/chapter-images trả URL ảnh đã gói qua /img (để prefetch chương sau)', async () => {
+  const agent = await authed();
+  const res = await agent.get('/api/chapter-images?slug=s&chapter=1');
+  assert.equal(res.status, 200);
+  assert.equal(res.body.images.length, 2);
+  assert.match(res.body.images[0], /^\/img\?i=/);       // đã gói, không lộ host CDN
+  assert.doesNotMatch(res.body.images[0], /otruyencdn|http/);
+});

@@ -28,7 +28,7 @@
 <% } %>
 
 <div class="rdstage"><div class="rdcol" id="pages"
-     data-slug="<%= slug %>" data-chapter="<%= chapterName %>" data-start="<%= startPage %>">
+     data-slug="<%= slug %>" data-chapter="<%= chapterName %>" data-start="<%= startPage %>" data-next="<%= next || '' %>">
   <% images.forEach(img => { %>
     <div class="mpage" data-page="<%= img.page %>">
       <span class="pn"><%= img.page + 1 %> / <%= images.length %></span>

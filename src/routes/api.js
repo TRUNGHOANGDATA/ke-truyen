@@ -1,5 +1,6 @@
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { packImg } from './image.js';
 
 function dirSize(dir) {
   try {
@@ -11,6 +12,24 @@ function dirSize(dir) {
 
 export function mountApi(app, { source, novelSource, library, updates, cacheDir, archive, drive, refererFor }) {
   app.get('/api/library', (req, res) => res.json({ items: library.listFollowed() }));
+
+  // Danh sách URL ảnh (đã gói qua /img) của một chương — để reader tải trước
+  // chương kế tiếp. Đồng thời làm ấm cache chapter phía server.
+  app.get('/api/chapter-images', async (req, res) => {
+    const slug = String(req.query.slug || '');
+    const chap = String(req.query.chapter || '');
+    try {
+      let chapters = library.chaptersOf(slug);
+      if (!chapters.length) {
+        const d = await source.detail(slug);
+        chapters = d.chapters.map(c => ({ chapter_name: c.name, api_url: c.apiUrl }));
+      }
+      const cur = chapters.find(c => c.chapter_name === chap);
+      if (!cur) return res.json({ images: [] });
+      const { images = [] } = await source.chapter(cur.api_url);
+      res.json({ images: images.map(im => '/img?i=' + packImg(im.url)) });
+    } catch { res.json({ images: [] }); }
+  });
 
   app.get('/api/search', async (req, res) => {
     const q = req.query.q || '';
