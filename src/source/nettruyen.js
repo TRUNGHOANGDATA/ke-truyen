@@ -48,12 +48,14 @@ export function parseChapterName(raw) {
 
 export function createNetTruyenSource({
   base = 'https://nettruyen.id',
+  apiBase = 'https://nettruyen-api.clubc.org',   // API JSON: search + host ảnh bìa
   fetchFn = fetch,
   retries = 2,
   retryDelayMs = 600,
   politeDelayMs = 400,
 } = {}) {
   base = base.replace(/\/+$/, '');
+  apiBase = apiBase.replace(/\/+$/, '');
   const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36';
   let lastCall = 0;
 
@@ -147,11 +149,25 @@ export function createNetTruyenSource({
       return [...seen.values()];
     },
 
-    // NetTruyen render kết quả tìm bằng JS phía client và API backend bỏ qua từ
-    // khoá, nên không có tìm kiếm server-side đáng tin. Trả rỗng để không chèn
-    // kết quả sai vào ô tìm; truyện bổ sung khám phá qua duyệt thể loại.
-    async search() {
-      return { items: [], pagination: null };
+    // Tìm kiếm qua API JSON của NetTruyen (param đúng là 'keyword', 'q' bị bỏ qua).
+    async search(keyword) {
+      let body;
+      try {
+        const res = await fetchFn(`${apiBase}/api/comics/search?keyword=${encodeURIComponent(keyword)}`,
+          { headers: { 'User-Agent': UA, Accept: 'application/json' } });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        body = await res.json();
+      } catch { return { items: [], pagination: null }; }
+      const items = (body.comics || []).map(c => ({
+        slug: c.slug,
+        name: scrubBrands(c.name || ''),
+        thumbUrl: c.thumbnail ? abs(apiBase, c.thumbnail) : '',
+        status: /ho[àa]n|full/i.test(c.status || '') ? 'completed' : null,
+        categories: [],
+        updatedAt: null,
+        latestChapter: parseChapterName(c.last_chapter?.name || c.last_chapter || '').name || null,
+      }));
+      return { items, pagination: null };
     },
 
     async detail(slug) {

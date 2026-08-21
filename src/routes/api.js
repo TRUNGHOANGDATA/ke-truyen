@@ -13,8 +13,21 @@ export function mountApi(app, { source, novelSource, library, updates, cacheDir,
   app.get('/api/library', (req, res) => res.json({ items: library.listFollowed() }));
 
   app.get('/api/search', async (req, res) => {
-    try { res.json(await source.search(req.query.q || '')); }
-    catch (e) { res.status(502).json({ error: String(e.message || e) }); }
+    const q = req.query.q || '';
+    try {
+      // Gộp: truyện tranh (nguồn chính + kho bổ sung) và truyện chữ. Truyện chữ
+      // gắn tiền tố tf~ để thẻ link đúng /chu/ và hiện nhãn "Chữ". Không gộp trùng
+      // giữa hai loại: cùng tên có thể vừa là truyện tranh vừa là truyện chữ.
+      const [comics, novels] = await Promise.all([
+        source.search(q).then(r => r.items || []).catch(() => []),
+        (novelSource ? novelSource.search(q).then(r => r.items || []) : Promise.resolve([])).catch(() => []),
+      ]);
+      const items = [
+        ...comics,
+        ...novels.map(n => ({ ...n, slug: 'tf~' + n.slug, kind: 'novel' })),
+      ];
+      res.json({ items });
+    } catch (e) { res.status(502).json({ error: String(e.message || e) }); }
   });
 
   app.get('/api/browse', async (req, res) => {

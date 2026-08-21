@@ -11,6 +11,41 @@
   </nav>
   <form class="navsearch-form" action="/search" method="get" role="search">
     <input class="navsearch" name="q" value="<%= typeof q !== 'undefined' ? q : '' %>" placeholder="⌕ Tìm truyện…" autocomplete="off">
+    <div class="navsug" id="navSug" hidden></div>
   </form>
   <div class="who"><span class="nm">Bạn</span><span class="av">N</span></div>
 </div></div>
+<script type="module">
+  // Gợi ý sống khi gõ ở ô tìm trên thanh đầu (truyện tranh + truyện chữ).
+  const inp = document.querySelector('.navsearch');
+  const box = document.getElementById('navSug');
+  if (inp && box) {
+    const pack = (u) => u ? '/img?i=' + btoa(unescape(encodeURIComponent(u))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'') : '';
+    const hrefOf = (slug) => slug.startsWith('tf~') ? '/chu/' + slug.slice(3) : '/truyen/' + slug;
+    let timer, lastQ = '';
+    const hide = () => { box.hidden = true; box.innerHTML = ''; };
+    async function run() {
+      const q = inp.value.trim();
+      if (q.length < 2) return hide();
+      if (q === lastQ) return; lastQ = q;
+      try {
+        const r = await fetch('/api/search?q=' + encodeURIComponent(q), { headers: { 'Content-Type': 'application/json' } });
+        if (!r.ok) return hide();
+        const { items = [] } = await r.json();
+        if (inp.value.trim() !== q) return;               // kết quả cũ, bỏ
+        if (!items.length) { box.innerHTML = '<div class="navsug-empty">Không tìm thấy</div>'; box.hidden = false; return; }
+        box.innerHTML = items.slice(0, 8).map(c => {
+          const novel = String(c.slug).startsWith('tf~');
+          return `<a class="navsug-item" href="${hrefOf(c.slug)}">
+            <img loading="lazy" src="${pack(c.thumbUrl)}" alt="">
+            <span class="navsug-name">${c.name}</span>
+            ${novel ? '<span class="navsug-tag">Chữ</span>' : ''}</a>`;
+        }).join('');
+        box.hidden = false;
+      } catch { hide(); }
+    }
+    inp.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(run, 300); });
+    inp.addEventListener('focus', () => { if (box.innerHTML) box.hidden = false; });
+    document.addEventListener('click', (e) => { if (!e.target.closest('.navsearch-form')) hide(); });
+  }
+</script>

@@ -35,9 +35,9 @@ const CHAP = `<html><body><div class="reading-detail">
 function fakeFetch(map) {
   return async (url) => {
     for (const [frag, html] of Object.entries(map)) {
-      if (url.includes(frag)) return { ok: true, status: 200, async text() { return html; } };
+      if (url.includes(frag)) return { ok: true, status: 200, async text() { return html; }, async json() { return JSON.parse(html); } };
     }
-    return { ok: false, status: 404, async text() { return ''; } };
+    return { ok: false, status: 404, async text() { return ''; }, async json() { return {}; } };
   };
 }
 const src = (map) => createNetTruyenSource({ fetchFn: fakeFetch(map), politeDelayMs: 0, retryDelayMs: 0 });
@@ -82,7 +82,21 @@ test('chapter() trả danh sách ảnh theo thứ tự', async () => {
   assert.ok(images[1].url.endsWith('page_2.jpg'));
 });
 
-test('search() trả rỗng (NetTruyen không có tìm server-side đáng tin)', async () => {
-  const { items } = await src({}).search('bất kỳ');
+test('search() dùng API JSON (param keyword), map slug + bìa', async () => {
+  const API = JSON.stringify({ status: 'success', comics: [
+    { slug: 'nguyen-ton', name: 'Nguyên Tôn', thumbnail: '/storage/images/thumbnails/nguyen-ton.webp',
+      status: 'ongoing', last_chapter: { name: 'Chapter 300' } },
+  ]});
+  const s = createNetTruyenSource({ fetchFn: fakeFetch({ '/api/comics/search': API }), politeDelayMs: 0, retryDelayMs: 0 });
+  const { items } = await s.search('nguyen ton');
+  assert.equal(items.length, 1);
+  assert.equal(items[0].slug, 'nguyen-ton');
+  assert.equal(items[0].name, 'Nguyên Tôn');
+  assert.ok(items[0].thumbUrl.includes('nettruyen-api.clubc.org'));
+  assert.equal(items[0].latestChapter, '300');
+});
+
+test('search() trả rỗng khi API lỗi (không làm chết ô tìm)', async () => {
+  const { items } = await src({}).search('bất kỳ');   // fakeFetch trả 404
   assert.deepEqual(items, []);
 });
