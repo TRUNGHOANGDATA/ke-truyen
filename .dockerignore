@@ -1,0 +1,10 @@
+node_modules
+data
+cache
+tests
+docs
+.git
+.env
+*.md
+docker-compose.yml
+Caddyfile

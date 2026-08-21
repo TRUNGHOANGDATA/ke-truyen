@@ -1,0 +1,151 @@
+# Kệ Truyện — CI/CD: build image, push lên ghcr.io của chính repo này, rồi rollout
+# vào cụm k8s nhà (namespace `bizflow`, Deployment `tradadata`, container `ke-truyen`).
+#
+# Vì sao dùng ghcr thay vì `docker save` + `scp` + `ctr import`:
+#   - không phải đẩy ~600MB tarball vào LAN mỗi lần deploy
+#   - KHÔNG cần self-hosted runner: build/push chạy trên runner GitHub, bước deploy
+#     chỉ gửi vài lệnh kubectl qua SSH nên payload rất nhỏ
+#   - cùng pattern với các app khác trong cụm (agent-board, agent-docs, tarot, recbook...)
+#
+# Tag bằng commit SHA (đúng quy ước cụm) -> `kubectl set image` tạo rollout xác định,
+# không phụ thuộc `imagePullPolicy: Always` hay việc trùng tag.
+#
+# ─── Secrets cần khai (Settings > Secrets and variables > Actions) ────────────
+#   SSH_PRIVATE_KEY   khoá riêng vào gateway + control plane
+#   SSH_KNOWN_HOSTS   output `ssh-keyscan` của gateway + control plane
+#   SSH_USER          user SSH (cụm này là `x`)
+#   SSH_GATEWAY       125.212.235.148   (gateway public, làm ProxyJump vào LAN)
+#   K8S_HOST          192.168.1.250     (control plane, chỉ tới được qua gateway)
+#
+# ─── Việc phải làm MỘT LẦN trước khi deploy job chạy được ────────────────────
+# Cụm phải pull được image private từ ghcr -> tạo pull secret trong namespace:
+#   kubectl create secret docker-registry ghcr-secret -n bizflow \
+#     --docker-server=ghcr.io \
+#     --docker-username=<github-user> \
+#     --docker-password=<PAT co scope read:packages>
+# Hoặc đặt package sang public (Package settings > Change visibility) thì khỏi cần secret.
+
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Deploy bấm tay: container `blog` và `ke-truyen` nằm CHUNG 1 pod với strategy
+  # Recreate, nên mỗi lần deploy truyện là tradadata.com cũng downtime vài chục giây.
+  # Khi nào tách thành 2 Deployment thì cho deploy chạy tự động theo push.
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+concurrency:
+  group: ke-truyen-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # 153 test chạy hoàn toàn offline bằng fixture -> không cần mạng, chạy trên runner GitHub.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      # better-sqlite3 phải biên dịch native
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq python3 make g++
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+
+  build-push:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write        # để GITHUB_TOKEN push được lên ghcr
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Đăng nhập ghcr
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tính tên image (ghcr yêu cầu chữ thường)
+        id: meta
+        run: |
+          REPO_LC=$(echo "${{ env.IMAGE_NAME }}" | tr '[:upper:]' '[:lower:]')
+          echo "image=${{ env.REGISTRY }}/${REPO_LC}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "repo_lc=${REPO_LC}" >> "$GITHUB_OUTPUT"
+
+      - name: Build + push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64        # cả 2 node cụm đều x86_64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.repo_lc }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.repo_lc }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-push
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://truyen.tradadata.com
+    env:
+      NAMESPACE: bizflow
+      DEPLOYMENT: tradadata
+      CONTAINER: ke-truyen
+      NODEPORT: '30161'
+      IMAGE: ${{ needs.build-push.outputs.image }}
+    steps:
+      - name: Chuẩn bị SSH (ProxyJump qua gateway public vào LAN)
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/ci_key
+          chmod 600 ~/.ssh/ci_key
+          printf '%s\n' "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<EOF
+          Host gw
+            HostName ${{ secrets.SSH_GATEWAY }}
+            User ${{ secrets.SSH_USER }}
+            IdentityFile ~/.ssh/ci_key
+            IdentitiesOnly yes
+          Host cp
+            HostName ${{ secrets.K8S_HOST }}
+            User ${{ secrets.SSH_USER }}
+            IdentityFile ~/.ssh/ci_key
+            IdentitiesOnly yes
+            ProxyJump gw
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Đổi image + chờ rollout
+        run: |
+          echo "deploy $IMAGE"
+          ssh cp "kubectl set image deployment/$DEPLOYMENT $CONTAINER=$IMAGE -n $NAMESPACE"
+          ssh cp "kubectl rollout status deployment/$DEPLOYMENT -n $NAMESPACE --timeout=10m"
+
+      - name: Nghiệm thu
+        run: |
+          ssh cp "kubectl get pods -n $NAMESPACE -l app=$DEPLOYMENT"
+          ssh cp "kubectl get deploy $DEPLOYMENT -n $NAMESPACE -o jsonpath='{range .spec.template.spec.containers[*]}{.name}={.image}{\"\n\"}{end}'"
+          ssh cp "curl -sf -m 15 -o /dev/null -w 'healthz http=%{http_code}\n' http://127.0.0.1:$NODEPORT/healthz"
+          ssh cp "kubectl logs -n $NAMESPACE deploy/$DEPLOYMENT -c $CONTAINER --tail=30"
+
+      - name: Dọn
+        if: always()
+        run: rm -f ~/.ssh/ci_key
