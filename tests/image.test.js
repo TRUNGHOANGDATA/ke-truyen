@@ -115,3 +115,24 @@ test('ảnh đã lưu Drive vẫn đọc được kể cả khi NGUỒN GỐC ch
   assert.equal(res.status, 200, 'phải phục vụ được từ Drive dù nguồn chết');
   assert.equal(res.body.toString(), 'anh-tu-drive');
 });
+
+test('/img đổi sang host dự phòng khi host chính lỗi (ảnh chương kho bổ sung)', async () => {
+  const db = openDb(':memory:');
+  createSchema(db);
+  const app = buildApp({
+    passwordHash: hash, sessionSecret: 't', db,
+    cacheDir: mkdtempSync(join(tmpdir(), 'imgc-')),
+    // host chính truyenonline.cc lỗi; host dự phòng otruyencdn.com trả ảnh
+    imageFetchFn: async (u) => {
+      if (u.includes('images.truyenonline.cc')) throw new Error('CDN chính chết');
+      if (u.includes('otruyencdn.com')) return { ok: true, status: 200, headers: { get: () => 'image/jpeg' }, arrayBuffer: async () => new Uint8Array([9]).buffer };
+      return { ok: false, status: 404, headers: { get: () => null }, arrayBuffer: async () => new ArrayBuffer(0) };
+    },
+  });
+  const agent = request.agent(app);
+  await agent.post('/login').type('form').send({ password: 'secret123' });
+  const url = 'https://images.truyenonline.cc/uploads/x/chapter_1/page_1.jpg';
+  const res = await agent.get('/img?i=' + packImg(url));
+  assert.equal(res.status, 200);                 // lấy được nhờ đổi sang otruyencdn.com
+  assert.equal(res.headers['content-type'], 'image/jpeg');
+});

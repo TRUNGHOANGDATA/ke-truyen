@@ -64,7 +64,7 @@ export function buildApp(deps = {}) {
   const source = deps.source ?? manager.source;
   // Nguồn truyện chữ (Phase 2) — trục riêng, không trộn vào facade truyện tranh.
   // Bọc cache home/list/byCategory/categories như nguồn tranh (detail/chapter/search vẫn tươi).
-  const novelSource = deps.novelSource ?? withCache(db, createTruyenfullSource({ base: config.TRUYENFULL_BASE }), { keyPrefix: 'nv:', detailTtlMs: 60 * 60 * 1000 });
+  const novelSource = deps.novelSource ?? withCache(db, createTruyenfullSource({ base: config.TRUYENFULL_BASE }), { keyPrefix: 'nv:', detailTtlMs: 60 * 60 * 1000, chapterTtlMs: 7 * 24 * 60 * 60 * 1000 });
   const library = createLibrary(db);
   const updates = createUpdates({ library, source });
 

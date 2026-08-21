@@ -34,8 +34,9 @@ export function createSourceManager({
   // Giữ tên settings 'otruyen' cho tương thích lịch sử.
   // Bọc cache: NetTruyen sau Cloudflare + CDN chậm, cache detail 60' để mở lại
   // trang truyện không phải tải + parse cả trang lớn mỗi lần (chương ít đổi).
+  const DAY = 24 * 60 * 60 * 1000;
   const newSupplement = () => wrap(db, makeSupplement({ base: config.NETTRUYEN_BASE }),
-    { keyPrefix: 'sup:', detailTtlMs: 60 * 60 * 1000 });
+    { keyPrefix: 'sup:', detailTtlMs: 60 * 60 * 1000, chapterTtlMs: 7 * DAY });
 
   function buildRaw(name) {
     if (name === 'otruyen') return newSupplement();

@@ -65,13 +65,16 @@ export function createNetTruyenSource({
     lastCall = Date.now();
   }
 
-  async function fetchText(url) {
+  async function fetchText(url, timeoutMs = 12000) {
     let lastErr;
     for (let attempt = 0; attempt <= retries; attempt++) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), timeoutMs);
       try {
         await polite();
         const res = await fetchFn(url, {
           headers: { 'User-Agent': UA, Referer: base + '/', 'Accept-Language': 'vi,en;q=0.8' },
+          signal: ctrl.signal,
         });
         if (!res.ok) throw new Error(`HTTP ${res.status} cho ${url}`);
         const text = await res.text();
@@ -80,6 +83,8 @@ export function createNetTruyenSource({
       } catch (err) {
         lastErr = err;
         if (attempt < retries) await sleep(retryDelayMs * (attempt + 1));
+      } finally {
+        clearTimeout(timer);
       }
     }
     throw lastErr;

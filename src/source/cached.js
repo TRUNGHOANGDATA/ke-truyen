@@ -7,7 +7,7 @@ const MIN = 60 * 1000;
  * - Nếu nguồn lỗi mà còn dữ liệu cũ trong cache thì dùng dữ liệu cũ
  *   (thà hiện hơi cũ còn hơn trang trắng).
  */
-export function withCache(db, source, { ttlMs = 30 * MIN, keyPrefix = '', detailTtlMs = 0 } = {}) {
+export function withCache(db, source, { ttlMs = 30 * MIN, keyPrefix = '', detailTtlMs = 0, chapterTtlMs = 0 } = {}) {
   const K = (k) => keyPrefix + k;
   const getRow = db.prepare('SELECT payload, expires_at FROM api_cache WHERE cache_key=?');
   const putRow = db.prepare(`
@@ -47,6 +47,12 @@ export function withCache(db, source, { ttlMs = 30 * MIN, keyPrefix = '', detail
     ...(detailTtlMs > 0 ? {
       detail: (slug) => cached(K(`detail:${slug}`), () => source.detail(slug), detailTtlMs),
     } : {}),
-    // chapter / search giữ nguyên: cần dữ liệu mới nhất
+    // chapter: cache danh sách ảnh/đoạn văn theo URL chương. Truyện đã ra thì
+    // chương bất biến nên cache dài, tránh đụng nguồn (Cloudflare) mỗi lần đọc lại
+    // hay chuyển chương. Ảnh thật vẫn do proxy /img cache riêng trên đĩa.
+    ...(chapterTtlMs > 0 ? {
+      chapter: (url) => cached(K(`chap:${url}`), () => source.chapter(url), chapterTtlMs),
+    } : {}),
+    // search giữ nguyên: cần dữ liệu mới nhất
   };
 }

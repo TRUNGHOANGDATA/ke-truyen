@@ -58,3 +58,23 @@ test('propagates the error when nothing is cached yet', async () => {
   const { src } = setup({ async home() { throw new Error('nguồn lỗi'); } });
   await assert.rejects(() => src.home(), /nguồn lỗi/);
 });
+
+test('chapter được cache khi bật chapterTtlMs (chương bất biến)', async () => {
+  let calls = 0;
+  const { src } = setup(
+    { async chapter(url) { calls++; return { images: [{ page: 0, url: url + '/p0' }] }; } },
+    { chapterTtlMs: 60000 },
+  );
+  const a = await src.chapter('https://x/chuong-1');
+  const b = await src.chapter('https://x/chuong-1');
+  await src.chapter('https://x/chuong-2');
+  assert.equal(calls, 2);              // chuong-1 chỉ gọi 1 lần, chuong-2 gọi 1 lần
+  assert.deepEqual(a, b);
+});
+
+test('không bật chapterTtlMs thì chapter không cache (mặc định)', async () => {
+  let calls = 0;
+  const { src } = setup({ async chapter() { calls++; return { images: [] }; } });
+  await src.chapter('u'); await src.chapter('u');
+  assert.equal(calls, 2);
+});
