@@ -39,23 +39,36 @@ export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes, re
         } catch { /* Drive lỗi thì rơi xuống lấy từ nguồn */ }
       }
     }
-    try {
-      const referer = refererFor ? refererFor(url) : new URL(url).origin + '/';
-      const upstream = await fetchFn(url, {
-        headers: {
-          Referer: referer,
-          // CDN truyện thường chặn user-agent lạ
-          'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
-          Accept: 'image/avif,image/webp,image/*,*/*;q=0.8',
-        },
-      });
-      if (!upstream.ok) return res.status(502).end();
-      const contentType = upstream.headers.get('content-type') || 'image/jpeg';
-      const buf = Buffer.from(await upstream.arrayBuffer());
-      cache.put(url, buf, contentType);
-      send(buf, contentType);
-    } catch {
-      res.status(502).end();
+    const referer = refererFor ? refererFor(url) : new URL(url).origin + '/';
+    const headers = {
+      Referer: referer,
+      // CDN truyện thường chặn user-agent lạ
+      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+      Accept: 'image/avif,image/webp,image/*,*/*;q=0.8',
+    };
+
+    // Một số CDN bìa (googleusercontent, 8cache) hay chậm/chập chờn: thêm timeout
+    // để không treo request, và thử lại 1 lần cho lỗi tạm thời trước khi bỏ cuộc.
+    async function fetchOnce(timeoutMs) {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), timeoutMs);
+      try {
+        return await fetchFn(url, { headers, signal: ctrl.signal });
+      } finally { clearTimeout(t); }
+    }
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const upstream = await fetchOnce(8000);
+        if (!upstream.ok) { if (attempt === 0) continue; return res.status(502).end(); }
+        const contentType = upstream.headers.get('content-type') || 'image/jpeg';
+        const buf = Buffer.from(await upstream.arrayBuffer());
+        cache.put(url, buf, contentType);
+        return send(buf, contentType);
+      } catch {
+        if (attempt === 0) continue;      // timeout/lỗi mạng: thử lại một lần
+        return res.status(502).end();
+      }
     }
   });
 }

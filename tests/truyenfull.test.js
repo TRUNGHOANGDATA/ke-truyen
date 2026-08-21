@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createTruyenfullSource, slugFromHref, parseChapterName } from '../src/source/truyenfull.js';
+import { createTruyenfullSource, slugFromHref, parseChapterName, upsizeCover } from '../src/source/truyenfull.js';
 
 // --- HTML tối giản nhưng đúng cấu trúc thật của truyenfull ---
 const LIST = `<html><body><div class="list-truyen">
@@ -96,4 +96,23 @@ test('chapter() trả các đoạn văn, bỏ script và quảng cáo', async ()
   assert.deepEqual(ch.paragraphs, ['Đoạn một.', 'Đoạn hai.', 'Đoạn ba.']);
   assert.ok(!ch.paragraphs.join(' ').includes('QUẢNG CÁO'));
   assert.ok(!ch.paragraphs.join(' ').includes('bẩn'));
+});
+
+test('upsizeCover nâng thumbnail Google, giữ nguyên host khác', () => {
+  assert.equal(upsizeCover('https://lh3.googleusercontent.com/d/ABC=w60-h85-c'),
+    'https://lh3.googleusercontent.com/d/ABC=w300-h420');
+  assert.equal(upsizeCover('https://lh3.googleusercontent.com/pw/XYZ=w60-h85-c'),
+    'https://lh3.googleusercontent.com/pw/XYZ=w300-h420');
+  assert.equal(upsizeCover('https://lh3.googleusercontent.com/d/ABC'),
+    'https://lh3.googleusercontent.com/d/ABC=w300-h420');
+  // host khác giữ nguyên
+  assert.equal(upsizeCover('https://static.truyenfull.live/cover/o/x.jpg'),
+    'https://static.truyenfull.live/cover/o/x.jpg');
+});
+
+test('detail/list trả bìa đã nâng cỡ cho ảnh Google', async () => {
+  const listG = LIST.replace('class="row"><h3', 'class="row"><span data-image="https://lh3.googleusercontent.com/d/ABC=w60-h85-c"></span><h3');
+  const s = src({ '/danh-sach/truyen-moi/': listG });
+  const { items } = await s.home();
+  assert.ok(items[0].thumbUrl.endsWith('=w300-h420'), 'bìa danh sách phải được nâng cỡ');
 });

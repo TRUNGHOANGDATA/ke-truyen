@@ -33,6 +33,18 @@ export const SEL = {
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const abs = (base, url) => { try { return new URL(url, base).href; } catch { return ''; } };
 
+/**
+ * Bìa ở danh sách là thumbnail Google 60×85 (`=w60-h85-c`) -> phóng to lên thẻ
+ * bị mờ. Google cho xin cỡ khác qua hậu tố kích thước, nên nâng lên ~300 cho nét.
+ * Chỉ áp cho ảnh googleusercontent; host khác giữ nguyên.
+ */
+export function upsizeCover(url) {
+  if (!/(^|\.)googleusercontent\.com$/.test((() => { try { return new URL(url).hostname; } catch { return ''; } })())) {
+    return url;
+  }
+  return /=[-\w]+$/.test(url) ? url.replace(/=[-\w]+$/, '=w300-h420') : url + '=w300-h420';
+}
+
 /** https://truyenfull.live/dai-chua-te/ -> dai-chua-te */
 export function slugFromHref(href) {
   const m = String(href || '').match(/truyenfull\.[a-z]+\/([^/?#]+)\/?(?:$|[?#])/i);
@@ -102,7 +114,7 @@ export function createTruyenfullSource({
         kind: 'novel',
         slug,
         name: scrubBrands($a.text().trim()),
-        thumbUrl: abs(base, thumb),
+        thumbUrl: upsizeCover(abs(base, thumb)),
         status: null,
         categories: [],
         updatedAt: null,
@@ -219,7 +231,7 @@ export function createTruyenfullSource({
         origin: '',
         content: cleanSynopsis($(SEL.synopsis).first().html() || ''),
         status: /full|ho[àa]n/i.test(statusLine) ? 'completed' : 'ongoing',
-        thumbUrl: abs(base, $(SEL.cover).attr('src') || $(SEL.cover).attr('content') || ''),
+        thumbUrl: upsizeCover(abs(base, $(SEL.cover).attr('src') || $(SEL.cover).attr('content') || '')),
         categories: cats,
         author: /đang cập nhật/i.test(authorText) ? '' : scrubBrands(authorText),
         updatedAt: null,
