@@ -7,7 +7,7 @@ const MIN = 60 * 1000;
  * - Nếu nguồn lỗi mà còn dữ liệu cũ trong cache thì dùng dữ liệu cũ
  *   (thà hiện hơi cũ còn hơn trang trắng).
  */
-export function withCache(db, source, { ttlMs = 30 * MIN, keyPrefix = '' } = {}) {
+export function withCache(db, source, { ttlMs = 30 * MIN, keyPrefix = '', detailTtlMs = 0 } = {}) {
   const K = (k) => keyPrefix + k;
   const getRow = db.prepare('SELECT payload, expires_at FROM api_cache WHERE cache_key=?');
   const putRow = db.prepare(`
@@ -41,6 +41,12 @@ export function withCache(db, source, { ttlMs = 30 * MIN, keyPrefix = '' } = {})
     list: (type = 'truyen-moi', page = 1) => cached(K(`list:v2:${type}:${page}`), () => source.list(type, page)),
     byCategory: (slug, page = 1) => cached(K(`cat:v2:${slug}:${page}`), () => source.byCategory(slug, page)),
     categories: () => cached(K('categories'), () => source.categories(), 24 * 60 * MIN),
-    // detail / chapter / search giữ nguyên: cần dữ liệu mới nhất
+    // detail: chỉ cache khi bật detailTtlMs (nguồn bổ sung/truyện chữ — chương ít
+    // đổi, mà mỗi lần mở lại phải tải + parse cả trang lớn qua CDN chậm). Nguồn
+    // chính (TruyenQQ) giữ detailTtlMs=0 để mục lục luôn mới.
+    ...(detailTtlMs > 0 ? {
+      detail: (slug) => cached(K(`detail:${slug}`), () => source.detail(slug), detailTtlMs),
+    } : {}),
+    // chapter / search giữ nguyên: cần dữ liệu mới nhất
   };
 }

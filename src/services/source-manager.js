@@ -32,7 +32,10 @@ export function createSourceManager({
 
   // Kho bổ sung nay crawl NetTruyen (OTruyen API đã chết phần đọc chương).
   // Giữ tên settings 'otruyen' cho tương thích lịch sử.
-  const newSupplement = () => makeSupplement({ base: config.NETTRUYEN_BASE });
+  // Bọc cache: NetTruyen sau Cloudflare + CDN chậm, cache detail 60' để mở lại
+  // trang truyện không phải tải + parse cả trang lớn mỗi lần (chương ít đổi).
+  const newSupplement = () => wrap(db, makeSupplement({ base: config.NETTRUYEN_BASE }),
+    { keyPrefix: 'sup:', detailTtlMs: 60 * 60 * 1000 });
 
   function buildRaw(name) {
     if (name === 'otruyen') return newSupplement();
