@@ -13,14 +13,14 @@
       <span>Nguồn đang dùng</span>
       <select id="source" class="field">
         <option value="truyenqq" <%= source==='truyenqq'?'selected':'' %>>TruyenQQ (crawl, cập nhật từng phút)</option>
-        <option value="otruyen" <%= source==='otruyen'?'selected':'' %>>OTruyen (API — đã ngừng cập nhật)</option>
+        <option value="otruyen" <%= source==='otruyen'?'selected':'' %>>NetTruyen (crawl, kho bổ sung)</option>
       </select>
     </label>
 
     <label style="display:flex; gap:9px; align-items:flex-start">
       <input id="sup" type="checkbox" <%= supplement ? "checked" : "" %> style="margin-top:3px; flex:0 0 auto">
-      <span>Bổ sung truyện từ kho OTruyen
-        <br><small style="color:#888">Ô tìm kiếm và các dải thể loại sẽ chèn thêm những bộ TruyenQQ không có; bộ nào TruyenQQ đã có thì bỏ. Kho này đã ngừng cập nhật từ 11/06/2026 nên chỉ thêm truyện cũ. Chỉ có tác dụng khi nguồn chính là TruyenQQ.</small>
+      <span>Bổ sung truyện từ kho NetTruyen
+        <br><small style="color:#888">Các dải thể loại sẽ chèn thêm những bộ TruyenQQ không có; bộ nào TruyenQQ đã có thì bỏ. (Kho bổ sung không có tìm kiếm nên chỉ hiện khi duyệt thể loại.) Chỉ có tác dụng khi nguồn chính là TruyenQQ.</small>
       </span>
     </label>
 
@@ -78,7 +78,7 @@
     try {
       const r = await api('/settings/supplement', { method: 'POST', body: JSON.stringify({ on }) });
       srcOut.textContent = r.supplement
-        ? 'Đã bật bổ sung từ kho OTruyen. Tải lại trang để thấy.'
+        ? 'Đã bật bổ sung từ kho NetTruyen. Tải lại trang để thấy.'
         : 'Đã tắt, chỉ còn truyện từ TruyenQQ. Tải lại trang để thấy.';
     } catch (err) {
       e.target.checked = !on;            // trả ô tick về đúng trạng thái thật
