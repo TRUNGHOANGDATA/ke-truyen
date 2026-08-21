@@ -55,6 +55,21 @@ export function mountPages(app) {
     return out;
   }
 
+  // Làm ấm cache trang chủ (home + categories + các dải thể loại) để người dùng
+  // không phải chờ lần tải "nguội". server.js gọi định kỳ (dưới TTL cache) + lúc
+  // khởi động. Chỉ nạp cache, không render.
+  async function warmHome() {
+    const source = svc().source;
+    try {
+      const rails = await resolveGenres(source);
+      await inBatches([
+        () => source.home().catch(() => ({})),
+        ...rails.map(g => () => source.byCategory(g.slug, 1).catch(() => ({}))),
+      ]);
+    } catch { /* nguồn lỗi thì thôi, lần sau ấm lại */ }
+  }
+  app.locals.warmHome = warmHome;
+
   const chapNum = (c) => { const n = parseFloat(c?.latestChapter); return Number.isFinite(n) ? n : 0; };
 
   const mapFollowed = (c) => ({ ...c, thumbUrl: c.thumb_url, latestChapter: c.last_chapter_seen });

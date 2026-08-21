@@ -11,6 +11,14 @@ createSchema(db);
 const app = buildApp({ db });
 app.listen(config.PORT, () => console.log(`listening on :${config.PORT}`));
 
+// Làm ấm cache trang chủ: ngay sau khi khởi động (cache trống) + định kỳ 20'
+// (dưới TTL 30' của cache thể loại) để người dùng luôn gặp bản ấm, không phải
+// chờ lần tải nguội ~9s+ (nặng vì nhiều dải thể loại + kho bổ sung qua CDN chậm).
+const WARM_MS = 20 * 60 * 1000;
+const warm = () => Promise.resolve(app.locals.warmHome?.()).catch(() => {});
+setTimeout(warm, 3000);
+setInterval(warm, WARM_MS);
+
 // nightly maintenance: backup DB + prune cache. Keeps the Always-Free VPS non-idle.
 // This does NOT call the OTruyen source, so it complies with "no background source polling".
 const DAY = 24 * 60 * 60 * 1000;
