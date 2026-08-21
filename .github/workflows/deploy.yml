@@ -10,6 +10,11 @@
 # Tag bằng commit SHA (đúng quy ước cụm) -> `kubectl set image` tạo rollout xác định,
 # không phụ thuộc `imagePullPolicy: Always` hay việc trùng tag.
 #
+# ⚠️ DEPLOY TỰ ĐỘNG mỗi push vào main. Container `blog` và `ke-truyen` đang nằm CHUNG
+#    1 pod với `strategy: Recreate`, nên mỗi lần deploy truyện thì tradadata.com cũng
+#    downtime ~1-2 phút (pull image ghcr mất ~50s). Muốn hết downtime chéo này: tách
+#    `20-deployment.yaml` thành 2 Deployment (đổi `selector`, 2 Service giữ nguyên).
+#
 # ─── Secrets cần khai (Settings > Secrets and variables > Actions) ────────────
 #   SSH_PRIVATE_KEY   khoá riêng vào gateway + control plane
 #   SSH_KNOWN_HOSTS   output `ssh-keyscan` của gateway + control plane
@@ -31,9 +36,7 @@ on:
   push:
     branches: [main]
   pull_request:
-  # Deploy bấm tay: container `blog` và `ke-truyen` nằm CHUNG 1 pod với strategy
-  # Recreate, nên mỗi lần deploy truyện là tradadata.com cũng downtime vài chục giây.
-  # Khi nào tách thành 2 Deployment thì cho deploy chạy tự động theo push.
+  # Vẫn giữ để bấm lại tay khi cần (rollback, deploy lại không đổi code).
   workflow_dispatch:
 
 env:
@@ -42,7 +45,7 @@ env:
 
 concurrency:
   group: ke-truyen-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   # 153 test chạy hoàn toàn offline bằng fixture -> không cần mạng, chạy trên runner GitHub.
@@ -100,8 +103,14 @@ jobs:
 
   deploy:
     needs: build-push
-    if: github.event_name == 'workflow_dispatch'
+    # TỰ ĐỘNG: mỗi push vào main là deploy luôn. PR thì không (chỉ test + build).
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # Concurrency RIÊNG, cancel-in-progress: false — không được huỷ giữa lúc
+    # `kubectl set image` / rollout đang chạy, sẽ để cụm ở trạng thái nửa vời.
+    concurrency:
+      group: ke-truyen-deploy-cum
+      cancel-in-progress: false
     environment:
       name: production
       url: https://truyen.tradadata.com
