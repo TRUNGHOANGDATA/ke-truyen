@@ -486,3 +486,14 @@ a.link { text-decoration: none; }
 /* Tiêu đề nhóm nhỏ (tách Truyện tranh / Truyện chữ trong danh sách) */
 .subhead { font-family: var(--font-head); font-size: 13px; font-weight: 700; color: var(--text-dim); padding: 4px 16px 2px; margin-top: 6px; }
 .subhead:first-of-type { margin-top: 0; }
+/* ===== Chế độ lật trang (manga) ===== */
+.rdstage.paged { padding-bottom: 0; }
+.rdstage.paged .rdcol { max-width: none; margin: 0; }
+.rdstage.paged .mpage { display: none; }
+.rdstage.paged .mpage.cur { display: flex; align-items: center; justify-content: center;
+  height: 100dvh; aspect-ratio: auto !important; border: 0; overflow: visible; }
+.rdstage.paged .mpage.cur img { width: auto; height: auto; max-width: 100%; max-height: 100dvh; object-fit: contain; }
+.rdstage.paged .mpage .pn { display: none; }
+.rdstage.paged .endblk { display: none; }
+/* Immersive: chạm giữa để ẩn thanh trên/dưới */
+body.imm .rdbar, body.imm .rdfoot { display: none; }
