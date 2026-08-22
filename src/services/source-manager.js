@@ -49,7 +49,7 @@ export function createSourceManager({
 
   function build(name) {
     raw = buildRaw(name);
-    active = wrap(db, raw);
+    active = wrap(db, raw, { searchTtlMs: 10 * 60 * 1000 });
   }
 
   build(settings.get('source', 'truyenqq'));

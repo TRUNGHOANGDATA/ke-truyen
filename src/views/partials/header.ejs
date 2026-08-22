@@ -23,25 +23,31 @@
     const pack = (u) => u ? '/img?i=' + btoa(unescape(encodeURIComponent(u))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'') : '';
     const hrefOf = (slug) => slug.startsWith('tf~') ? '/chu/' + slug.slice(3) : '/truyen/' + slug;
     let timer, lastQ = '';
+    const cache = new Map();                              // query -> items (trong phiên)
     const hide = () => { box.hidden = true; box.innerHTML = ''; };
+    const render = (items, q) => {
+      if (inp.value.trim() !== q) return;                 // kết quả cũ, bỏ
+      if (!items.length) { box.innerHTML = '<div class="navsug-empty">Không tìm thấy</div>'; box.hidden = false; return; }
+      box.innerHTML = items.slice(0, 8).map(c => {
+        const novel = String(c.slug).startsWith('tf~');
+        return `<a class="navsug-item" href="${hrefOf(c.slug)}">
+          <img loading="lazy" src="${pack(c.thumbUrl)}" alt="">
+          <span class="navsug-name">${c.name}</span>
+          ${novel ? '<span class="navsug-tag">Chữ</span>' : ''}</a>`;
+      }).join('');
+      box.hidden = false;
+    };
     async function run() {
       const q = inp.value.trim();
       if (q.length < 2) return hide();
       if (q === lastQ) return; lastQ = q;
+      if (cache.has(q)) return render(cache.get(q), q);   // đã tìm rồi -> hiện ngay
       try {
         const r = await fetch('/api/search?q=' + encodeURIComponent(q), { headers: { 'Content-Type': 'application/json' } });
         if (!r.ok) return hide();
         const { items = [] } = await r.json();
-        if (inp.value.trim() !== q) return;               // kết quả cũ, bỏ
-        if (!items.length) { box.innerHTML = '<div class="navsug-empty">Không tìm thấy</div>'; box.hidden = false; return; }
-        box.innerHTML = items.slice(0, 8).map(c => {
-          const novel = String(c.slug).startsWith('tf~');
-          return `<a class="navsug-item" href="${hrefOf(c.slug)}">
-            <img loading="lazy" src="${pack(c.thumbUrl)}" alt="">
-            <span class="navsug-name">${c.name}</span>
-            ${novel ? '<span class="navsug-tag">Chữ</span>' : ''}</a>`;
-        }).join('');
-        box.hidden = false;
+        cache.set(q, items);
+        render(items, q);
       } catch { hide(); }
     }
     inp.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(run, 300); });

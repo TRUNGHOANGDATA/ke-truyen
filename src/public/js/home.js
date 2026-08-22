@@ -13,7 +13,7 @@ function cardHtml(c) {
   const isNovel = String(c.slug).startsWith('tf~');
   const href = isNovel ? '/chu/' + c.slug.slice(3) : '/truyen/' + c.slug;
   return `<a class="cc" href="${href}">
-    <div class="thumb">${isNovel ? '<span class="kindflag">Chữ</span>' : ''}<img loading="lazy" src="${imgSrc(c.thumbUrl)}" alt="">
+    <div class="thumb"><span class="kindflag ${isNovel ? 'novel' : 'comic'}">${isNovel ? 'Truyện chữ' : 'Truyện tranh'}</span><img loading="lazy" src="${imgSrc(c.thumbUrl)}" alt="">
       ${c.latestChapter ? `<span class="newflag">Chương <b>${c.latestChapter}</b></span>` : ''}</div>
     <div class="tt">${c.name}</div>
     ${c.latestChapter ? `<div class="row"><span class="ch">Chương ${c.latestChapter}</span></div>` : ''}

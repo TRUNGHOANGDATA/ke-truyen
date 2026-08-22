@@ -6,7 +6,8 @@
           aria-label="<%= clearMode ? 'Xoá khỏi đang đọc dở' : 'Bỏ theo dõi' %>">✕</button>
   <a class="cc" href="<%= detailUrl(comic.slug) %>">
     <div class="thumb">
-      <% if (String(comic.slug).startsWith("tf~")) { %><span class="kindflag">Chữ</span><% } %>
+      <% const _nv = String(comic.slug).startsWith("tf~"); %>
+      <span class="kindflag <%= _nv ? 'novel' : 'comic' %>"><%= _nv ? 'Truyện chữ' : 'Truyện tranh' %></span>
       <img loading="lazy" src="<%= img(comic.thumbUrl) %>" alt="<%= comic.name %>">
       <% if (comic.progress) { %><span class="when">Đang đọc</span><% } %>
       <% if (comic.unread) { %><span class="hotflag"><%= comic.unread %></span><% } %>

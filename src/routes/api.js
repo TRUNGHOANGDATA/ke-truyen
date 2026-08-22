@@ -31,6 +31,11 @@ export function mountApi(app, { source, novelSource, library, updates, cacheDir,
     } catch { res.json({ images: [] }); }
   });
 
+  // Một nguồn chậm không được kéo cả ô tìm: quá hạn thì trả rỗng cho nguồn đó.
+  const withTimeout = (p, ms) => Promise.race([
+    p, new Promise(resolve => setTimeout(() => resolve([]), ms)),
+  ]);
+
   app.get('/api/search', async (req, res) => {
     const q = req.query.q || '';
     try {
@@ -38,8 +43,8 @@ export function mountApi(app, { source, novelSource, library, updates, cacheDir,
       // gắn tiền tố tf~ để thẻ link đúng /chu/ và hiện nhãn "Chữ". Không gộp trùng
       // giữa hai loại: cùng tên có thể vừa là truyện tranh vừa là truyện chữ.
       const [comics, novels] = await Promise.all([
-        source.search(q).then(r => r.items || []).catch(() => []),
-        (novelSource ? novelSource.search(q).then(r => r.items || []) : Promise.resolve([])).catch(() => []),
+        withTimeout(source.search(q).then(r => r.items || []).catch(() => []), 5000),
+        withTimeout((novelSource ? novelSource.search(q).then(r => r.items || []) : Promise.resolve([])).catch(() => []), 5000),
       ]);
       const items = [
         ...comics,

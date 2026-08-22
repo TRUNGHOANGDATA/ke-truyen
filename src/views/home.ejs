@@ -39,10 +39,21 @@
     <% } else if (following) { %>
       <div class="box">
         <div class="boxhead"><h2>Đang theo dõi</h2><div class="sp"></div><span class="cnt"><%= items.length %> bộ</span></div>
+        <% const _fc = items.filter(c => !String(c.slug).startsWith('tf~')); %>
+        <% const _fn = items.filter(c => String(c.slug).startsWith('tf~')); %>
         <% if (items.length) { %>
-        <div class="cgrid">
-          <% items.forEach(comic => { %><%- include('partials/followed-card', { comic }) %><% }) %>
-        </div>
+          <% if (_fc.length) { %>
+            <div class="subhead">Truyện tranh (<%= _fc.length %>)</div>
+            <div class="cgrid">
+              <% _fc.forEach(comic => { %><%- include('partials/followed-card', { comic }) %><% }) %>
+            </div>
+          <% } %>
+          <% if (_fn.length) { %>
+            <div class="subhead">Truyện chữ (<%= _fn.length %>)</div>
+            <div class="cgrid">
+              <% _fn.forEach(comic => { %><%- include('partials/followed-card', { comic }) %><% }) %>
+            </div>
+          <% } %>
         <% } else { %>
         <div class="emptymsg">Chưa theo dõi bộ nào. Vào <a href="/browse">Thể loại</a> hoặc <a href="/search">Tìm truyện</a> để thêm.</div>
         <% } %>
@@ -56,10 +67,21 @@
         <div class="boxhead"><h2>Đang đọc dở</h2><div class="sp"></div>
           <% if (items && items.length) { %><a class="seemore" href="/following">Truyện theo dõi (<%= items.length %>) →</a><% } %>
           <span class="cnt" style="margin-left:10px"><%= reading.length %></span></div>
+        <% const _rc = reading.filter(c => !String(c.slug).startsWith('tf~')); %>
+        <% const _rn = reading.filter(c => String(c.slug).startsWith('tf~')); %>
         <% if (reading.length) { %>
-        <div class="cgrid">
-          <% reading.forEach(comic => { %><%- include('partials/followed-card', { comic, mode: 'reading' }) %><% }) %>
-        </div>
+          <% if (_rc.length) { %>
+            <div class="subhead">Truyện tranh</div>
+            <div class="cgrid">
+              <% _rc.forEach(comic => { %><%- include('partials/followed-card', { comic, mode: 'reading' }) %><% }) %>
+            </div>
+          <% } %>
+          <% if (_rn.length) { %>
+            <div class="subhead">Truyện chữ</div>
+            <div class="cgrid">
+              <% _rn.forEach(comic => { %><%- include('partials/followed-card', { comic, mode: 'reading' }) %><% }) %>
+            </div>
+          <% } %>
         <% } else { %>
         <div class="emptymsg">Chưa có truyện đang đọc dở. Mở một truyện bất kỳ và đọc — nó sẽ tự xuất hiện ở đây kèm vị trí đã đọc.<br>
           Xem truyện đang theo dõi ở tab <a href="/following">Đang theo dõi</a>.</div>

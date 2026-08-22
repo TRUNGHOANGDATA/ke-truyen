@@ -116,7 +116,7 @@ test('/chu hiện chip thể loại và lọc theo thể loại', async () => {
 test('thẻ truyện chữ có nhãn "Chữ" phân biệt với truyện tranh', async () => {
   const a = await authed();
   const res = await a.get('/chu');
-  assert.match(res.text, /class="kindflag">Chữ</);
+  assert.match(res.text, /kindflag novel">Truyện chữ</);
 });
 
 test('truyện chữ đang đọc dở ở trang chủ mang nhãn "Chữ"', async () => {
@@ -124,5 +124,5 @@ test('truyện chữ đang đọc dở ở trang chủ mang nhãn "Chữ"', asyn
   await a.get('/doc-chu/dai-chua-te/1');   // tạo tiến độ đọc
   await a.post('/api/progress').send({ slug: 'tf~dai-chua-te', chapter: '1', page: 10 });
   const home = await a.get('/');
-  assert.match(home.text, /class="kindflag">Chữ</);
+  assert.match(home.text, /kindflag novel">Truyện chữ</);
 });
