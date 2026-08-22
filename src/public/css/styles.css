@@ -442,14 +442,29 @@ a.link { text-decoration: none; }
 /* ===== Đọc truyện chữ ===== */
 .txt-btn { background: rgba(255,255,255,.12); color: #fff; border: 0; border-radius: 6px; padding: 6px 9px; font-family: var(--font-mono); font-size: 12px; cursor: pointer; }
 .txt-btn:hover { background: rgba(255,255,255,.22); }
-.rdstage.novel { background: #EDE7DA; padding-bottom: 60px; }           /* nền giấy, dịu mắt */
-.novel-col { max-width: 720px; margin: 0 auto; padding: 26px 20px 40px; color: #23201A; font-family: var(--font-prose); }
-.novel-h { font-family: var(--font-head); font-size: 22px; font-weight: 700; margin: 0 0 4px; color: #1a1712; }
-.novel-ch { font-family: var(--font-mono); font-size: 13px; color: #6a6455; margin: 0 0 22px; padding-bottom: 14px; border-bottom: 1px solid #D8CFBB; }
-.novel-col p { font-size: var(--novel-fs, 19px); line-height: 1.85; margin: 0 0 1.05em; text-align: justify; text-justify: inter-word; word-break: break-word; }
-.novel-col .endblk { margin-top: 34px; padding-top: 20px; border-top: 1px solid #D8CFBB; text-align: center; }
-.novel-col .endblk .lb { font-family: var(--font-mono); font-size: 13px; color: #6a6455; margin-bottom: 12px; }
+/* Nền đọc truyện chữ: 3 chủ đề qua data-th (JS đặt). Màu khai báo bằng biến để đổi 1 chỗ. */
+.rdstage.novel { --nv-bg: #EDE7DA; --nv-text: #23201A; --nv-muted: #6a6455; --nv-rule: #D8CFBB; --nv-head: #1a1712; --nv-cur: rgba(255,216,74,.18);
+  background: var(--nv-bg); padding-bottom: 60px; }
+.rdstage.novel[data-th="light"] { --nv-bg: #FFFFFF; --nv-text: #1b1b1b; --nv-muted: #6a6a6a; --nv-rule: #e6e6e6; --nv-head: #111; --nv-cur: rgba(255,46,85,.10); }
+.rdstage.novel[data-th="dark"]  { --nv-bg: #16141A; --nv-text: #c9c4ba; --nv-muted: #8b8579; --nv-rule: #2c2a33; --nv-head: #e6e0d4; --nv-cur: rgba(255,216,74,.14); }
+.novel-col { max-width: 720px; margin: 0 auto; padding: 26px 20px 40px; color: var(--nv-text); font-family: var(--novel-ff, var(--font-prose)); }
+.novel-h { font-family: var(--font-head); font-size: 22px; font-weight: 700; margin: 0 0 4px; color: var(--nv-head); }
+.novel-ch { font-family: var(--font-mono); font-size: 13px; color: var(--nv-muted); margin: 0 0 22px; padding-bottom: 14px; border-bottom: 1px solid var(--nv-rule); }
+.novel-col p { font-size: var(--novel-fs, 19px); line-height: var(--novel-lh, 1.85); margin: 0 0 1.05em; text-align: justify; text-justify: inter-word; word-break: break-word; border-radius: 4px; transition: background .2s; }
+.novel-col p.tts-cur { background: var(--nv-cur); box-shadow: 0 0 0 6px var(--nv-cur); }   /* đoạn đang đọc */
+.novel-col .endblk { margin-top: 34px; padding-top: 20px; border-top: 1px solid var(--nv-rule); text-align: center; }
+.novel-col .endblk .lb { font-family: var(--font-mono); font-size: 13px; color: var(--nv-muted); margin-bottom: 12px; }
 .novel-col .endblk .bg { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+/* Panel tuỳ chỉnh đọc truyện chữ */
+.nvcfg { position: sticky; top: 44px; z-index: 20; background: #1c1b22; color: #eee; border-bottom: 1px solid rgba(255,255,255,.12); padding: 8px 12px; display: flex; flex-direction: column; gap: 8px; }
+.nvrow { display: flex; align-items: center; gap: 10px; }
+.nvrow > span { flex: 0 0 92px; font-size: 12.5px; color: #b8b4c0; }
+.nvbtns { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.nvbtns button { background: rgba(255,255,255,.12); color: #fff; border: 0; border-radius: 6px; padding: 5px 11px; font-family: var(--font-mono); font-size: 12.5px; cursor: pointer; }
+.nvbtns button:hover { background: rgba(255,255,255,.22); }
+.nvbtns button.on { background: var(--hot); color: #fff; font-weight: 700; }
+.nvval { min-width: 30px; text-align: center; font-family: var(--font-mono); font-size: 12.5px; color: #d8d5df; }
 /* Phân trang kiểu link (dùng ở /chu truyện chữ) */
 .pager .pgbtn { height: 32px; display: inline-flex; align-items: center; padding: 0 12px; background: var(--card-2); border: 1px solid var(--line); border-radius: var(--r); font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); text-decoration: none; }
 .pager .pgbtn:hover { background: var(--hot-soft); color: var(--hot); }

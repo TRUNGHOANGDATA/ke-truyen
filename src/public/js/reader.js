@@ -94,10 +94,34 @@ function onScroll() {
 window.addEventListener('scroll', onScroll, { passive: true });
 onScroll();
 
-// keyboard: left/right = prev/next chapter, f = fullscreen
+// Tự cuộn (nhớ tốc độ trong localStorage). Cuộn ngược lên tay -> tự tắt.
+const autoBtn = document.getElementById('autoBtn');
+const maxY = () => Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+let speed = Math.min(9, Math.max(1, Number(localStorage.getItem('rd-auto-speed')) || 3));
+let autoOn = false, autoRAF = 0, acc = 0, lastY = window.scrollY;
+function autoStep() {
+  if (!autoOn) return;
+  acc += speed; const dy = Math.floor(acc); acc -= dy;
+  window.scrollBy(0, dy);
+  if (window.scrollY >= maxY() - 1) return stopAuto();   // hết chương thì dừng
+  autoRAF = requestAnimationFrame(autoStep);
+}
+function startAuto() { autoOn = true; if (autoBtn) autoBtn.textContent = '⏸'; cancelAnimationFrame(autoRAF); autoRAF = requestAnimationFrame(autoStep); }
+function stopAuto() { autoOn = false; if (autoBtn) autoBtn.textContent = '▶'; cancelAnimationFrame(autoRAF); }
+autoBtn?.addEventListener('click', () => (autoOn ? stopAuto() : startAuto()));
+window.addEventListener('scroll', () => {
+  if (autoOn && window.scrollY < lastY - 4) stopAuto();   // cuộn ngược lên -> tắt
+  lastY = window.scrollY;
+}, { passive: true });
+
+// keyboard: left/right = prev/next chapter, f = fullscreen, space = tự cuộn,
+// +/- = tăng/giảm tốc độ tự cuộn
 document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowRight') document.querySelector('.rnav .pri')?.closest('a')?.click();
   if (e.key === 'ArrowLeft') document.querySelector('.rnav button:not(.pri)')?.closest('a')?.click();
+  if (e.key === ' ') { e.preventDefault(); autoOn ? stopAuto() : startAuto(); }
+  if (e.key === '+' || e.key === '=') { speed = Math.min(9, speed + 1); localStorage.setItem('rd-auto-speed', speed); }
+  if (e.key === '-') { speed = Math.max(1, speed - 1); localStorage.setItem('rd-auto-speed', speed); }
   if (e.key === 'f' || e.key === 'F') {
     if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
     else document.exitFullscreen?.();

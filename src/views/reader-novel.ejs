@@ -9,11 +9,23 @@
   <div class="ti"><div class="a"><%= name %></div><div class="b">Chương <%= chapterName %><%= chapterTitle ? ' · ' + chapterTitle.replace(/^Ch[uươ]+ng\s*[\d.]+\s*:?\s*/i,'') : '' %></div></div>
   <div class="sp"></div>
   <div class="rnav">
-    <button class="txt-btn" id="fontMinus" type="button" aria-label="Chữ nhỏ hơn">A−</button>
-    <button class="txt-btn" id="fontPlus" type="button" aria-label="Chữ to hơn">A+</button>
+    <button class="txt-btn" id="ttsBtn" type="button" aria-label="Nghe truyện" title="Nghe">🔊</button>
+    <button class="txt-btn" id="autoBtn" type="button" aria-label="Tự cuộn" title="Tự cuộn">▶</button>
+    <button class="txt-btn" id="cfgBtn" type="button" aria-label="Tuỳ chỉnh" title="Tuỳ chỉnh">⚙</button>
     <% if (prev) { %><a class="link" href="/doc-chu/<%= clean %>/<%= encodeURIComponent(prev) %>"><button type="button">←<span class="lbl"> Trước</span></button></a><% } %>
     <% if (next) { %><a class="link" href="/doc-chu/<%= clean %>/<%= encodeURIComponent(next) %>"><button class="pri" type="button"><span class="lbl">Sau </span>→</button></a><% } %>
   </div>
+</div>
+
+<div class="nvcfg" id="nvcfg" hidden>
+  <div class="nvrow"><span>Nền</span><div class="nvbtns" data-group="theme">
+    <button type="button" data-th="light">Sáng</button><button type="button" data-th="paper">Giấy</button><button type="button" data-th="dark">Tối</button></div></div>
+  <div class="nvrow"><span>Kiểu chữ</span><div class="nvbtns" data-group="ff">
+    <button type="button" data-ff="sans">Không chân</button><button type="button" data-ff="serif">Có chân</button></div></div>
+  <div class="nvrow"><span>Cỡ chữ</span><div class="nvbtns"><button type="button" id="fMinus">A−</button><span class="nvval" id="fVal"></span><button type="button" id="fPlus">A+</button></div></div>
+  <div class="nvrow"><span>Giãn dòng</span><div class="nvbtns"><button type="button" id="lhMinus">−</button><span class="nvval" id="lhVal"></span><button type="button" id="lhPlus">+</button></div></div>
+  <div class="nvrow"><span>Tốc độ cuộn</span><div class="nvbtns"><button type="button" id="spMinus">−</button><span class="nvval" id="spVal"></span><button type="button" id="spPlus">+</button></div></div>
+  <div class="nvrow"><span>Tốc độ đọc</span><div class="nvbtns"><button type="button" id="ttsMinus">−</button><span class="nvval" id="ttsVal"></span><button type="button" id="ttsPlus">+</button></div></div>
 </div>
 
 <div class="rdstage novel">
