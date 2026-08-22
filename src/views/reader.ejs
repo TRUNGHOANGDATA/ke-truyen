@@ -9,7 +9,6 @@
   <div class="ti"><div class="a"><%= name %></div><div class="b">Chương <%= chapterName %> · <%= images.length %> trang</div></div>
   <div class="sp"></div>
   <div class="rnav">
-    <button class="txt-btn" id="modeBtn" type="button" aria-label="Đổi chế độ đọc" title="Cuộn / Lật trang">⇄ Lật</button>
     <button class="txt-btn" id="autoBtn" type="button" aria-label="Tự cuộn" title="Tự cuộn">▶</button>
     <% if (prev) { %><a class="link" href="/doc/<%= slug %>/<%= encodeURIComponent(prev) %>"><button type="button">←<span class="lbl"> Chương trước</span></button></a><% } %>
     <% if (next) { %><a class="link" href="/doc/<%= slug %>/<%= encodeURIComponent(next) %>"><button class="pri" type="button"><span class="lbl">Chương sau </span>→</button></a><% } %>
