@@ -62,10 +62,15 @@ export function mountPages(app) {
     const source = svc().source;
     try {
       const rails = await resolveGenres(source);
+      // Thể loại hay xem (tự học từ lượt mở) + thể loại của trang chủ, khử trùng.
+      const railSlugs = new Set(rails.map(g => g.slug));
+      let hot = [];
+      try { hot = svc().library.topCategories(10).filter(s => !railSlugs.has(s)); } catch { /* bảng có thể trống */ }
       await inBatches([
         () => source.home().catch(() => ({})),
         () => source.list('truyen-moi', 1).catch(() => ({})),   // danh sách mặc định trang /browse
         ...rails.map(g => () => source.byCategory(g.slug, 1).catch(() => ({}))),
+        ...hot.map(slug => () => source.byCategory(slug, 1).catch(() => ({}))),
       ]);
     } catch { /* nguồn lỗi thì thôi, lần sau ấm lại */ }
   }

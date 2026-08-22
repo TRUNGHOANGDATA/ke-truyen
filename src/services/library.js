@@ -114,5 +114,18 @@ export function createLibrary(db) {
     chaptersOf(slug) {
       return db.prepare('SELECT * FROM chapters WHERE comic_slug=? ORDER BY order_index').all(slug);
     },
+    /** Ghi nhận mở một thể loại (để warmer tự làm ấm thể loại hay xem). */
+    recordCategoryHit(slug) {
+      if (!slug) return;
+      db.prepare(`
+        INSERT INTO category_hits (slug, hits, last_at) VALUES (?, 1, ?)
+        ON CONFLICT(slug) DO UPDATE SET hits = hits + 1, last_at = excluded.last_at
+      `).run(slug, Date.now());
+    },
+    /** N thể loại được mở nhiều nhất (gần đây ưu tiên khi bằng điểm). */
+    topCategories(n = 10) {
+      return db.prepare('SELECT slug FROM category_hits ORDER BY hits DESC, last_at DESC LIMIT ?')
+        .all(n).map(r => r.slug);
+    },
   };
 }

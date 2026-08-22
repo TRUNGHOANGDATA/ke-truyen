@@ -158,12 +158,12 @@ a { color: inherit; }
 .rnav button:hover { background: rgba(255,255,255,.16); }
 .rdstage { position: relative; padding-bottom: 30px; background: var(--readerbg); }
 .rdcol { max-width: 760px; margin: 0 auto; }
-.mpage { position: relative; border-bottom: 1px solid rgba(255,255,255,.07); }
-.mpage img { display: block; width: 100%; height: auto; background: #17161c; }
-/* Trang chua tai xong van giu san cho theo ti le anh (--pg-ar do reader.js do tu trang dau).
-   Thieu buoc nay, o anh chi cao 120px roi bung ra ca nghin px, day noi dung dang doc
-   xuong -> cuon tren dien thoai thay rung lac. */
-.mpage img:not([data-ok]) { aspect-ratio: var(--pg-ar, 2 / 3); }
+/* Ô chứa giữ sẵn chỗ theo tỉ lệ; reader.js đặt aspect-ratio ĐÚNG của từng ảnh
+   (đo bằng bộ nạp rời) TRƯỚC khi ảnh hiện -> ô không đổi cỡ lúc ảnh xong -> hết
+   rung khi cuộn, kể cả trên điện thoại và khi các trang khác khổ. 2/3 chỉ là
+   chỗ giữ tạm trước khi biết tỉ lệ thật. overflow-anchor giữ vùng nhìn ổn định. */
+.mpage { position: relative; border-bottom: 1px solid rgba(255,255,255,.07); aspect-ratio: 2 / 3; overflow: hidden; }
+.mpage img { display: block; width: 100%; height: 100%; object-fit: cover; background: #17161c; }
 .mpage .pn { position: absolute; top: 8px; right: 9px; font-family: var(--font-mono); font-size: 10px; color: rgba(255,255,255,.55); background: rgba(0,0,0,.55); padding: 2px 6px; border-radius: 3px; font-variant-numeric: tabular-nums; z-index: 3; }
 .endblk { padding: 28px 16px 36px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
 .endblk .lb { font-family: var(--font-mono); font-size: 11px; color: #7C7987; }

@@ -62,6 +62,13 @@ export function createSchema(db) {
       message TEXT,
       updated_at INTEGER NOT NULL
     );
+
+    -- Đếm lượt mở từng thể loại để warmer tự làm ấm những thể loại hay xem.
+    CREATE TABLE IF NOT EXISTS category_hits (
+      slug TEXT PRIMARY KEY,
+      hits INTEGER NOT NULL DEFAULT 0,
+      last_at INTEGER NOT NULL
+    );
   `);
 
   // Tách "có trong thư viện" khỏi "đang theo dõi": mở một truyện để đọc cũng

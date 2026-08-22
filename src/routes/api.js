@@ -57,7 +57,10 @@ export function mountApi(app, { source, novelSource, library, updates, cacheDir,
   app.get('/api/browse', async (req, res) => {
     const page = Number(req.query.page || 1);
     try {
-      if (req.query.category) return res.json(await source.byCategory(req.query.category, page));
+      if (req.query.category) {
+        if (page === 1) library.recordCategoryHit(req.query.category);   // học thể loại hay xem
+        return res.json(await source.byCategory(req.query.category, page));
+      }
       return res.json(await source.list(req.query.type || 'truyen-moi', page));
     } catch (e) { res.status(502).json({ error: String(e.message || e) }); }
   });

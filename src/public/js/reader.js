@@ -9,40 +9,49 @@ const track = document.getElementById('track');
 const pageLabel = document.getElementById('pageLabel');
 const total = imgs.length;
 
-// lazy-load + prefetch next 3 using IntersectionObserver
+// Tải một trang: ĐO tỉ lệ thật bằng bộ nạp rời, đặt aspect-ratio ĐÚNG cho ô chứa
+// TRƯỚC khi ảnh hiện -> ô không đổi kích thước lúc ảnh tải xong -> hết rung, kể
+// cả trên điện thoại và khi các trang có khổ khác nhau. Trả Promise để nạp nền
+// giới hạn số ảnh cùng lúc.
+function loadImg(im) {
+  const src = im.dataset.src;
+  if (!src) return Promise.resolve();          // đã (đang) tải
+  delete im.dataset.src;
+  const mpage = im.closest('.mpage');
+  return new Promise(res => {
+    const pre = new Image();
+    const show = () => { im.src = src; im.dataset.ok = '1'; res(); };
+    pre.onload = () => {
+      if (pre.naturalWidth && pre.naturalHeight) {
+        mpage.style.aspectRatio = pre.naturalWidth + ' / ' + pre.naturalHeight;
+      }
+      show();                                   // src đã trong cache -> hiện tức thì vào ô đúng cỡ
+    };
+    pre.onerror = show;
+    pre.src = src;
+  });
+}
+
+// Ưu tiên vùng nhìn: nạp trang vào tầm nhìn + vài trang kế tiếp.
 const io = new IntersectionObserver((entries) => {
   for (const e of entries) {
     if (!e.isIntersecting) continue;
     const idx = imgs.indexOf(e.target);
-    for (let i = idx; i < Math.min(imgs.length, idx + 6); i++) {
-      const im = imgs[i];
-      if (im.dataset.src) { im.src = im.dataset.src; delete im.dataset.src; }
-    }
+    for (let i = idx; i < Math.min(imgs.length, idx + 6); i++) loadImg(imgs[i]);
     io.unobserve(e.target);
   }
 }, { rootMargin: '1600px 0px' });
 imgs.forEach(im => io.observe(im));
 
-// #1 Tải trước CẢ chương ở nền (giới hạn 4 ảnh cùng lúc): đọc trang đầu thì các
-// trang sau đã ngầm tải xong, cuộn tới đâu ảnh có sẵn tới đó. Ưu tiên viewport
-// trước (IntersectionObserver), nên bắt đầu sau một nhịp ngắn.
+// #1 Tải trước CẢ chương ở nền (4 ảnh cùng lúc, top-down): trang trên nạp trước
+// nên cuộn xuống ảnh đã có sẵn, ô đã đúng cỡ -> không giật.
 async function warmAllImages() {
   const CONC = 4;
   let i = 0;
-  async function worker() {
-    while (i < imgs.length) {
-      const im = imgs[i++];
-      if (!im.dataset.src) continue;                 // đã tải bởi IO ở trên
-      im.src = im.dataset.src; delete im.dataset.src;
-      await new Promise(r => {
-        im.addEventListener('load', r, { once: true });
-        im.addEventListener('error', r, { once: true });
-      });
-    }
-  }
+  const worker = async () => { while (i < imgs.length) await loadImg(imgs[i++]); };
   await Promise.all(Array.from({ length: CONC }, worker));
 }
-setTimeout(warmAllImages, 500);
+setTimeout(warmAllImages, 400);
 
 // #2 Tải trước chương kế tiếp: xin danh sách ảnh (đồng thời làm ấm cache server),
 // nạp sẵn vài ảnh đầu. Chạy một lần khi đã cuộn quá nửa chương.
@@ -57,22 +66,6 @@ async function prefetchNext() {
     images.slice(0, 5).forEach(u => { const im = new Image(); im.src = u; });
   } catch { /* bỏ qua nếu lỗi */ }
 }
-
-// Do ti le tu vai trang dau roi ap cho nhung trang chua tai (bien --pg-ar trong CSS),
-// de luc anh tai xong o chua no khong doi kich thuoc -> het rung khi dang cuon.
-const ratios = [];
-function markLoaded(im) {
-  im.dataset.ok = '1';
-  if (ratios.length < 3 && im.naturalWidth && im.naturalHeight) {
-    ratios.push(im.naturalWidth / im.naturalHeight);
-    const sorted = [...ratios].sort((a, b) => a - b);
-    pages.style.setProperty('--pg-ar', String(sorted[Math.floor(sorted.length / 2)]));
-  }
-}
-imgs.forEach(im => {
-  if (im.complete && im.naturalWidth) markLoaded(im);
-  else im.addEventListener('load', () => markLoaded(im), { once: true });
-});
 
 // jump to saved page
 if (startPage > 0 && imgs[startPage]) {
