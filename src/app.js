@@ -47,6 +47,14 @@ export function buildApp(deps = {}) {
 
   app.use('/public', express.static(join(__dirname, 'public')));
   app.get('/healthz', (req, res) => res.json({ ok: true }));
+  // Service worker phải phục vụ từ GỐC để có phạm vi "/" (điều khiển cả trang đọc
+  // -> đọc offline). Không qua auth để trình duyệt tải/cập nhật được kịch bản.
+  app.get('/sw.js', (req, res) => {
+    res.set('Content-Type', 'application/javascript; charset=utf-8');
+    res.set('Service-Worker-Allowed', '/');
+    res.set('Cache-Control', 'no-cache');
+    res.sendFile(join(__dirname, 'public', 'sw.js'));
+  });
 
   mountAuth(app, { passwordHash });
 
