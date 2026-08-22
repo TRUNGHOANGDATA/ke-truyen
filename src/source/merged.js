@@ -26,7 +26,17 @@ export function withSupplement(primary, secondary, {
   const untag = (s) => (isTagged(s) ? s.slice(prefix.length) : s);
 
   /** Gọi nguồn bổ sung, lỗi thì trả null (bỏ qua phần bổ sung). */
-  const trySup = async (fn) => { try { return await fn(); } catch { return null; } };
+  // Nguồn bổ sung (NetTruyen qua Cloudflare) có thể chậm; quá hạn thì bỏ qua để
+  // không kéo chậm nguồn chính (trang duyệt/dải thể loại/tìm vẫn hiện nhanh).
+  const SUP_TIMEOUT = 6000;
+  const trySup = async (fn) => {
+    try {
+      return await Promise.race([
+        fn(),
+        new Promise(resolve => setTimeout(() => resolve(null), SUP_TIMEOUT)),
+      ]);
+    } catch { return null; }
+  };
 
   /** Chèn item của nguồn bổ sung vào sau, bỏ bộ đã có tên trùng. */
   function mergeInto(base, supRes) {

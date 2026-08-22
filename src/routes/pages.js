@@ -64,6 +64,7 @@ export function mountPages(app) {
       const rails = await resolveGenres(source);
       await inBatches([
         () => source.home().catch(() => ({})),
+        () => source.list('truyen-moi', 1).catch(() => ({})),   // danh sách mặc định trang /browse
         ...rails.map(g => () => source.byCategory(g.slug, 1).catch(() => ({}))),
       ]);
     } catch { /* nguồn lỗi thì thôi, lần sau ấm lại */ }

@@ -66,7 +66,7 @@ a { color: inherit; }
 .cc { display: flex; flex-direction: column; gap: 6px; cursor: pointer; min-width: 0; text-decoration: none; color: inherit; }
 .cc .thumb { position: relative; border-radius: 3px; overflow: hidden; background: var(--card-2); aspect-ratio: 190/247; }
 .cc .thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.cc .when { position: absolute; top: 0; left: 0; z-index: 3; background: rgba(0,0,0,.62); color: #fff; font-size: 10px; padding: 3px 6px; border-bottom-right-radius: 4px; font-family: var(--font-mono); }
+.cc .when { position: absolute; bottom: 0; right: 0; z-index: 4; background: rgba(0,0,0,.72); color: #fff; font-size: 10px; padding: 3px 6px; border-top-left-radius: 4px; font-family: var(--font-mono); }
 .cc .hotflag { position: absolute; top: 0; right: 0; z-index: 3; background: var(--hot); color: #fff; font-size: 9.5px; font-weight: 700; padding: 3px 6px; border-bottom-left-radius: 4px; }
 .cc .newflag { position: absolute; bottom: 0; left: 0; right: 0; z-index: 3; background: linear-gradient(transparent, rgba(0,0,0,.82)); color: #fff; font-size: 10.5px; padding: 14px 7px 5px; font-family: var(--font-mono); }
 .cc .newflag b { color: #FFD84A; font-weight: 700; }
@@ -237,7 +237,7 @@ a.link { text-decoration: none; }
 .cc .newflag { font-family: var(--font-mono); font-weight: 500; font-size: 11.5px; padding: 16px 8px 6px; }
 .cc .newflag b { color: #FFD84A; }
 .cc .hotflag { background: linear-gradient(135deg, var(--hot), var(--hot-2)); border-radius: 0 var(--r-sm) 0 8px; font-size: 10.5px; padding: 3px 7px; }
-.cc .when { border-radius: var(--r-sm) 0 8px 0; padding: 3px 7px; font-family: var(--font-mono); }
+.cc .when { border-radius: 8px 0 0 0; padding: 3px 7px; font-family: var(--font-mono); }
 
 /* Buttons: gradient, bo vừa, có bóng */
 .btn, .side-btn { background: linear-gradient(135deg, var(--hot), var(--hot-2)); border-radius: var(--r-sm); box-shadow: 0 3px 10px rgba(255,46,85,.28); transition: transform .12s ease, box-shadow .12s ease, filter .12s; font-weight: 700; letter-spacing: .3px; }
@@ -458,8 +458,6 @@ a.link { text-decoration: none; }
 .cc .kindflag { position: absolute; top: 0; left: 0; z-index: 4; color: #fff; font-size: 9px; font-weight: 700; letter-spacing: .02em; padding: 3px 7px; border-bottom-right-radius: 5px; font-family: var(--font-mono); }
 .cc .kindflag.novel { background: #6D4AFF; }   /* truyện chữ - tím */
 .cc .kindflag.comic { background: #0EA5A5; }   /* truyện tranh - xanh ngọc */
-/* Nếu vừa có nhãn "Chữ" vừa có badge "Đang đọc"/thời gian ở góc trái thì đẩy badge xuống */
-.thumb:has(.kindflag) .when { top: 20px; }
 /* Dropdown gợi ý ở ô tìm trên thanh đầu */
 .navsearch-form { position: relative; }
 .navsug { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 50; background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow-lg); overflow: hidden; max-height: 70vh; overflow-y: auto; }
