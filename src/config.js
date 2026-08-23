@@ -38,7 +38,7 @@ export const IMAGE_HOSTS = [
   'img.otruyenapi.com', 'otruyencdn.com', 'sv1.otruyencdn.com',
   'nettruyen-api.clubc.org', 'images.truyenonline.cc', 'truyenonline.cc', 'nettruyen.id',
   // TruyenQQ (bìa + ảnh chương)
-  'truyenvua.com', 'hinhhinh.com', 'tintruyen.net', 'truyenqqko.com',
+  'truyenvua.com', 'hinhhinh.com', 'tintruyen.net', 'truyenqqko.com', 'hinhtruyen.com',
   // Truyện chữ (chỉ ảnh bìa; nhiều host: CDN riêng, 8cache, ảnh Google Drive)
   'static.truyenfull.live', 'truyenfull.live', 'truyenfull.vn',
   'truyenngan.8cache.com', '8cache.com', 'lh3.googleusercontent.com',
@@ -51,7 +51,7 @@ export const IMAGE_HOSTS = [
 export function refererFor(url) {
   let u;
   try { u = new URL(url); } catch { return undefined; }
-  if (/(?:^|\.)(truyenvua\.com|hinhhinh\.com|tintruyen\.net|truyenqqko\.com)$/.test(u.hostname)) {
+  if (/(?:^|\.)(truyenvua\.com|hinhhinh\.com|tintruyen\.net|truyenqqko\.com|hinhtruyen\.com)$/.test(u.hostname)) {
     return config.TRUYENQQ_BASE + '/';
   }
   return u.origin + '/';
