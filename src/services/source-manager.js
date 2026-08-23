@@ -35,20 +35,37 @@ export function createSourceManager({
   // Bọc cache: NetTruyen sau Cloudflare + CDN chậm, cache detail 60' để mở lại
   // trang truyện không phải tải + parse cả trang lớn mỗi lần (chương ít đổi).
   const DAY = 24 * 60 * 60 * 1000;
-  const newSupplement = () => wrap(db, makeSupplement({ base: config.NETTRUYEN_BASE }),
-    { keyPrefix: 'sup:', detailTtlMs: 60 * 60 * 1000, chapterTtlMs: 7 * DAY });
+
+  /**
+   * Danh sách kho bổ sung: mỗi site dùng chung khung NetTruyen là một kho RIÊNG
+   * (slug khác nhau) nên có tiền tố + khoá cache riêng. Site đầu giữ tiền tố
+   * 'ot~' vì thư viện cũ đã lưu theo nó.
+   */
+  const SITES = (config.NETTRUYEN_SITES?.length ? config.NETTRUYEN_SITES : [
+    { id: 'nettruyen', label: 'NetTruyen', base: config.NETTRUYEN_BASE, prefix: 'ot~' },
+  ]);
+
+  const newSupplements = () => SITES.map(site => ({
+    id: site.id,
+    label: site.label || site.id,
+    prefix: site.prefix,
+    src: wrap(db, makeSupplement({ base: site.base, apiBase: site.apiBase || '' }),
+      { keyPrefix: `sup:${site.id}:`, detailTtlMs: 60 * 60 * 1000, chapterTtlMs: 7 * DAY }),
+  }));
 
   function buildRaw(name) {
     if (name === 'otruyen') {
-      const nt = newSupplement(); parts = { supplement: nt }; return nt;
+      const sups = newSupplements();
+      parts = { supplements: sups };
+      return sups[0].src;
     }
     const qq = makeTruyenQQ({ base: resolver.current(), reprobe: () => resolver.reprobe() });
-    // TruyenQQ làm nguồn chính, kho NetTruyen bổ sung những bộ TruyenQQ không có.
-    // Tắt được bằng settings: supplement=0.
-    if (settings.get('supplement', '1') === '0') { parts = { primary: qq }; return qq; }
-    const nt = newSupplement();
-    parts = { primary: qq, supplement: nt };
-    return combine(qq, nt);
+    // TruyenQQ làm nguồn chính, các kho NetTruyen bổ sung những bộ TruyenQQ không
+    // có (thử lần lượt, kho nào sống thì dùng). Tắt bằng settings: supplement=0.
+    if (settings.get('supplement', '1') === '0') { parts = { primary: qq, supplements: [] }; return qq; }
+    const sups = newSupplements();
+    parts = { primary: qq, supplements: sups };
+    return combine(qq, sups);
   }
 
   function build(name) {
@@ -80,7 +97,7 @@ export function createSourceManager({
     comicSources() {
       const list = [];
       if (parts.primary) list.push({ id: 'truyenqq', label: 'TruyenQQ', prefix: '', src: parts.primary });
-      if (parts.supplement) list.push({ id: 'nettruyen', label: 'NetTruyen', prefix: 'ot~', src: parts.supplement });
+      for (const s of parts.supplements || []) list.push({ id: s.id, label: s.label, prefix: s.prefix, src: s.src });
       return list;
     },
 

@@ -5,6 +5,17 @@ for (const k of required) {
   if (!process.env[k]) console.warn(`[config] missing env ${k} — using insecure default`);
 }
 
+/** "id|Nhãn|https://a.com|pre~[|apiBase]" cách nhau bằng dấu phẩy -> mảng site. */
+function parseSites(raw) {
+  if (!raw) return null;
+  const out = raw.split(',').map(s => s.trim()).filter(Boolean).map(entry => {
+    const [id, label, base, prefix, apiBase] = entry.split('|').map(s => (s || '').trim());
+    if (!id || !base || !prefix) return null;
+    return { id, label: label || id, base: base.replace(/\/+$/, ''), prefix, ...(apiBase ? { apiBase } : {}) };
+  }).filter(Boolean);
+  return out.length ? out : null;
+}
+
 export const config = {
   PORT: Number(process.env.PORT || 3000),
   DB_PATH: process.env.DB_PATH || './data/app.db',
@@ -23,6 +34,24 @@ export const config = {
   ).split(',').map(s => s.trim().replace(/\/+$/, '')).filter(Boolean),
   // Nguồn bổ sung truyện tranh: NetTruyen (thay OTruyen API đã chết phần đọc chương)
   NETTRUYEN_BASE: process.env.NETTRUYEN_BASE || "https://nettruyen.id",
+  /**
+   * Các site DÙNG CHUNG bộ khung NetTruyen (cùng selector -> cùng adapter), mỗi
+   * site là một KHO RIÊNG (slug khác nhau, không phải bản sao của nhau):
+   *   - Duyệt/tìm: thử lần lượt, site nào sống thì dùng (tự chuyển dự phòng).
+   *   - Đọc: mỗi site một tiền tố slug riêng nên chương đã lưu không bị trỏ nhầm.
+   * Tiền tố 'ot~' của site đầu giữ nguyên vì thư viện cũ đã lưu theo nó.
+   * Ghi đè bằng .env: NETTRUYEN_SITES=id|Nhãn|https://a.com|pre~,id2|...
+   */
+  NETTRUYEN_SITES: parseSites(process.env.NETTRUYEN_SITES) || [
+    { id: 'nettruyen', label: 'NetTruyen', base: process.env.NETTRUYEN_BASE || 'https://nettruyen.id', prefix: 'ot~', apiBase: 'https://nettruyen-api.clubc.org' },
+    { id: 'nettruyenar', label: 'NetTruyen 2', base: 'https://nettruyenar.com', prefix: 'nar~' },
+    { id: 'nettruyenx', label: 'NetTruyen 3', base: 'https://nettruyenx.net', prefix: 'nx~' },
+    { id: 'nettruyenco', label: 'NetTruyen 4', base: 'https://nettruyen.co.com', prefix: 'nco~' },
+  ],
+  // Ứng viên để trang Cài đặt bấm "dò từ máy chủ" (máy ở nhà hay bị chặn, máy chủ thì không).
+  PROBE_CANDIDATES: (process.env.PROBE_CANDIDATES ||
+    'https://nettruyen.id,https://nettruyenar.com,https://nettruyenx.net,https://nettruyen.co.com,https://cuutruyen.net,https://blogtruyenmoi.com,https://manhuavn.top,https://lxmanga.net'
+  ).split(',').map(s => s.trim().replace(/\/+$/, '')).filter(Boolean),
   // Nguồn truyện chữ (Phase 2): truyenfull, crawl HTML
   TRUYENFULL_BASE: process.env.TRUYENFULL_BASE || "https://truyenfull.live",
   // Google Drive — lưu ảnh chương để đọc lâu dài (xem README phần "Lưu offline")

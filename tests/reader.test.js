@@ -69,3 +69,32 @@ test('/api/other-sources tìm cùng bộ ở nguồn khác (so tên) + link cùn
   assert.equal(res.status, 200);
   assert.deepEqual(res.body.sources, [{ label: 'NetTruyen', url: '/doc/ot~tu-dai-danh-bo/5' }]);
 });
+
+test('/api/other-sources với NHIỀU kho: bỏ đúng kho đang đọc, gợi ý các kho còn lại', async () => {
+  const db = openDb(':memory:'); createSchema(db);
+  const site = (id, label, prefix, slug) => ({
+    id, label, prefix,
+    src: { async search() { return { items: slug ? [{ name: 'Tứ Đại Danh Bổ', slug }] : [] }; } },
+  });
+  const manager = {
+    comicSources: () => [
+      site('truyenqq', 'TruyenQQ', '', 'tu-dai-danh-bo-1463'),
+      site('nettruyen', 'NetTruyen', 'ot~', 'tu-dai-danh-bo'),
+      site('hai', 'NetTruyen 2', 'nar~', 'tu-dai-danh-bo-1463'),
+      site('ba', 'NetTruyen 3', 'nx~', null),          // kho này không có bộ đó
+    ],
+  };
+  const app = buildApp({ passwordHash: hash, sessionSecret: 't', db, manager,
+    cacheDir: mkdtempSync(join(tmpdir(), 'os2-')) });
+  const a = request.agent(app);
+  await a.post('/login').type('form').send({ password: 'secret123' });
+
+  // đang đọc ở kho 'nar~' -> phải bỏ chính nó, giữ TruyenQQ + 'ot~'
+  const res = await a.get('/api/other-sources?slug=nar~tu-dai-danh-bo-1463&name='
+    + encodeURIComponent('Tứ Đại Danh Bổ') + '&chapter=12');
+  assert.equal(res.status, 200);
+  const urls = res.body.sources.map(s => s.url).sort();
+  assert.deepEqual(urls, ['/doc/ot~tu-dai-danh-bo/12', '/doc/tu-dai-danh-bo-1463/12']);
+  assert.ok(!res.body.sources.some(s => s.label === 'NetTruyen 2'), 'không gợi ý lại kho đang đọc');
+  assert.ok(!res.body.sources.some(s => s.label === 'NetTruyen 3'), 'kho không có bộ thì không hiện');
+});

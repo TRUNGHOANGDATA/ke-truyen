@@ -120,3 +120,71 @@ test('đổi sang otruyen làm nguồn chính thì không bổ sung, slug không
   const { items } = await mgr.source.search('x');
   assert.deepEqual(items.map(i => i.slug), ['bo-thieu']);
 });
+
+// --- nhiều site cùng khung NetTruyen: mỗi site là một kho riêng ---
+
+const THREE_SITES = [
+  { id: 'nettruyen', label: 'NetTruyen', base: 'https://mot.com', prefix: 'ot~', apiBase: 'https://api.mot' },
+  { id: 'hai', label: 'NetTruyen 2', base: 'https://hai.com', prefix: 'nar~' },
+  { id: 'ba', label: 'NetTruyen 3', base: 'https://ba.com', prefix: 'nx~' },
+];
+
+function setupSites(overrides = {}) {
+  const db = openDb(':memory:');
+  createSchema(db);
+  const settings = createSettings(db);
+  const seen = [];
+  const mgr = createSourceManager({
+    db, settings,
+    config: { TRUYENQQ_MIRRORS: ['https://a.com'], NETTRUYEN_SITES: THREE_SITES },
+    wrap: (_db, raw) => raw,
+    makeResolver: () => ({ current: () => 'https://a.com', setCurrent() {}, reprobe: async () => 'https://a.com' }),
+    makeTruyenQQ: ({ base }) => ({
+      base, setBase(b) { this.base = b; },
+      async home() { return { items: [] }; },
+      async search() { return { items: [] }; },
+      async detail(slug) { return { slug, name: 'qq' }; },
+    }),
+    makeSupplement: (opts) => {
+      seen.push(opts);
+      const host = new URL(opts.base).hostname;
+      return {
+        getBase: () => opts.base,
+        async home() { return { items: [] }; },
+        async search() { return { items: [{ name: 'Bộ ' + host, slug: 'bo-' + host }] }; },
+        async detail(slug) { return { slug, name: host }; },
+        async chapter(url) { return { via: host, url }; },
+      };
+    },
+    ...overrides,
+  });
+  return { mgr, seen, settings };
+}
+
+test('mỗi site trong NETTRUYEN_SITES thành một nguồn dựng riêng, đúng base + apiBase', () => {
+  const { seen } = setupSites();
+  assert.deepEqual(seen.map(o => o.base), ['https://mot.com', 'https://hai.com', 'https://ba.com']);
+  assert.equal(seen[0].apiBase, 'https://api.mot');
+  assert.equal(seen[1].apiBase, '', 'site không khai apiBase thì phải rỗng để rơi về tìm kiếm HTML');
+});
+
+test('comicSources liệt kê nguồn chính + mọi kho, kèm nhãn và tiền tố', () => {
+  const { mgr } = setupSites();
+  assert.deepEqual(mgr.comicSources().map(s => [s.label, s.prefix]), [
+    ['TruyenQQ', ''], ['NetTruyen', 'ot~'], ['NetTruyen 2', 'nar~'], ['NetTruyen 3', 'nx~'],
+  ]);
+});
+
+test('detail và chapter về đúng site theo tiền tố / host', async () => {
+  const { mgr } = setupSites();
+  assert.equal((await mgr.source.detail('nar~x')).name, 'hai.com');
+  assert.equal((await mgr.source.detail('nx~x')).name, 'ba.com');
+  assert.equal((await mgr.source.detail('khong-tien-to')).name, 'qq');
+  assert.equal((await mgr.source.chapter('https://ba.com/truyen-tranh/x/chuong-1')).via, 'ba.com');
+});
+
+test('tắt bổ sung thì comicSources chỉ còn nguồn chính', () => {
+  const { mgr } = setupSites();
+  mgr.setSupplement(false);
+  assert.deepEqual(mgr.comicSources().map(s => s.label), ['TruyenQQ']);
+});

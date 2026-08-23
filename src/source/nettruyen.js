@@ -29,6 +29,9 @@ export const SEL = {
   pageImg: '.page-chapter img, .reading-detail img',
 };
 
+/** Link chương thật (bỏ "Xem thêm" href="#", link quảng bá… lọt vào cùng vùng). */
+export const isChapterHref = (href) => /\/(?:chuong|chapter)-[^/?#]+/i.test(String(href || ''));
+
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const abs = (base, url) => { try { return new URL(url, base).href; } catch { return ''; } };
 
@@ -116,6 +119,58 @@ export function createNetTruyenSource({
     return items;
   }
 
+  /** Mục lục từ một trang bất kỳ (trang chi tiết hoặc trả về của ProcessChapterList). */
+  function collectChapters($) {
+    const out = [];
+    const seen = new Set();
+    $(SEL.chapterRow).each((_, a) => {
+      const href = $(a).attr('href');
+      if (!isChapterHref(href)) return;
+      const { name, title } = parseChapterName($(a).text());
+      if (!name || seen.has(name)) return;
+      seen.add(name);
+      out.push({ name, title, apiUrl: abs(base, href), order: 0 });
+    });
+    out.reverse();   // trang liệt kê chương mới nhất trước -> đảo thành tăng dần
+    return out;
+  }
+
+  /**
+   * Mục lục ĐẦY ĐỦ qua endpoint JSON của khung NetTruyen:
+   * { chapters: [{ chapterId, name: "Chapter 371", url: "/truyen-tranh/.../chuong-371/355573" }] }
+   * Danh sách trả về mới-trước, đảo lại thành tăng dần cho khớp collectChapters().
+   */
+  async function fullChapterList(comicId) {
+    const raw = await fetchText(
+      `${base}/Comic/Services/ComicService.asmx/ProcessChapterList?comicId=${encodeURIComponent(comicId)}`);
+    const list = JSON.parse(raw)?.chapters;
+    if (!Array.isArray(list)) return [];
+    const out = [];
+    const seen = new Set();
+    for (const c of list) {
+      if (!isChapterHref(c?.url)) continue;
+      const { name, title } = parseChapterName(c.name);
+      if (!name || seen.has(name)) continue;
+      seen.add(name);
+      out.push({ name, title, apiUrl: abs(base, c.url), order: 0 });
+    }
+    out.reverse();
+    return out;
+  }
+
+  /** id truyện = data-id KHÔNG nằm trên link chương (link chương mang id của chương). */
+  function findComicId($) {
+    let id = '';
+    $('[data-id]').each((_, el) => {
+      if (id) return;
+      const $el = $(el);
+      if (isChapterHref($el.attr('href'))) return;
+      const v = String($el.attr('data-id') || '').trim();
+      if (/^\d+$/.test(v)) id = v;
+    });
+    return id;
+  }
+
   const pageParam = (url, page) => (page > 1 ? `${url}${url.includes('?') ? '&' : '?'}page=${page}` : url);
 
   async function listPage(path, page) {
@@ -154,8 +209,15 @@ export function createNetTruyenSource({
       return [...seen.values()];
     },
 
-    // Tìm kiếm qua API JSON của NetTruyen (param đúng là 'keyword', 'q' bị bỏ qua).
+    // Tìm kiếm: site nào có API JSON thì dùng (nhanh, gọn); còn lại crawl trang
+    // /tim-truyen (param đúng là 'keyword', 'q' bị bỏ qua).
     async search(keyword) {
+      if (!apiBase) {
+        try {
+          const $ = await load(`${base}/tim-truyen?keyword=${encodeURIComponent(keyword)}`);
+          return { items: parseCards($), pagination: null };
+        } catch { return { items: [], pagination: null }; }
+      }
       let body;
       try {
         const res = await fetchFn(`${apiBase}/api/comics/search?keyword=${encodeURIComponent(keyword)}`,
@@ -186,17 +248,16 @@ export function createNetTruyenSource({
       const categories = kindText.split(/\s*-\s*/).map(s => scrubBrands(s.trim()))
         .filter(s => s && !/nettruyen/i.test(s));
 
-      const chapters = [];
-      const seenCh = new Set();
-      $(SEL.chapterRow).each((_, a) => {
-        const href = $(a).attr('href');
-        if (!href) return;
-        const { name, title } = parseChapterName($(a).text());
-        if (!name || seenCh.has(name)) return;
-        seenCh.add(name);
-        chapters.push({ name, title, apiUrl: abs(base, href), order: 0 });
-      });
-      chapters.reverse();  // trang liệt kê chương mới nhất trước -> đảo tăng dần
+      // Vài site cùng khung chỉ nhả ~20 chương mới nhất trong HTML (nút "Xem thêm"
+      // bị ẩn). Endpoint ProcessChapterList trả ĐỦ mục lục -> lấy bản dài hơn.
+      let chapters = collectChapters($);
+      const comicId = findComicId($);
+      if (comicId) {
+        try {
+          const full = await fullChapterList(comicId);
+          if (full.length > chapters.length) chapters = full;
+        } catch { /* không có endpoint này thì dùng danh sách trong trang */ }
+      }
       chapters.forEach((c, i) => { c.order = i; });
 
       const $cov = $(SEL.cover).first();

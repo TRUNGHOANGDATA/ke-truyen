@@ -113,6 +113,85 @@ test('trang chủ và danh sách thể loại chỉ lấy từ nguồn chính', 
   assert.deepEqual((await s.categories()).map(c => c.slug), ['hanh-dong-99']);
 });
 
+/* ---------- Nhiều kho bổ sung: tự chuyển dự phòng + định tuyến theo tiền tố ---------- */
+
+// Mỗi kho là một site riêng (slug khác nhau) nên phải có tiền tố + host riêng.
+const supEntry = (id, prefix, host, over = {}) => ({
+  prefix,
+  src: {
+    getBase: () => 'https://' + host,
+    async home() { return { items: [] }; },
+    async list() { return { items: [{ name: 'Bộ ' + id, slug: 'bo-' + id }] }; },
+    async search() { return { items: [{ name: 'Bộ ' + id, slug: 'bo-' + id }] }; },
+    async categories() { return [{ name: 'Hành động', slug: 'act-' + id }]; },
+    async byCategory() { return { items: [{ name: 'Bộ ' + id, slug: 'bo-' + id }] }; },
+    async detail(slug) { return { slug, name: id + ' ' + slug, chapters: [] }; },
+    async chapter(url) { return { via: id, url }; },
+    ...over,
+  },
+});
+
+test('kho ưu tiên chết thì tự dùng kho dự phòng, kèm ĐÚNG tiền tố của kho đó', async () => {
+  const s = withSupplement(fakeQQ([{ name: 'A', slug: 'a' }]), [
+    supEntry('mot', 'ot~', 'mot.com', { async search() { throw new Error('kho 1 chết'); } }),
+    supEntry('hai', 'nar~', 'hai.com'),
+  ]);
+  const { items } = await s.search('x');
+  assert.deepEqual(items.map(i => i.slug), ['a', 'nar~bo-hai']);
+});
+
+test('kho ưu tiên còn sống thì không đụng tới kho dự phòng', async () => {
+  let chamKhoHai = false;
+  const s = withSupplement(fakeQQ([]), [
+    supEntry('mot', 'ot~', 'mot.com'),
+    supEntry('hai', 'nar~', 'hai.com', { async search() { chamKhoHai = true; return { items: [] }; } }),
+  ]);
+  const { items } = await s.search('x');
+  assert.deepEqual(items.map(i => i.slug), ['ot~bo-mot']);
+  assert.equal(chamKhoHai, false);
+});
+
+test('detail về đúng kho theo tiền tố slug', async () => {
+  const s = withSupplement(fakeQQ(), [
+    supEntry('mot', 'ot~', 'mot.com'),
+    supEntry('hai', 'nar~', 'hai.com'),
+  ]);
+  assert.equal((await s.detail('abc')).name, 'QQ abc');
+  assert.equal((await s.detail('ot~abc')).name, 'mot abc');
+  const hai = await s.detail('nar~abc');
+  assert.equal(hai.name, 'hai abc');
+  assert.equal(hai.slug, 'nar~abc');           // giữ tiền tố -> thư viện lưu đúng kho
+});
+
+test('chapter về đúng kho theo host, kho cũ vẫn nhận host đời trước', async () => {
+  const s = withSupplement(fakeQQ(), [
+    supEntry('mot', 'ot~', 'nettruyen.id'),
+    supEntry('hai', 'nar~', 'nettruyenar.com'),
+  ]);
+  assert.equal((await s.chapter('https://nettruyen.id/truyen-tranh/x/chuong-1')).via, 'mot');
+  assert.equal((await s.chapter('https://nettruyenar.com/truyen-tranh/x/chuong-1')).via, 'hai');
+  // dữ liệu cũ còn trỏ tới CDN OTruyen -> vẫn phải về kho mang tiền tố 'ot~'
+  assert.equal((await s.chapter('https://sv1.otruyencdn.com/v1/api/chapter/a')).via, 'mot');
+  assert.equal((await s.chapter('https://truyenqqko.com/truyen/x/chuong-1')).via, 'qq');
+});
+
+test('supplementPrefixes liệt kê tiền tố của mọi kho', async () => {
+  const s = withSupplement(fakeQQ(), [
+    supEntry('mot', 'ot~', 'mot.com'),
+    supEntry('hai', 'nar~', 'hai.com'),
+  ]);
+  assert.deepEqual(s.supplementPrefixes(), ['ot~', 'nar~']);
+});
+
+test('mọi kho đều chết thì trả nguyên kết quả nguồn chính', async () => {
+  const boom = { async search() { throw new Error('chết'); } };
+  const s = withSupplement(fakeQQ([{ name: 'A', slug: 'a' }]), [
+    supEntry('mot', 'ot~', 'mot.com', boom),
+    supEntry('hai', 'nar~', 'hai.com', boom),
+  ]);
+  assert.deepEqual((await s.search('a')).items.map(i => i.slug), ['a']);
+});
+
 test('đổi domain vẫn xuyên qua lớp gộp tới nguồn chính', async () => {
   const qq = fakeQQ();
   const s = withSupplement(qq, fakeOT());

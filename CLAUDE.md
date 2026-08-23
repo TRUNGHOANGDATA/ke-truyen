@@ -33,23 +33,44 @@ inject (db, source, fetchFn…). [src/server.js](src/server.js) chỉ mở DB th
 **Nguồn truyện (adapter pattern)** — mọi nguồn cùng interface: `home/list/search/
 categories/byCategory/detail/chapter`.
 - [src/source/truyenqq.js](src/source/truyenqq.js) — crawl TruyenQQ bằng cheerio (nguồn chính).
-- [src/source/nettruyen.js](src/source/nettruyen.js) `createNetTruyenSource` — **nguồn bổ sung truyện tranh** (crawl NetTruyen `nettruyen.id`). Thay [otruyen.js](src/source/otruyen.js) (client API OTruyen — API đọc chương đã chết, giữ lại làm tham chiếu). `chapter()` trả `{images}`; bìa từ `nettruyen-api.clubc.org`, ảnh chương từ `images.truyenonline.cc`. NetTruyen không có tìm kiếm server-side đáng tin nên `search()` trả rỗng — truyện bổ sung khám phá qua duyệt thể loại.
+- [src/source/nettruyen.js](src/source/nettruyen.js) `createNetTruyenSource` — **adapter cho KHUNG NetTruyen**, dùng lại được cho nhiều site cùng khung (xem `config.NETTRUYEN_SITES`). Thay [otruyen.js](src/source/otruyen.js) (client API OTruyen — API đọc chương đã chết, giữ lại làm tham chiếu). `chapter()` trả `{images}`. Hai điểm phải nhớ:
+  - **Tìm kiếm:** site nào khai `apiBase` thì gọi API JSON (`?keyword=`, KHÔNG phải `?q=`); site không có thì crawl `/tim-truyen?keyword=`.
+  - **Mục lục bị cắt:** vài site chỉ nhả ~20 chương mới nhất trong HTML (nút "Xem thêm" bị ẩn, `href="#"` — phải lọc bằng `isChapterHref`). Mục lục ĐẦY ĐỦ lấy qua endpoint JSON `/Comic/Services/ComicService.asmx/ProcessChapterList?comicId=<id>`; `comicId` = `data-id` KHÔNG nằm trên link chương.
 - [src/source/cached.js](src/source/cached.js) `withCache` — cache home/list/byCategory/categories trong bảng `api_cache` (TTL 30', stale-fallback khi nguồn lỗi).
 - [src/source/clean.js](src/source/clean.js) — `cleanSynopsis`/`scrubBrands` bỏ HTML + đoạn SEO + tên nguồn.
-- [src/services/source-manager.js](src/services/source-manager.js) `createSourceManager` — chọn/đổi nguồn + domain **lúc chạy** (không cần restart); trả về facade (Proxy) ủy quyền. Đổi nguồn thì xóa `api_cache`.
-- [src/source/merged.js](src/source/merged.js) `withSupplement` — **gộp nguồn**: TruyenQQ chính, kho NetTruyen bổ sung những bộ TruyenQQ KHÔNG có (so tên qua [title-key.js](src/source/title-key.js), bỏ dấu + hạ chữ). Slug bổ sung mang tiền tố `ot~` để `detail()` về đúng adapter và thư viện không lẫn slug; slug TruyenQQ giữ nguyên nên dữ liệu cũ không phải migrate (tiền tố giữ tên `ot~` cho tương thích lịch sử). `chapter()` nhận URL nên định tuyến **theo host** (`nettruyen.id`, còn `otruyencdn.com`/`otruyenapi.com` cho dữ liệu cũ). Nguồn bổ sung lỗi thì bỏ qua, không làm chết nguồn chính. Trang chủ + danh sách thể loại chỉ lấy từ nguồn chính; thể loại dịch slug giữa hai nguồn qua tên. Tắt bằng `settings` `supplement=0`.
+- [src/services/source-manager.js](src/services/source-manager.js) `createSourceManager` — chọn/đổi nguồn + domain **lúc chạy** (không cần restart); trả về facade (Proxy) ủy quyền. Đổi nguồn thì xóa `api_cache`. Dựng **một adapter cho mỗi site** trong `config.NETTRUYEN_SITES` (cache tách riêng theo `keyPrefix: sup:<id>:`). `comicSources()` liệt kê mọi nguồn tranh `{id,label,prefix,src}` — dùng cho nút "⇄ Nguồn" ở trang đọc và cho danh sách referer của proxy ảnh.
+- [src/source/merged.js](src/source/merged.js) `withSupplement(primary, secondaries)` — **gộp nguồn**: TruyenQQ chính, các kho NetTruyen bổ sung những bộ TruyenQQ KHÔNG có (so tên qua [title-key.js](src/source/title-key.js), bỏ dấu + hạ chữ). Nhận **một mảng** kho `{prefix, src, hostRe}` (vẫn nhận một nguồn đơn kiểu cũ).
+  - **Mỗi kho là kho RIÊNG, không phải bản sao của nhau** — slug khác nhau hoàn toàn. Nên mỗi kho có **tiền tố slug riêng** (`ot~`, `nar~`, `nx~`…): `detail()` định tuyến theo tiền tố, `chapter()` theo **host** của URL. Kho `ot~` còn nhận thêm host đời cũ (`otruyencdn.com`/`otruyenapi.com`) vì thư viện cũ đã lưu theo đó. Slug TruyenQQ giữ nguyên (không tiền tố) nên dữ liệu cũ không phải migrate.
+  - **Tự chuyển dự phòng CHỈ ở khâu duyệt/tìm** (`list`/`search`/`byCategory`): thử lần lượt các kho, kho nào trả về có item thì dùng, gắn đúng tiền tố của kho đó. Có hạn tổng (`SUP_BUDGET`) để không kéo dài. KHÔNG rotate ở `detail`/`chapter` — làm thế là trỏ slug sang kho khác, hỏng dữ liệu đã lưu.
+  - Kho lỗi thì bỏ qua, không làm chết nguồn chính. Trang chủ + danh sách thể loại chỉ lấy từ nguồn chính; thể loại dịch slug giữa các nguồn qua tên. Tắt bằng `settings` `supplement=0`.
 - [src/source/truyenfull.js](src/source/truyenfull.js) `createTruyenfullSource` — **nguồn truyện CHỮ (Phase 2)**, crawl HTML. Cùng bộ phương thức nhưng item mang `kind:'novel'` và `chapter()` trả `{paragraphs,title}` (đoạn văn) thay vì ảnh. Mục lục gộp mọi trang `/{slug}/trang-N/` (đọc `#total-page`, tải song song theo lô). Là **trục riêng** với truyện tranh: wire thẳng trong [app.js](src/app.js) là `novelSource`, KHÔNG qua source-manager/merge. Slug lưu kèm tiền tố `tf~` (chống trùng slug trong bảng dùng chung + là tín hiệu "đây là truyện chữ"); `app.locals.detailUrl` bóc tiền tố để thẻ truyện link đúng `/chu/...`. Route: `/chu` (duyệt/tìm), `/chu/:slug` (chi tiết), `/doc-chu/:slug/:chapter` (đọc). Reader chữ [reader-novel.ejs](src/views/reader-novel.ejs) + [reader-novel.js](src/public/js/reader-novel.js): nền giấy, căn đều, chỉnh cỡ chữ (nhớ localStorage), lưu vị trí đọc theo **% cuộn** (tái dùng cột `image_page`). Theo dõi qua `/api/novel/follow`; unfollow/progress dùng chung API (slug đã có tiền tố).
 - [src/source/domain-resolver.js](src/source/domain-resolver.js) — **tự bắt domain TruyenQQ** khi nó nhảy tên miền: dò danh sách mirror (`config.TRUYENQQ_MIRRORS`), gặp domain sống thì ghi nhớ vào `settings`. `truyenqq.js` gọi `reprobe` khi request lỗi rồi thử lại.
 
 **Cấu hình sửa được trong web:** [src/services/settings.js](src/services/settings.js) bọc bảng
-`settings(key,value)`. Key: `source`, `truyenqq_base`. DB là nguồn chân lý lúc chạy;
-`.env` chỉ seed lần đầu. Trang **/settings** ([views/settings.ejs](src/views/settings.ejs))
-đổi nguồn / kiểm-tra-&-lưu domain / "↻ Tự dò lại ngay".
+`settings(key,value)`. Key: `source`, `truyenqq_base`, `supplement`, `image_hosts_learned`,
+`image_referers_learned`. DB là nguồn chân lý lúc chạy; `.env` chỉ seed lần đầu. Trang
+**/settings** ([views/settings.ejs](src/views/settings.ejs)) đổi nguồn / bật-tắt bổ sung /
+kiểm-tra-&-lưu domain / "↻ Tự dò lại ngay" / **"Dò nguồn từ máy chủ"**.
+
+**Dò nguồn từ máy chủ:** [src/services/site-prober.js](src/services/site-prober.js)
+`createSiteProber` + `POST /settings/probe`. Lý do tồn tại: **máy ở nhà thường bị nhà mạng
+chặn các trang truyện** — dò ở đó ra "chết" trong khi máy chủ vào bình thường, nên muốn
+biết một nguồn có dùng được không thì phải để chính máy chủ thử. Trả về tốc độ + **"khung"
+web nhận diện được** (`THEMES`): trùng khung NetTruyen/TruyenQQ thì adapter sẵn có dùng lại
+được ngay, khỏi viết parser mới. Có `safeTarget` chặn localhost/IP nội bộ (SSRF).
+Danh sách ứng viên mặc định ở `config.PROBE_CANDIDATES`.
 
 **Ảnh (proxy):** [src/routes/image.js](src/routes/image.js) — URL ảnh gói base64url thành
 `/img?i=<packImg(url)>` (không lộ host CDN nguồn). Phục vụ theo thứ tự: cache đĩa →
-Drive (nếu đã lưu) → nguồn gốc. Có whitelist host (`config.IMAGE_HOSTS`) và giả `Referer`
-(`config.refererFor`) vì CDN TruyenQQ chống hotlink. Cache LRU đĩa: [src/cache/imageCache.js](src/cache/imageCache.js).
+Drive (nếu đã lưu) → nguồn gốc. Cache LRU đĩa: [src/cache/imageCache.js](src/cache/imageCache.js).
+**CDN của các nguồn đều chống hotlink** nên phải giả `Referer`, và host ảnh thì hay đổi —
+xử lý bằng hai lớp TỰ HỌC trong [src/services/image-hosts.js](src/services/image-hosts.js):
+- *Host:* whitelist tĩnh (`config.IMAGE_HOSTS`) + host tự học mỗi khi web dựng link ảnh
+  (`app.locals.img`). Nguồn đổi CDN thì host mới tự được chấp nhận, không phải sửa code.
+  Chặn IP nội bộ/localhost để không thành proxy mở (SSRF).
+- *Referer:* thử lần lượt referer **đã học cho host đó** → `config.refererFor` → base của
+  **mọi nguồn đang đăng ký** (`manager.comicSources()`). Tổ hợp nào lấy được ảnh thì nhớ
+  lại theo host, ảnh sau đi thẳng (đo thật: 4852ms → 1323ms).
 
 **Lưu offline (Google Drive):** [src/storage/drive.js](src/storage/drive.js) (OAuth refresh
 token, scope `drive.file`) + [src/services/archive.js](src/services/archive.js) (`archiveComic`
@@ -78,6 +99,8 @@ settings/api_cache/archive/archive_jobs.
 ## .env (xem [.env.example](.env.example))
 `SESSION_SECRET`, `PASSWORD_HASH` (bcrypt của mật khẩu đăng nhập — tạo bằng
 `node scripts/hash-password.js '<pass>'`), `SOURCE`, `TRUYENQQ_BASE`, `TRUYENQQ_MIRRORS`,
+`NETTRUYEN_SITES` (`id|Nhãn|https://a.com|tiền_tố~[|apiBase]`, cách nhau bằng dấu phẩy),
+`PROBE_CANDIDATES`,
 `DRIVE_CLIENT_ID/SECRET/REFRESH_TOKEN`, `DRIVE_FOLDER_ID`, `DOMAIN`. **`.env` không commit** (gitignore).
 
 ## Triển khai (Docker + Caddy, chạy được trên mọi VPS Ubuntu)

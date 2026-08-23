@@ -21,10 +21,12 @@ export function mountApi(app, { source, novelSource, library, updates, cacheDir,
     const name = String(req.query.name || '');
     const chapter = String(req.query.chapter || '');
     if (!name || !manager?.comicSources) return res.json({ sources: [] });
-    const curPrefix = slug.startsWith('ot~') ? 'ot~' : '';
+    const all = manager.comicSources();
+    // Nguồn đang đọc = nguồn có tiền tố khớp đầu slug ('' = nguồn chính).
+    const curPrefix = all.map(s => s.prefix).filter(Boolean).find(p => slug.startsWith(p)) || '';
     const key = titleKey(name);
     const out = [];
-    await Promise.all(manager.comicSources().map(async (cs) => {
+    await Promise.all(all.map(async (cs) => {
       if (cs.prefix === curPrefix) return;                 // bỏ nguồn đang đọc
       try {
         const r = await cs.src.search(name);

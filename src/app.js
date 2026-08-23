@@ -12,6 +12,7 @@ import { withCache } from './source/cached.js';
 import { createSettings } from './services/settings.js';
 import { createSourceManager } from './services/source-manager.js';
 import { createImageHosts } from './services/image-hosts.js';
+import { createSiteProber } from './services/site-prober.js';
 import { createTruyenfullSource } from './source/truyenfull.js';
 import { createLibrary } from './services/library.js';
 import { createUpdates } from './services/updates.js';
@@ -94,14 +95,26 @@ export function buildApp(deps = {}) {
     cache,
     isAllowed: (u) => imageHosts.allowed(u),
     refererFor,
-    // Referer dự phòng = trang TruyenQQ hiện hành (cho CDN ảnh mới chống hotlink).
-    altReferer: () => (settings.get('truyenqq_base', config.TRUYENQQ_BASE) || config.TRUYENQQ_BASE).replace(/\/+$/, '') + '/',
+    // Referer dự phòng = base của MỌI nguồn đang đăng ký. CDN ảnh của các nguồn
+    // đều chống hotlink theo đúng trang của họ, nên khi nguồn đổi host ảnh (hoặc
+    // khi thêm nguồn mới) thì ảnh vẫn lấy được, không cần sửa code.
+    altReferer: () => {
+      const qq = (settings.get('truyenqq_base', config.TRUYENQQ_BASE) || config.TRUYENQQ_BASE || '').replace(/\/+$/, '');
+      const bases = (manager.comicSources?.() || [])
+        .map(s => { try { return s.src.getBase?.(); } catch { return ''; } })
+        .filter(Boolean).map(b => String(b).replace(/\/+$/, ''));
+      return [...new Set([qq, ...bases])].filter(Boolean).map(b => b + '/');
+    },
+    // Nhớ referer nào lấy được ảnh cho từng host CDN -> lần sau đi thẳng.
+    refererHints: { get: (u) => imageHosts.knownReferer(u), set: (u, r) => imageHosts.rememberReferer(u, r) },
     archive,
     drive,
   });
 
   mountApi(app, { source, novelSource, library, updates, cacheDir, archive, drive, refererFor, manager });
-  app.locals.services = { db, source, novelSource, library, updates, archive, drive, settings, manager };
+  // Dò nguồn TỪ MÁY CHỦ (máy ở nhà hay bị nhà mạng chặn nên dò ở đó không tin được).
+  const prober = deps.prober ?? createSiteProber();
+  app.locals.services = { db, source, novelSource, library, updates, archive, drive, settings, manager, prober };
 
   // Link chi tiết theo loại: slug truyện chữ mang tiền tố "tf~" -> /chu/...
   app.locals.detailUrl = (slug) => (String(slug).startsWith('tf~') ? '/chu/' + slug.slice(3) : '/truyen/' + slug);

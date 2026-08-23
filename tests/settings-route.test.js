@@ -14,14 +14,14 @@ const hash = bcrypt.hashSync('secret123', 10);
 const PAGE_OK = '<html><head><title>Truyện tranh</title></head><body>' +
   'Thể loại <a href="/truyen-tranh/x-1">x</a>'.repeat(20) + '</body></html>';
 
-function app({ probeFetch } = {}) {
+function app({ probeFetch, prober } = {}) {
   const db = openDb(':memory:');
   createSchema(db);
   return buildApp({
     passwordHash: hash, sessionSecret: 't', db,
     cacheDir: mkdtempSync(join(tmpdir(), 'imgc-')),
     imageFetchFn: async () => ({ ok: true, status: 200, headers: { get: () => 'image/jpeg' }, arrayBuffer: async () => new Uint8Array([1]).buffer }),
-    probeFetch,
+    probeFetch, prober,
   });
 }
 
@@ -99,6 +99,59 @@ test('bật/tắt bổ sung qua POST /settings/supplement', async () => {
 
   const on = await a.post('/settings/supplement').send({ on: true });
   assert.equal(on.body.supplement, true);
+});
+
+/* ---------- Dò nguồn từ máy chủ ---------- */
+
+const fakeProber = (sink = []) => ({
+  async probeAll(list) {
+    sink.push(list);
+    return list.map(u => ({ input: u, ok: true, status: 200, ms: 120, theme: 'nettruyen', adapter: 'nettruyen.js', comicCount: 9 }));
+  },
+});
+
+test('POST /settings/probe cần đăng nhập', async () => {
+  const res = await request(app()).post('/settings/probe').send({ urls: ['a.com'] });
+  assert.equal(res.status, 302);           // trang (không phải /api) -> đẩy về /login
+  assert.match(res.headers.location, /login/);
+});
+
+test('POST /settings/probe dò đúng danh sách người dùng nhập', async () => {
+  const sink = [];
+  const a = request.agent(app({ prober: fakeProber(sink) }));
+  await login(a);
+  const res = await a.post('/settings/probe').send({ urls: ['mot.com', 'hai.com'] });
+  assert.equal(res.status, 200);
+  assert.deepEqual(sink[0], ['mot.com', 'hai.com']);
+  assert.equal(res.body.results.length, 2);
+  assert.equal(res.body.results[0].adapter, 'nettruyen.js');
+});
+
+test('POST /settings/probe bỏ trống thì dò danh sách ứng viên cài sẵn', async () => {
+  const sink = [];
+  const a = request.agent(app({ prober: fakeProber(sink) }));
+  await login(a);
+  const res = await a.post('/settings/probe').send({ urls: '' });
+  assert.equal(res.status, 200);
+  assert.ok(sink[0].length > 1, 'phải dùng danh sách cài sẵn');
+  assert.ok(sink[0].every(u => /^https?:\/\//.test(u)));
+});
+
+test('POST /settings/probe nhận cả chuỗi nhiều dòng', async () => {
+  const sink = [];
+  const a = request.agent(app({ prober: fakeProber(sink) }));
+  await login(a);
+  await a.post('/settings/probe').send({ urls: 'mot.com\n hai.com ,ba.com' });
+  assert.deepEqual(sink[0], ['mot.com', 'hai.com', 'ba.com']);
+});
+
+test('trang /settings liệt kê các nguồn truyện tranh đang đăng ký', async () => {
+  const a = request.agent(app());
+  await login(a);
+  const res = await a.get('/settings');
+  assert.match(res.text, /Dò nguồn từ máy chủ/);
+  assert.match(res.text, /TruyenQQ/);
+  assert.match(res.text, /NetTruyen 2/, 'phải thấy các kho bổ sung mới');
 });
 
 test('trang /settings hiện ô tick bổ sung theo trạng thái đang lưu', async () => {

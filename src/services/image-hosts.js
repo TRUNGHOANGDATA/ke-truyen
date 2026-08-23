@@ -9,6 +9,7 @@
  * IP nội bộ / localhost để tránh bị lợi dụng làm proxy tới mạng nội bộ (SSRF).
  */
 const KEY = 'image_hosts_learned';
+const REF_KEY = 'image_referers_learned';
 
 const hostOf = (url) => { try { return new URL(url).hostname.toLowerCase(); } catch { return ''; } };
 
@@ -28,6 +29,14 @@ export function createImageHosts(settings, staticHosts = []) {
 
   const matches = (host, suffix) => host === suffix || host.endsWith('.' + suffix);
 
+  // Referer đã biết là LẤY ĐƯỢC ẢNH, theo từng host CDN. Nhiều CDN chống hotlink
+  // và chỉ nhận referer của đúng trang nguồn; nhớ lại thì ảnh sau khỏi dò lại.
+  const referers = new Map(
+    (settings.get(REF_KEY, '') || '').split(',').map(s => s.trim()).filter(Boolean)
+      .map(pair => { const i = pair.indexOf('='); return i > 0 ? [pair.slice(0, i), pair.slice(i + 1)] : null; })
+      .filter(Boolean),
+  );
+
   return {
     allowed(url) {
       const h = hostOf(url);
@@ -44,5 +53,19 @@ export function createImageHosts(settings, staticHosts = []) {
       settings.set(KEY, [...learned].join(','));
     },
     learnedList: () => [...learned],
+
+    /** Referer từng lấy được ảnh của host này (nếu đã học). */
+    knownReferer(url) {
+      const h = hostOf(url);
+      return (h && referers.get(h)) || '';
+    },
+
+    /** Ghi nhớ referer vừa lấy được ảnh cho host này. */
+    rememberReferer(url, referer) {
+      const h = hostOf(url);
+      if (!h || !referer || referers.get(h) === referer) return;
+      referers.set(h, referer);
+      settings.set(REF_KEY, [...referers].map(([k, v]) => `${k}=${v}`).join(','));
+    },
   };
 }

@@ -26,6 +26,38 @@ function agentApp() {
   });
 }
 
+test('CDN chống hotlink: proxy thử base của nguồn rồi NHỚ referer đó cho ảnh sau', async () => {
+  const OK_REF = 'https://nettruyenar.com/';
+  const tried = [];
+  const db = openDb(':memory:'); createSchema(db);
+  const app = buildApp({
+    passwordHash: hash, sessionSecret: 't', db,
+    cacheDir: mkdtempSync(join(tmpdir(), 'imgref-')),
+    // nguồn giả: base của nó chính là referer duy nhất CDN chấp nhận
+    manager: { comicSources: () => [{ id: 'x', label: 'X', prefix: '', src: { getBase: () => 'https://nettruyenar.com' } }] },
+    imageFetchFn: async (_u, opts) => {
+      tried.push(opts.headers.Referer);
+      if (opts.headers.Referer !== OK_REF) return { ok: false, status: 403, headers: { get: () => 'text/html' }, arrayBuffer: async () => new ArrayBuffer(0) };
+      return { ok: true, status: 200, headers: { get: () => 'image/jpeg' }, arrayBuffer: async () => new Uint8Array([9]).buffer };
+    },
+  });
+  const agent = request.agent(app);
+  await agent.post('/login').type('form').send({ password: 'secret123' });
+
+  // hinhtruyen.com nằm trong whitelist tĩnh; refererFor trả referer TruyenQQ -> bị 403,
+  // phải rơi xuống base của nguồn mới lấy được ảnh.
+  const first = await agent.get('/img?i=' + packImg('https://hinhtruyen.com/a/0.jpg'));
+  assert.equal(first.status, 200);
+  assert.ok(tried.includes(OK_REF), 'phải thử tới base của nguồn, đã thử: ' + tried.join(', '));
+  assert.ok(tried.length > 1, 'ảnh đầu phải dò qua vài referer');
+
+  // ảnh khác CÙNG host: đi thẳng bằng referer đã nhớ, không dò lại
+  tried.length = 0;
+  const second = await agent.get('/img?i=' + packImg('https://hinhtruyen.com/a/1.jpg'));
+  assert.equal(second.status, 200);
+  assert.deepEqual(tried, [OK_REF], 'phải trúng ngay lần đầu nhờ referer đã học');
+});
+
 test('isAllowedHost enforces whitelist', () => {
   const allow = ['img.otruyenapi.com', 'otruyencdn.com'];
   assert.ok(isAllowedHost('https://sv1.otruyencdn.com/x.jpg', allow));

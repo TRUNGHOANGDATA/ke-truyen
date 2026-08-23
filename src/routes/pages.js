@@ -180,6 +180,8 @@ export function mountPages(app) {
       domain: manager.resolver.current(),
       mirrors: config.TRUYENQQ_MIRRORS,
       supplement: manager.supplementOn(),
+      comicSources: manager.comicSources().map(s => ({ id: s.id, label: s.label })),
+      probeCandidates: config.PROBE_CANDIDATES,
     });
   });
 
@@ -208,6 +210,21 @@ export function mountPages(app) {
     if (!alive) return res.status(400).json({ error: 'Domain không phản hồi hoặc không phải trang TruyenQQ' });
     const saved = manager.applyDomain(base);
     res.json({ ok: true, domain: saved });
+  });
+
+  /**
+   * Dò thử nguồn TỪ MÁY CHỦ. Máy ở nhà thường bị nhà mạng chặn các trang truyện,
+   * dò ở đó ra "chết" trong khi máy chủ vào bình thường — nên phải hỏi máy chủ.
+   * Không nhập gì thì dò danh sách ứng viên cài sẵn.
+   */
+  app.post('/settings/probe', async (req, res) => {
+    const raw = req.body.urls;
+    const list = (Array.isArray(raw) ? raw : String(raw || '').split(/[\s,]+/))
+      .map(s => String(s).trim()).filter(Boolean);
+    const targets = list.length ? list : config.PROBE_CANDIDATES;
+    try {
+      res.json({ ok: true, results: await svc().prober.probeAll(targets) });
+    } catch (e) { res.status(502).json({ error: e.message }); }
   });
 
   // Tự dò lại domain sống ngay lập tức

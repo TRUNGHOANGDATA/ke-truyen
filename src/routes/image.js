@@ -13,7 +13,7 @@ export function isAllowedHost(url, allowSuffixes) {
   return allowSuffixes.some(s => host === s || host.endsWith('.' + s) || host.endsWith(s));
 }
 
-export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes, isAllowed, refererFor, altReferer, archive, drive }) {
+export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes, isAllowed, refererFor, altReferer, refererHints, archive, drive }) {
   const allow = isAllowed || ((u) => isAllowedHost(u, allowSuffixes || []));
   app.get('/img', async (req, res) => {
     // ?i= là URL đã gói (mặc định); ?u= giữ lại cho tương thích
@@ -71,14 +71,19 @@ export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes, is
       } finally { clearTimeout(t); }
     }
 
-    // Danh sách referer để thử: referer mặc định, rồi referer TruyenQQ (nhiều CDN
-    // ảnh của TruyenQQ chống hotlink theo trang chủ; khi họ đổi host mới, host đó
-    // chưa khớp refererFor nên thử thêm referer TruyenQQ để không vỡ ảnh).
+    // Danh sách referer để thử, theo thứ tự rẻ nhất trước:
+    //  1. referer ĐÃ HỌC cho host này (lần trước lấy được ảnh) -> thường trúng ngay;
+    //  2. referer mặc định theo host;
+    //  3. base của các nguồn đang đăng ký (CDN của họ chống hotlink theo đúng trang
+    //     nguồn — nên khi nguồn đổi host ảnh, ảnh vẫn không vỡ).
     function referersFor(u) {
-      const list = [refererFor ? refererFor(u) : new URL(u).origin + '/'];
+      const list = [];
+      const known = refererHints?.get?.(u);
+      if (known) list.push(known);
+      list.push(refererFor ? refererFor(u) : new URL(u).origin + '/');
       const alt = typeof altReferer === 'function' ? altReferer() : altReferer;
-      if (alt && !list.includes(alt)) list.push(alt);
-      return list;
+      for (const a of [].concat(alt || [])) if (a) list.push(a);
+      return [...new Set(list.filter(Boolean))];
     }
 
     // Thử lần lượt: từng host mirror × từng referer, tới khi lấy được ảnh.
@@ -90,6 +95,7 @@ export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes, is
           if (!upstream.ok) continue;      // referer/host này chưa được -> thử tiếp
           const contentType = upstream.headers.get('content-type') || 'image/jpeg';
           const buf = Buffer.from(await upstream.arrayBuffer());
+          refererHints?.set?.(u, ref);        // nhớ tổ hợp vừa ăn -> ảnh sau đi thẳng
           cache.put(url, buf, contentType);   // cache theo URL gốc
           return send(buf, contentType);
         } catch { /* thử tổ hợp kế tiếp */ }

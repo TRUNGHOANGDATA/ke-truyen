@@ -47,7 +47,29 @@
     </div>
     <% } %>
 
+    <% if (comicSources && comicSources.length) { %>
+    <div>
+      <small style="color:#888">Nguồn truyện tranh đang đăng ký (nút “⇄ Nguồn” ở trang đọc):</small>
+      <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px">
+        <% comicSources.forEach(s => { %><span class="tag"><%= s.label %></span><% }) %>
+      </div>
+    </div>
+    <% } %>
+
     <div class="sysbox" id="srcOut"></div>
+  </div>
+</div>
+
+<div class="box">
+  <div class="boxhead"><h2>Dò nguồn từ máy chủ</h2></div>
+  <div style="padding:14px; display:flex; flex-direction:column; gap:12px; max-width:760px">
+    <small style="color:#888">Máy ở nhà hay bị nhà mạng chặn các trang truyện — dò ở đó ra “chết” trong khi
+      máy chủ vào bình thường. Nút này để chính máy chủ thử, nên kết quả mới đúng với cái web thật sự dùng được.
+      Mỗi dòng một địa chỉ; để trống thì dò danh sách cài sẵn.</small>
+    <textarea id="probeUrls" class="field" rows="4" spellcheck="false"
+      placeholder="<%= (probeCandidates || []).slice(0, 3).join('\n') %>"></textarea>
+    <div><button class="btn" id="probeBtn" type="button" style="justify-content:center">Dò thử</button></div>
+    <div id="probeOut"></div>
   </div>
 </div>
 
@@ -102,6 +124,36 @@
       srcOut.textContent = 'Đã tìm được domain sống: ' + r.domain;
       document.getElementById('domain').value = r.domain;
     } catch (e) { srcOut.textContent = 'Không dò được domain nào sống: ' + e.message; }
+  });
+
+  // Dò nguồn từ máy chủ: hiện bảng kết quả (sống/chết, tốc độ, khung web nhận ra).
+  const probeBtn = document.getElementById('probeBtn');
+  const probeOut = document.getElementById('probeOut');
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  probeBtn.addEventListener('click', async () => {
+    probeBtn.disabled = true;
+    probeOut.innerHTML = '<div class="sysbox">Máy chủ đang dò… (tối đa ~10 giây mỗi trang)</div>';
+    try {
+      const urls = document.getElementById('probeUrls').value.split(/[\s,]+/).filter(Boolean);
+      const { results = [] } = await api('/settings/probe', { method: 'POST', body: JSON.stringify({ urls }) });
+      results.sort((a, b) => (b.ok - a.ok) || ((a.ms || 9e9) - (b.ms || 9e9)));
+      probeOut.innerHTML = '<table class="probe"><thead><tr><th>Trang</th><th>Kết quả</th><th>Tốc độ</th><th>Khung web</th></tr></thead><tbody>'
+        + results.map(r => {
+            const host = esc(String(r.input || '').replace(/^https?:\/\//, ''));
+            const verdict = r.ok
+              ? '<b style="color:#1a7f37">Sống</b>' + (r.comicCount ? ' · ' + r.comicCount + ' link truyện' : '')
+              : '<span style="color:#b42318">' + esc(r.error || ('HTTP ' + r.status)) + '</span>';
+            const theme = r.adapter
+              ? '<b>' + esc(r.themeLabel) + '</b><br><small style="color:#888">dùng lại ' + esc(r.adapter) + '</small>'
+              : (r.themeLabel ? esc(r.themeLabel) + '<br><small style="color:#888">phải viết parser mới</small>'
+                              : '<small style="color:#888">—</small>');
+            return '<tr><td>' + host + (r.finalUrl ? '<br><small style="color:#888">→ ' + esc(r.finalUrl) + '</small>' : '')
+              + '</td><td>' + verdict + '</td><td>' + (r.ms ? r.ms + 'ms' : '—') + '</td><td>' + theme + '</td></tr>';
+          }).join('')
+        + '</tbody></table>';
+    } catch (e) { probeOut.innerHTML = '<div class="sysbox">Lỗi: ' + esc(e.message) + '</div>'; }
+    finally { probeBtn.disabled = false; }
   });
 
   document.getElementById('save').addEventListener('click', async () => {

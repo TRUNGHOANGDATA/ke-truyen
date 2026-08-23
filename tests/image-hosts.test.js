@@ -32,6 +32,34 @@ test('học rồi thì lưu bền (service mới đọc lại được)', () => 
   assert.ok(hosts2.allowed('https://cdnmoi.net/z.jpg'));
 });
 
+/* ---------- Nhớ referer lấy được ảnh theo từng host CDN ---------- */
+
+test('chưa học thì không có referer gợi ý', () => {
+  const { hosts } = setup();
+  assert.equal(hosts.knownReferer('https://cdn3.cloud-zzz.com/a/0.jpg'), '');
+});
+
+test('nhớ referer theo host, dùng lại cho ảnh khác cùng host', () => {
+  const { hosts } = setup();
+  hosts.rememberReferer('https://cdn3.cloud-zzz.com/a/0.jpg', 'https://nettruyenar.com/');
+  assert.equal(hosts.knownReferer('https://cdn3.cloud-zzz.com/b/9.jpg'), 'https://nettruyenar.com/');
+  assert.equal(hosts.knownReferer('https://khac.com/b/9.jpg'), '', 'host khác thì không lây');
+});
+
+test('referer đã nhớ lưu bền qua lần dựng sau', () => {
+  const { settings, hosts } = setup();
+  hosts.rememberReferer('https://static3.kptackpte.com/a/0.jpg', 'https://nettruyenx.net/');
+  const lai = createImageHosts(settings, []);
+  assert.equal(lai.knownReferer('https://static3.kptackpte.com/z.jpg'), 'https://nettruyenx.net/');
+});
+
+test('referer đổi thì ghi đè bản cũ', () => {
+  const { hosts } = setup();
+  hosts.rememberReferer('https://cdn.x.com/a.jpg', 'https://cu.com/');
+  hosts.rememberReferer('https://cdn.x.com/a.jpg', 'https://moi.com/');
+  assert.equal(hosts.knownReferer('https://cdn.x.com/b.jpg'), 'https://moi.com/');
+});
+
 test('KHÔNG học IP nội bộ / localhost (chống SSRF)', () => {
   const { hosts } = setup();
   ['http://127.0.0.1/x', 'http://localhost/x', 'http://169.254.169.254/latest/meta-data',
