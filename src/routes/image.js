@@ -13,11 +13,12 @@ export function isAllowedHost(url, allowSuffixes) {
   return allowSuffixes.some(s => host === s || host.endsWith('.' + s) || host.endsWith(s));
 }
 
-export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes, refererFor, archive, drive }) {
+export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes, isAllowed, refererFor, altReferer, archive, drive }) {
+  const allow = isAllowed || ((u) => isAllowedHost(u, allowSuffixes || []));
   app.get('/img', async (req, res) => {
     // ?i= là URL đã gói (mặc định); ?u= giữ lại cho tương thích
     const url = req.query.i ? unpackImg(req.query.i) : req.query.u;
-    if (!url || !isAllowedHost(url, allowSuffixes)) return res.status(403).end();
+    if (!url || !allow(url)) return res.status(403).end();
 
     const send = (buf, contentType) => {
       res.set('Content-Type', contentType);
@@ -62,30 +63,36 @@ export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes, re
       return list;
     }
 
-    async function fetchOnce(u, timeoutMs) {
+    async function fetchOnce(u, referer, timeoutMs) {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), timeoutMs);
       try {
-        const ref = refererFor ? refererFor(u) : new URL(u).origin + '/';
-        return await fetchFn(u, { headers: { ...headers, Referer: ref }, signal: ctrl.signal });
+        return await fetchFn(u, { headers: { ...headers, Referer: referer }, signal: ctrl.signal });
       } finally { clearTimeout(t); }
     }
 
-    // Thử lần lượt từng host (mỗi host 1 lần), host cuối được thêm 1 lần thử nữa.
+    // Danh sách referer để thử: referer mặc định, rồi referer TruyenQQ (nhiều CDN
+    // ảnh của TruyenQQ chống hotlink theo trang chủ; khi họ đổi host mới, host đó
+    // chưa khớp refererFor nên thử thêm referer TruyenQQ để không vỡ ảnh).
+    function referersFor(u) {
+      const list = [refererFor ? refererFor(u) : new URL(u).origin + '/'];
+      const alt = typeof altReferer === 'function' ? altReferer() : altReferer;
+      if (alt && !list.includes(alt)) list.push(alt);
+      return list;
+    }
+
+    // Thử lần lượt: từng host mirror × từng referer, tới khi lấy được ảnh.
     const candidates = candidatesFor(url);
-    for (let i = 0; i < candidates.length; i++) {
-      const last = i === candidates.length - 1;
-      for (let attempt = 0; attempt < (last ? 2 : 1); attempt++) {
+    for (const u of candidates) {
+      for (const ref of referersFor(u)) {
         try {
-          const upstream = await fetchOnce(candidates[i], 8000);
-          if (!upstream.ok) break;      // host này lỗi -> sang host khác
+          const upstream = await fetchOnce(u, ref, 8000);
+          if (!upstream.ok) continue;      // referer/host này chưa được -> thử tiếp
           const contentType = upstream.headers.get('content-type') || 'image/jpeg';
           const buf = Buffer.from(await upstream.arrayBuffer());
           cache.put(url, buf, contentType);   // cache theo URL gốc
           return send(buf, contentType);
-        } catch {
-          if (last && attempt === 0) continue;   // host cuối: thử lại 1 lần
-        }
+        } catch { /* thử tổ hợp kế tiếp */ }
       }
     }
     return res.status(502).end();

@@ -11,6 +11,7 @@ import { createSchema } from './db/migrations.js';
 import { withCache } from './source/cached.js';
 import { createSettings } from './services/settings.js';
 import { createSourceManager } from './services/source-manager.js';
+import { createImageHosts } from './services/image-hosts.js';
 import { createTruyenfullSource } from './source/truyenfull.js';
 import { createLibrary } from './services/library.js';
 import { createUpdates } from './services/updates.js';
@@ -40,10 +41,8 @@ export function buildApp(deps = {}) {
     httpOnly: true,
   }));
 
-  // Helper cho template: img(url) -> /img?i=... (không lộ host CDN của nguồn)
-  // imgProxy là alias cho chỗ biến vòng lặp đã chiếm tên `img` (reader.ejs)
-  app.locals.img = (url) => (url ? `/img?i=${packImg(url)}` : '');
-  app.locals.imgProxy = app.locals.img;
+  // Helper img(url) -> /img?i=... định nghĩa sau khi có imageHosts (bên dưới),
+  // để mỗi link ảnh web dựng ra tự "dạy" proxy host đó là hợp lệ.
 
   app.use('/public', express.static(join(__dirname, 'public')));
   app.get('/healthz', (req, res) => res.json({ ok: true }));
@@ -67,6 +66,11 @@ export function buildApp(deps = {}) {
   const settings = createSettings(db);
   settings.seedDefaults({ source: config.SOURCE, truyenqq_base: config.TRUYENQQ_BASE });
 
+  // Host ảnh được phép qua proxy: tĩnh + tự học khi web dựng link ảnh.
+  const imageHosts = createImageHosts(settings, IMAGE_HOSTS);
+  app.locals.img = (url) => { if (url) imageHosts.learn(url); return url ? `/img?i=${packImg(url)}` : ''; };
+  app.locals.imgProxy = app.locals.img;
+
   // Nguồn động: đổi nguồn/domain lúc chạy không cần restart. Test vẫn inject deps.source được.
   const manager = createSourceManager({ db, settings, config, probeFetch: deps.probeFetch });
   const source = deps.source ?? manager.source;
@@ -88,8 +92,10 @@ export function buildApp(deps = {}) {
   mountImageProxy(app, {
     fetchFn: deps.imageFetchFn ?? fetch,
     cache,
-    allowSuffixes: IMAGE_HOSTS,
+    isAllowed: (u) => imageHosts.allowed(u),
     refererFor,
+    // Referer dự phòng = trang TruyenQQ hiện hành (cho CDN ảnh mới chống hotlink).
+    altReferer: () => (settings.get('truyenqq_base', config.TRUYENQQ_BASE) || config.TRUYENQQ_BASE).replace(/\/+$/, '') + '/',
     archive,
     drive,
   });
