@@ -1,6 +1,7 @@
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { packImg } from './image.js';
+import { titleKey } from '../source/title-key.js';
 
 function dirSize(dir) {
   try {
@@ -10,8 +11,30 @@ function dirSize(dir) {
   } catch { return 0; }
 }
 
-export function mountApi(app, { source, novelSource, library, updates, cacheDir, archive, drive, refererFor }) {
+export function mountApi(app, { source, novelSource, library, updates, cacheDir, archive, drive, refererFor, manager }) {
   app.get('/api/library', (req, res) => res.json({ items: library.listFollowed() }));
+
+  // "Đổi nguồn" ở trang đọc: tìm CÙNG bộ (so tên) ở các nguồn tranh khác, trả
+  // link đọc cùng chương ở nguồn đó. Chương lỗi -> đổi sang nguồn còn chạy.
+  app.get('/api/other-sources', async (req, res) => {
+    const slug = String(req.query.slug || '');
+    const name = String(req.query.name || '');
+    const chapter = String(req.query.chapter || '');
+    if (!name || !manager?.comicSources) return res.json({ sources: [] });
+    const curPrefix = slug.startsWith('ot~') ? 'ot~' : '';
+    const key = titleKey(name);
+    const out = [];
+    await Promise.all(manager.comicSources().map(async (cs) => {
+      if (cs.prefix === curPrefix) return;                 // bỏ nguồn đang đọc
+      try {
+        const r = await cs.src.search(name);
+        const hit = (r.items || []).find(i => titleKey(i.name) === key)
+          || (r.items || []).find(i => titleKey(i.name).includes(key) || key.includes(titleKey(i.name)));
+        if (hit) out.push({ label: cs.label, url: `/doc/${cs.prefix}${hit.slug}/${encodeURIComponent(chapter)}` });
+      } catch { /* nguồn lỗi thì bỏ qua */ }
+    }));
+    res.json({ sources: out });
+  });
 
   // Danh sách URL ảnh (đã gói qua /img) của một chương — để reader tải trước
   // chương kế tiếp. Đồng thời làm ấm cache chapter phía server.

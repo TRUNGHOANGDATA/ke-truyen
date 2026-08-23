@@ -72,7 +72,7 @@ export function buildApp(deps = {}) {
   app.locals.imgProxy = app.locals.img;
 
   // Nguồn động: đổi nguồn/domain lúc chạy không cần restart. Test vẫn inject deps.source được.
-  const manager = createSourceManager({ db, settings, config, probeFetch: deps.probeFetch });
+  const manager = deps.manager ?? createSourceManager({ db, settings, config, probeFetch: deps.probeFetch });
   const source = deps.source ?? manager.source;
   // Nguồn truyện chữ (Phase 2) — trục riêng, không trộn vào facade truyện tranh.
   // Bọc cache home/list/byCategory/categories như nguồn tranh (detail/chapter/search vẫn tươi).
@@ -100,7 +100,7 @@ export function buildApp(deps = {}) {
     drive,
   });
 
-  mountApi(app, { source, novelSource, library, updates, cacheDir, archive, drive, refererFor });
+  mountApi(app, { source, novelSource, library, updates, cacheDir, archive, drive, refererFor, manager });
   app.locals.services = { db, source, novelSource, library, updates, archive, drive, settings, manager };
 
   // Link chi tiết theo loại: slug truyện chữ mang tiền tố "tf~" -> /chu/...

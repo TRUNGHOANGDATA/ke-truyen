@@ -112,3 +112,25 @@ document.addEventListener('keydown', (e) => {
     else document.exitFullscreen?.();
   }
 });
+
+/* ---------- Đổi nguồn: chương lỗi -> đọc cùng chương ở nguồn khác ---------- */
+const altBtn = document.getElementById('altBtn');
+const altMenu = document.getElementById('altMenu');
+if (altBtn && altMenu) {
+  const name = pages.dataset.name || '';
+  let loaded = false;
+  altBtn.addEventListener('click', async () => {
+    if (!altMenu.hidden) { altMenu.hidden = true; return; }
+    altMenu.hidden = false;
+    if (loaded) return;
+    altMenu.innerHTML = '<div class="alt-msg">Đang tìm nguồn khác…</div>';
+    try {
+      const q = `slug=${encodeURIComponent(slug)}&name=${encodeURIComponent(name)}&chapter=${encodeURIComponent(chapter)}`;
+      const { sources = [] } = await api('/api/other-sources?' + q);
+      loaded = true;
+      altMenu.innerHTML = sources.length
+        ? sources.map(s => `<a class="alt-item" href="${s.url}">Đọc từ <b>${s.label}</b> →</a>`).join('')
+        : '<div class="alt-msg">Không tìm thấy bộ này ở nguồn khác.</div>';
+    } catch { altMenu.innerHTML = '<div class="alt-msg">Lỗi tìm nguồn khác.</div>'; }
+  });
+}

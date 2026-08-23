@@ -28,7 +28,7 @@ export function createSourceManager({
     ...(probeFetch ? { fetchFn: probeFetch } : {}),
   });
 
-  let raw, active;
+  let raw, active, parts = {};
 
   // Kho bổ sung nay crawl NetTruyen (OTruyen API đã chết phần đọc chương).
   // Giữ tên settings 'otruyen' cho tương thích lịch sử.
@@ -39,12 +39,16 @@ export function createSourceManager({
     { keyPrefix: 'sup:', detailTtlMs: 60 * 60 * 1000, chapterTtlMs: 7 * DAY });
 
   function buildRaw(name) {
-    if (name === 'otruyen') return newSupplement();
+    if (name === 'otruyen') {
+      const nt = newSupplement(); parts = { supplement: nt }; return nt;
+    }
     const qq = makeTruyenQQ({ base: resolver.current(), reprobe: () => resolver.reprobe() });
     // TruyenQQ làm nguồn chính, kho NetTruyen bổ sung những bộ TruyenQQ không có.
     // Tắt được bằng settings: supplement=0.
-    if (settings.get('supplement', '1') === '0') return qq;
-    return combine(qq, newSupplement());
+    if (settings.get('supplement', '1') === '0') { parts = { primary: qq }; return qq; }
+    const nt = newSupplement();
+    parts = { primary: qq, supplement: nt };
+    return combine(qq, nt);
   }
 
   function build(name) {
@@ -68,6 +72,17 @@ export function createSourceManager({
     source,
     resolver,
     current: () => settings.get('source', 'truyenqq'),
+
+    /**
+     * Các nguồn truyện tranh tìm-riêng-được (để "đổi nguồn" ở trang đọc). Mỗi
+     * mục: id, label, prefix slug (''=TruyenQQ, 'ot~'=NetTruyen), và adapter.
+     */
+    comicSources() {
+      const list = [];
+      if (parts.primary) list.push({ id: 'truyenqq', label: 'TruyenQQ', prefix: '', src: parts.primary });
+      if (parts.supplement) list.push({ id: 'nettruyen', label: 'NetTruyen', prefix: 'ot~', src: parts.supplement });
+      return list;
+    },
 
     /** Đổi nguồn (truyenqq|otruyen); xóa cache để không lẫn dữ liệu 2 nguồn. */
     setSource(name) {
