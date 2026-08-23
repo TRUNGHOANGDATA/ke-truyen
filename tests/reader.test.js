@@ -67,10 +67,13 @@ test('/api/other-sources tìm cùng bộ ở nguồn khác (so tên) + link cùn
   // đang đọc bản TruyenQQ (slug thường) -> gợi ý NetTruyen, cùng chương 5
   const res = await a.get('/api/other-sources?slug=tu-dai-danh-bo-1463&name=' + encodeURIComponent('Tứ Đại Danh Bổ') + '&chapter=5');
   assert.equal(res.status, 200);
-  assert.deepEqual(res.body.sources, [{ label: 'NetTruyen', url: '/doc/ot~tu-dai-danh-bo/5' }]);
+  assert.deepEqual(res.body.sources, [
+    { n: 1, id: 'truyenqq', label: 'TruyenQQ', current: true, url: '/doc/tu-dai-danh-bo-1463/5' },
+    { n: 2, id: 'nettruyen', label: 'NetTruyen', current: false, url: '/doc/ot~tu-dai-danh-bo/5' },
+  ]);
 });
 
-test('/api/other-sources với NHIỀU kho: bỏ đúng kho đang đọc, gợi ý các kho còn lại', async () => {
+test('/api/other-sources với NHIỀU kho: đánh dấu kho đang đọc, liệt kê các kho còn lại', async () => {
   const db = openDb(':memory:'); createSchema(db);
   const site = (id, label, prefix, slug) => ({
     id, label, prefix,
@@ -89,12 +92,41 @@ test('/api/other-sources với NHIỀU kho: bỏ đúng kho đang đọc, gợi 
   const a = request.agent(app);
   await a.post('/login').type('form').send({ password: 'secret123' });
 
-  // đang đọc ở kho 'nar~' -> phải bỏ chính nó, giữ TruyenQQ + 'ot~'
+  // đang đọc ở kho 'nar~' -> nó vẫn có mặt nhưng ĐƯỢC ĐÁNH DẤU current
   const res = await a.get('/api/other-sources?slug=nar~tu-dai-danh-bo-1463&name='
     + encodeURIComponent('Tứ Đại Danh Bổ') + '&chapter=12');
   assert.equal(res.status, 200);
-  const urls = res.body.sources.map(s => s.url).sort();
-  assert.deepEqual(urls, ['/doc/ot~tu-dai-danh-bo/12', '/doc/tu-dai-danh-bo-1463/12']);
-  assert.ok(!res.body.sources.some(s => s.label === 'NetTruyen 2'), 'không gợi ý lại kho đang đọc');
+  assert.deepEqual(res.body.sources.map(s => [s.n, s.label, s.current, s.url]), [
+    [1, 'TruyenQQ', false, '/doc/tu-dai-danh-bo-1463/12'],
+    [2, 'NetTruyen', false, '/doc/ot~tu-dai-danh-bo/12'],
+    [3, 'NetTruyen 2', true, '/doc/nar~tu-dai-danh-bo-1463/12'],
+  ]);
   assert.ok(!res.body.sources.some(s => s.label === 'NetTruyen 3'), 'kho không có bộ thì không hiện');
+});
+
+test('/api/other-sources nhớ kết quả: chương sau của cùng bộ không tra lại nguồn', async () => {
+  const db = openDb(':memory:'); createSchema(db);
+  let lanTra = 0;
+  const manager = {
+    comicSources: () => [
+      { id: 'truyenqq', label: 'TruyenQQ', prefix: '', src: { async search() { lanTra++; return { items: [] }; } } },
+      { id: 'nettruyen', label: 'NetTruyen', prefix: 'ot~', src: { async search() { lanTra++; return { items: [{ name: 'Tứ Đại Danh Bổ', slug: 'tu-dai-danh-bo' }] }; } } },
+    ],
+  };
+  const app = buildApp({ passwordHash: hash, sessionSecret: 't', db, manager,
+    cacheDir: mkdtempSync(join(tmpdir(), 'os3-')) });
+  const a = request.agent(app);
+  await a.post('/login').type('form').send({ password: 'secret123' });
+  const q = (ch) => '/api/other-sources?slug=tu-dai-danh-bo-1463&name='
+    + encodeURIComponent('Tứ Đại Danh Bổ') + '&chapter=' + ch;
+
+  const ch1 = await a.get(q(1));
+  const sau = lanTra;
+  assert.ok(sau > 0, 'lần đầu phải tra nguồn');
+
+  const ch2 = await a.get(q(2));
+  assert.equal(lanTra, sau, 'chương sau không được tra lại');
+  // vẫn phải ra link ĐÚNG chương đang đọc, không phải link đã cache của chương 1
+  assert.equal(ch1.body.sources[1].url, '/doc/ot~tu-dai-danh-bo/1');
+  assert.equal(ch2.body.sources[1].url, '/doc/ot~tu-dai-danh-bo/2');
 });

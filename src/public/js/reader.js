@@ -113,24 +113,22 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-/* ---------- Đổi nguồn: chương lỗi -> đọc cùng chương ở nguồn khác ---------- */
-const altBtn = document.getElementById('altBtn');
-const altMenu = document.getElementById('altMenu');
-if (altBtn && altMenu) {
+/* ---------- Nút chọn nguồn, bày sẵn trên thanh đọc ----------
+   Tra "bộ này có ở nguồn nào" ngay khi mở trang (không đợi bấm) rồi hiện nút,
+   nên lúc ảnh lỗi là bấm đổi được liền. Máy chủ nhớ kết quả 12 tiếng nên các
+   chương sau của cùng bộ hiện gần như tức thì. Chỉ hiện khi có TỪ 2 NGUỒN trở
+   lên — một nguồn thì chẳng có gì để chọn. */
+const srcPick = document.getElementById('srcPick');
+if (srcPick) (async function loadSources() {
   const name = pages.dataset.name || '';
-  let loaded = false;
-  altBtn.addEventListener('click', async () => {
-    if (!altMenu.hidden) { altMenu.hidden = true; return; }
-    altMenu.hidden = false;
-    if (loaded) return;
-    altMenu.innerHTML = '<div class="alt-msg">Đang tìm nguồn khác…</div>';
-    try {
-      const q = `slug=${encodeURIComponent(slug)}&name=${encodeURIComponent(name)}&chapter=${encodeURIComponent(chapter)}`;
-      const { sources = [] } = await api('/api/other-sources?' + q);
-      loaded = true;
-      altMenu.innerHTML = sources.length
-        ? sources.map(s => `<a class="alt-item" href="${s.url}">Đọc từ <b>${s.label}</b> →</a>`).join('')
-        : '<div class="alt-msg">Không tìm thấy bộ này ở nguồn khác.</div>';
-    } catch { altMenu.innerHTML = '<div class="alt-msg">Lỗi tìm nguồn khác.</div>'; }
-  });
-}
+  if (!name) return;
+  try {
+    const q = `slug=${encodeURIComponent(slug)}&name=${encodeURIComponent(name)}&chapter=${encodeURIComponent(chapter)}`;
+    const { sources = [] } = await api('/api/other-sources?' + q);
+    if (sources.length < 2) return;
+    srcPick.innerHTML = '<span class="sp-lb">Nguồn</span>' + sources.map(s => (s.current
+      ? `<span class="sp-i on" title="${s.label} (đang đọc)" aria-current="true">${s.n}</span>`
+      : `<a class="sp-i" href="${s.url}" title="Đọc từ ${s.label}">${s.n}</a>`)).join('');
+    srcPick.hidden = false;
+  } catch { /* không tra được thì thôi, không làm phiền lúc đang đọc */ }
+})();

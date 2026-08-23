@@ -11,31 +11,57 @@ function dirSize(dir) {
   } catch { return 0; }
 }
 
-export function mountApi(app, { source, novelSource, library, updates, cacheDir, archive, drive, refererFor, manager }) {
+/** Bộ này nằm ở nguồn nào, slug là gì. Nguồn lỗi thì bỏ qua. */
+async function resolveSlugs(sources, name, key) {
+  const out = [];
+  await Promise.all(sources.map(async (cs) => {
+    try {
+      const items = (await cs.src.search(name)).items || [];
+      const hit = items.find(i => titleKey(i.name) === key)
+        || items.find(i => titleKey(i.name).includes(key) || key.includes(titleKey(i.name)));
+      if (hit) out.push({ id: cs.id, slug: hit.slug });
+    } catch { /* nguồn lỗi thì bỏ qua */ }
+  }));
+  return out;
+}
+
+export function mountApi(app, { source, novelSource, library, updates, cacheDir, archive, drive, refererFor, manager, kv }) {
   app.get('/api/library', (req, res) => res.json({ items: library.listFollowed() }));
 
-  // "Đổi nguồn" ở trang đọc: tìm CÙNG bộ (so tên) ở các nguồn tranh khác, trả
-  // link đọc cùng chương ở nguồn đó. Chương lỗi -> đổi sang nguồn còn chạy.
+  // Bộ này có ở những nguồn nào -> nhớ 12 tiếng. Tra một lần phải gọi search()
+  // tới TỪNG nguồn (~3 giây) trong khi câu trả lời gần như cố định theo bộ truyện,
+  // nên không cache thì mỗi lần mở chương lại phải chờ.
+  const ALT_TTL = 12 * 60 * 60 * 1000;
+
+  /**
+   * Các nguồn đọc được bộ đang xem, kèm link CÙNG chương ở nguồn đó — để trang
+   * đọc bày sẵn nút chọn nguồn. Nguồn đang đọc cũng có mặt (current: true) để
+   * đánh dấu, vì slug của nó đã biết sẵn từ URL.
+   */
   app.get('/api/other-sources', async (req, res) => {
     const slug = String(req.query.slug || '');
     const name = String(req.query.name || '');
     const chapter = String(req.query.chapter || '');
     if (!name || !manager?.comicSources) return res.json({ sources: [] });
+
     const all = manager.comicSources();
     // Nguồn đang đọc = nguồn có tiền tố khớp đầu slug ('' = nguồn chính).
     const curPrefix = all.map(s => s.prefix).filter(Boolean).find(p => slug.startsWith(p)) || '';
     const key = titleKey(name);
-    const out = [];
-    await Promise.all(all.map(async (cs) => {
-      if (cs.prefix === curPrefix) return;                 // bỏ nguồn đang đọc
-      try {
-        const r = await cs.src.search(name);
-        const hit = (r.items || []).find(i => titleKey(i.name) === key)
-          || (r.items || []).find(i => titleKey(i.name).includes(key) || key.includes(titleKey(i.name)));
-        if (hit) out.push({ label: cs.label, url: `/doc/${cs.prefix}${hit.slug}/${encodeURIComponent(chapter)}` });
-      } catch { /* nguồn lỗi thì bỏ qua */ }
-    }));
-    res.json({ sources: out });
+    // Khoá cache mang danh sách nguồn: thêm/bớt nguồn thì bản cũ tự hết giá trị.
+    const cacheKey = `${all.map(s => s.id).join('+')}:${key}`;
+    const found = kv
+      ? await kv.wrap(cacheKey, ALT_TTL, () => resolveSlugs(all, name, key))
+      : await resolveSlugs(all, name, key);
+
+    const bySrc = new Map(found.map(f => [f.id, f.slug]));
+    const sources = all.map((cs, i) => {
+      const current = cs.prefix === curPrefix;
+      const s = current ? slug.slice(cs.prefix.length) : bySrc.get(cs.id);
+      if (!s) return null;                                  // nguồn này không có bộ đó
+      return { n: i + 1, id: cs.id, label: cs.label, current, url: `/doc/${cs.prefix}${s}/${encodeURIComponent(chapter)}` };
+    }).filter(Boolean);
+    res.json({ sources });
   });
 
   // Danh sách URL ảnh (đã gói qua /img) của một chương — để reader tải trước

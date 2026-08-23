@@ -84,6 +84,14 @@ tách "trong thư viện" khỏi "đang theo dõi"; `remember()` ghi tiến đ�
 `PASSWORD_HASH`), cookie-session. `requireAuth` chặn mọi thứ trừ `/login`, `/healthz`,
 `/public`. Trang chưa auth → 302 về /login; API → 401.
 
+**Chọn nguồn ở trang đọc:** thanh đọc bày sẵn dãy nút `Nguồn [1][2][3]` (số đang đọc
+sáng lên) — [reader.ejs](src/views/reader.ejs) `#srcPick` + [reader.js](src/public/js/reader.js).
+Dữ liệu từ `GET /api/other-sources` (tìm cùng bộ ở các nguồn khác, so tên qua `titleKey`),
+gọi **ngay khi mở trang** chứ không đợi bấm. Phép tra này phải gọi `search()` tới TỪNG
+nguồn (~2-3 giây) nên kết quả được nhớ 12 tiếng bằng [kv-cache.js](src/services/kv-cache.js)
+— khoá gồm danh sách id nguồn nên thêm/bớt nguồn thì bản cũ tự hết giá trị; chỉ nhớ ánh xạ
+*bộ → slug ở từng nguồn*, còn số chương ghép vào lúc trả lời (đo thật: 2276ms → 2ms).
+
 **Routes:** [pages.js](src/routes/pages.js) (trang + /settings), [api.js](src/routes/api.js)
 (/api/archive, /api/status…), [image.js](src/routes/image.js), [auth.js](src/routes/auth.js).
 **DB:** [src/db/migrations.js](src/db/migrations.js) — bảng comics/chapters/reading_progress/

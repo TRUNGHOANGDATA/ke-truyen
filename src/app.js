@@ -13,6 +13,7 @@ import { createSettings } from './services/settings.js';
 import { createSourceManager } from './services/source-manager.js';
 import { createImageHosts } from './services/image-hosts.js';
 import { createSiteProber } from './services/site-prober.js';
+import { createKvCache } from './services/kv-cache.js';
 import { createTruyenfullSource } from './source/truyenfull.js';
 import { createLibrary } from './services/library.js';
 import { createUpdates } from './services/updates.js';
@@ -111,7 +112,8 @@ export function buildApp(deps = {}) {
     drive,
   });
 
-  mountApi(app, { source, novelSource, library, updates, cacheDir, archive, drive, refererFor, manager });
+  const kv = createKvCache(db, { prefix: 'kv:' });
+  mountApi(app, { source, novelSource, library, updates, cacheDir, archive, drive, refererFor, manager, kv });
   // Dò nguồn TỪ MÁY CHỦ (máy ở nhà hay bị nhà mạng chặn nên dò ở đó không tin được).
   const prober = deps.prober ?? createSiteProber();
   app.locals.services = { db, source, novelSource, library, updates, archive, drive, settings, manager, prober };
