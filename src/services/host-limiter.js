@@ -1,63 +1,86 @@
 /**
- * Giới hạn số request ĐỒNG THỜI tới cùng một host, có xếp hàng.
+ * Giới hạn số request ĐỒNG THỜI tới cùng một host, có xếp hàng và CÓ LÀN ƯU TIÊN.
  *
- * Lý do tồn tại: trang đọc nạp trước rất hăng (4 luồng + 6 ảnh nhìn trước + tải
- * trước chương sau), nên proxy dội cả chùm chục request vào CDN của nguồn cùng
- * lúc. CDN thấy vậy thì chặn bớt — hệ quả là ảnh vỡ lỗ chỗ, trong khi thử LẺ
- * từng ảnh lại ngon lành (đo thật: 1 ảnh = 315ms, OK ngay lần đầu).
+ * Lý do tồn tại (đo thật trên máy chủ): CDN nguồn chịu tải LẺ tốt (1 ảnh =
+ * 1070ms OK) nhưng dội 8 ảnh cùng lúc thì rớt 7/8 (HTTP 502/504). Trang đọc lại
+ * nạp trước rất hăng, nên không xếp hàng là ảnh vỡ lỗ chỗ.
  *
- * Xếp hàng theo host chứ không theo toàn cục: nhiều nguồn khác nhau vẫn chạy
- * song song, chỉ riêng từng CDN là được "gõ cửa từ tốn".
+ * Hai làn:
+ *  - 'fg' (mặc định): ảnh người đọc ĐANG NHÌN. Được chen trước làn nền; chờ quá
+ *    lâu thì cho đi luôn (thà chậm còn hơn treo trắng màn hình).
+ *  - 'bg': nạp trước/ủ cache. Bị ép nhường: mỗi host chỉ 1 request nền một lúc,
+ *    và chờ quá lâu thì TRẢ LỖI ngay (err.busy=true) để người gọi quay lại sau —
+ *    tuyệt đối không được giành chỗ của ảnh đang nhìn.
+ *
+ * Xếp hàng theo host chứ không toàn cục: nhiều nguồn khác nhau vẫn chạy song song.
  */
-export function createHostLimiter({ limit = 3, maxWaitMs = 10000, now = () => Date.now() } = {}) {
-  const lanes = new Map();   // host -> { running, queue: [] }
+export function createHostLimiter({
+  limit = 3,               // tổng request đồng thời tới MỘT host (cả hai làn)
+  bgLimit = 1,             // riêng làn nền không vượt số này
+  maxWaitMs = 10000,       // fg: chờ quá thì cho đi luôn
+  bgMaxWaitMs = 4000,      // bg: chờ quá thì trả lỗi busy
+  now = () => Date.now(),
+} = {}) {
+  const lanes = new Map();  // host -> { running: {fg,bg}, q: {fg:[],bg:[]} }
 
   const laneOf = (host) => {
     let l = lanes.get(host);
-    if (!l) { l = { running: 0, queue: [] }; lanes.set(host, l); }
+    if (!l) { l = { running: { fg: 0, bg: 0 }, q: { fg: [], bg: [] } }; lanes.set(host, l); }
     return l;
   };
+  const total = (l) => l.running.fg + l.running.bg;
 
-  function release(host) {
-    const l = lanes.get(host);
-    if (!l) return;
-    l.running--;
-    const next = l.queue.shift();
-    if (next) { l.running++; next(); }
-    else if (l.running <= 0 && !l.queue.length) lanes.delete(host);
+  /** Nhả chỗ xong thì cho người chờ vào: fg TRƯỚC, bg chỉ khi fg hết hàng. */
+  function admit(l) {
+    while (l.q.fg.length && total(l) < limit) { l.running.fg++; l.q.fg.shift().go(); }
+    while (l.q.bg.length && total(l) < limit && l.running.bg < bgLimit) { l.running.bg++; l.q.bg.shift().go(); }
   }
 
-  /** Chiếm một chỗ cho host; trả về hàm nhả chỗ. Chờ quá lâu thì cứ cho đi. */
-  async function acquire(host) {
-    const l = laneOf(host);
-    if (l.running < limit) { l.running++; return () => release(host); }
+  function release(host, lane) {
+    const l = lanes.get(host);
+    if (!l) return;
+    l.running[lane]--;
+    admit(l);
+    if (total(l) <= 0 && !l.q.fg.length && !l.q.bg.length) lanes.delete(host);
+  }
 
-    const start = now();
-    let timer;
-    await new Promise((resolve) => {
-      const go = () => { clearTimeout(timer); resolve(); };
-      l.queue.push(go);
-      // Không để ai kẹt vô hạn: quá hạn thì bỏ hàng đợi mà chạy luôn, thà chậm
-      // còn hơn treo. Ghế đã xin thì vẫn đếm để không vọt quá giới hạn nhiều.
-      timer = setTimeout(() => {
-        const i = l.queue.indexOf(go);
-        if (i >= 0) { l.queue.splice(i, 1); l.running++; }
-        resolve();
-      }, Math.max(0, maxWaitMs - (now() - start)));
+  function acquire(host, lane) {
+    const l = laneOf(host);
+    const canRun = lane === 'fg'
+      ? total(l) < limit
+      : total(l) < limit && l.running.bg < bgLimit;
+    if (canRun) { l.running[lane]++; return Promise.resolve(); }
+
+    return new Promise((resolve, reject) => {
+      const entry = { go: () => { clearTimeout(timer); resolve(); } };
+      l.q[lane].push(entry);
+      const wait = lane === 'fg' ? maxWaitMs : bgMaxWaitMs;
+      const timer = setTimeout(() => {
+        const i = l.q[lane].indexOf(entry);
+        if (i < 0) return;                       // đã được cho vào rồi
+        l.q[lane].splice(i, 1);
+        if (lane === 'fg') { l.running.fg++; resolve(); }   // fg: cho đi luôn
+        else reject(Object.assign(new Error('host đang bận, quay lại sau'), { busy: true }));
+      }, wait);
     });
-    return () => release(host);
   }
 
   return {
-    /** Chạy fn() với ràng buộc số lượng đồng thời của host này. */
-    async run(host, fn) {
-      const done = await acquire(String(host || ''));
-      try { return await fn(); } finally { done(); }
+    /** Chạy fn() trong làn `lane` của host này. Làn nền có thể ném err.busy. */
+    async run(host, fn, lane = 'fg') {
+      const h = String(host || '');
+      const ln = lane === 'bg' ? 'bg' : 'fg';
+      await acquire(h, ln);
+      try { return await fn(); } finally { release(h, ln); }
     },
-    /** Đang chạy bao nhiêu / xếp hàng bao nhiêu (cho test + chẩn đoán). */
+    /** Cho test + chẩn đoán. */
     stats(host) {
       const l = lanes.get(String(host || ''));
-      return { running: l?.running || 0, queued: l?.queue.length || 0 };
+      return {
+        running: l ? total(l) : 0,
+        queued: l ? l.q.fg.length + l.q.bg.length : 0,
+        bgRunning: l?.running.bg || 0,
+      };
     },
   };
 }

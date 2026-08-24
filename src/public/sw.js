@@ -3,7 +3,7 @@
 // - Ảnh (/img): cache-first (ảnh bất biến) -> đọc lại chương cũ khi mất mạng + nhanh.
 // - Trang đọc/chi tiết: network-first, mất mạng thì lấy bản đã lưu; không có thì
 //   hiện trang "offline" gọn.
-const SHELL = 'shell-v18';
+const SHELL = 'shell-v19';
 const PAGES = 'pages-v1';
 const IMGS = 'imgs-v1';
 const ASSETS = ['/public/css/styles.css', '/public/js/common.js', '/public/js/home.js', '/public/js/reader.js', '/public/js/reader-novel.js'];
@@ -56,14 +56,18 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Ảnh: cache-first (ảnh không đổi) -> đọc lại offline + nhanh
+  // Ảnh: cache-first (ảnh không đổi) -> đọc lại offline + nhanh.
+  // ?bg=1 chỉ là nhãn xếp làn cho máy chủ — khoá cache BỎ nhãn đi, để ảnh nạp
+  // nền và ảnh nhìn thẳng dùng chung một bản lưu (không tải đúp, offline không hụt).
   if (url.pathname === '/img') {
+    url.searchParams.delete('bg');
+    const key = new Request(url.pathname + '?' + url.searchParams.toString());
     e.respondWith(caches.open(IMGS).then(async (cache) => {
-      const cached = await cache.match(req);
+      const cached = await cache.match(key);
       if (cached) return cached;
       try {
         const res = await fetch(req);
-        if (res && res.ok) { cache.put(req, res.clone()); trim(IMGS, IMG_MAX); }
+        if (res && res.ok) { cache.put(key, res.clone()); trim(IMGS, IMG_MAX); }
         return res;
       } catch { return cached || Response.error(); }
     }));

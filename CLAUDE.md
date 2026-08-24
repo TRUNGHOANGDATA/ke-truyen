@@ -79,10 +79,19 @@ xử lý bằng hai lớp TỰ HỌC trong [src/services/image-hosts.js](src/ser
 2. *Đừng đoán mã nào là "chặn hotlink".* Từng thu hẹp thành `401/403` → CDN từ chối bằng 404
    thì không bao giờ tới được referer đúng, **ảnh vỡ sạch**. Quy tắc đúng: máy chủ CÓ trả lời
    (mã gì cũng được) = host còn sống = đáng thử referer tiếp.
-3. *Đừng dội cả chùm vào một CDN.* Trang đọc nạp trước rất hăng (4 luồng + 6 ảnh nhìn
-   trước + tải trước chương sau) → CDN chặn bớt → **ảnh vỡ lỗ chỗ** dù thử LẺ vẫn ngon
-   (đo thật: 1 ảnh = 315ms OK ngay). Có [host-limiter.js](src/services/host-limiter.js)
-   xếp hàng tối đa 3 request đồng thời **theo từng host** (nguồn khác nhau vẫn song song).
+3. *Đừng dội cả chùm vào một CDN.* Đo thật trên máy chủ: tải LẺ 1 ảnh = OK 1070ms,
+   dội 8 ảnh song song = **rớt 7/8 (HTTP 502/504)**. Kiến trúc chống lại nó gồm 3 tầng:
+   - [host-limiter.js](src/services/host-limiter.js): tối đa 3 request/host, **hai làn** —
+     `fg` (ảnh đang nhìn, được chen trước) và `bg` (nạp trước, 1 slot, chờ lâu thì trả
+     `err.busy` chứ không giành chỗ). Route `/img` xếp làn theo nhãn `?bg=1`.
+   - [chapter-prewarm.js](src/services/chapter-prewarm.js): mở trang đọc là máy chủ tự ủ
+     TUẦN TỰ cả chương vào cache đĩa (làn bg, dùng chung [createImageFetcher]
+     (src/routes/image.js) với route). Đo thật: sau 25s ủ, 12 ảnh = 33ms tổng.
+   - [reader.js](src/public/js/reader.js): ảnh tầm nhìn +2 đi làn fg; tải nền 2 luồng
+     mang nhãn `bg=1` và TỰ DỪNG khi `fgPending > 0`; ảnh lỗi tự thử lại 2 lần rồi hiện
+     ô "bấm để thử lại" (không còn icon vỡ chết cứng); chương sau chỉ ủ khi chương này xong.
+   - SW cache ảnh theo khoá ĐÃ BỎ nhãn `bg` — không thì ảnh nạp nền và ảnh nhìn thẳng
+     thành hai bản lưu, tải đúp và offline hụt.
 
 **Chẩn đoán ảnh vỡ:** [src/services/image-doctor.js](src/services/image-doctor.js)
 `createImageDoctor` + `POST /settings/diagnose-image` (mục "Ảnh vỡ? Hỏi máy chủ"). Dán link

@@ -53,7 +53,74 @@ export function mirrorsFor(u) {
 const TOTAL_BUDGET_MS = 14000;
 const ATTEMPT_MS = 7000;
 
-export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes, isAllowed, refererFor, altReferer, refererHints, limiter, archive, drive }) {
+/**
+ * Bộ lấy ảnh từ CDN nguồn — TÁCH RIÊNG để route /img và bộ ủ chương dùng chung
+ * (cùng một logic thử host × referer, cùng một hàng đợi theo host).
+ *
+ * lane: 'fg' = ảnh người đọc đang nhìn (ưu tiên); 'bg' = nạp trước/ủ cache
+ * (nhường chỗ, host bận thì thôi — người gọi tự quay lại sau).
+ */
+export function createImageFetcher({ fetchFn = fetch, refererFor, altReferer, refererHints, limiter } = {}) {
+  const headers = {
+    // CDN truyện thường chặn user-agent lạ
+    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+    Accept: 'image/avif,image/webp,image/*,*/*;q=0.8',
+  };
+
+  async function fetchOnce(u, referer, timeoutMs, lane) {
+    const call = async () => {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), timeoutMs);
+      try {
+        return await fetchFn(u, { headers: { ...headers, Referer: referer }, signal: ctrl.signal });
+      } finally { clearTimeout(t); }
+    };
+    if (!limiter) return call();
+    let host = '';
+    try { host = new URL(u).hostname; } catch { /* URL lạ: không xếp hàng */ }
+    return host ? limiter.run(host, call, lane) : call();
+  }
+
+  return {
+    /**
+     * Thử host × referer. Chia theo TẦNG LỖI, không theo mã HTTP:
+     *  - Không nối được / quá hạn  -> host chết, referer nào cũng vậy -> sang host khác.
+     *  - Có trả lời nhưng lỗi      -> host sống, có thể do referer -> thử referer tiếp.
+     * Nhờ vậy một host chết chỉ tốn 1 lần thử (trước đây 3 host x 5 referer x 8s
+     * = tới 80 giây thật đo được), mà vẫn quét đủ referer trên host còn sống.
+     * Trả { buf, contentType } hoặc null nếu chịu thua.
+     */
+    async get(url, { lane = 'fg' } = {}) {
+      const deadline = Date.now() + TOTAL_BUDGET_MS;
+      nextHost:
+      for (const u of mirrorsFor(url)) {
+        for (const ref of buildReferers(u, { refererFor, altReferer, refererHints })) {
+          const left = deadline - Date.now();
+          if (left < 700) break nextHost;             // hết giờ: thà báo lỗi sớm
+          let upstream;
+          try {
+            upstream = await fetchOnce(u, ref, Math.min(ATTEMPT_MS, left), lane);
+          } catch {
+            continue nextHost;                        // host không phản hồi / làn nền bận
+          }
+          if (upstream.ok) {
+            const contentType = upstream.headers.get('content-type') || 'image/jpeg';
+            const buf = Buffer.from(await upstream.arrayBuffer());
+            refererHints?.set?.(u, ref);      // nhớ tổ hợp vừa ăn -> ảnh sau đi thẳng
+            return { buf, contentType };
+          }
+          // Máy chủ CÓ trả lời (dù mã gì) = host còn sống -> đáng thử referer khác.
+          // Đừng đoán mã nào là "chặn hotlink": mỗi CDN từ chối một kiểu (403, 404,
+          // 429, trang lỗi...). Đoán hẹp là không bao giờ tới được referer đúng.
+        }
+      }
+      return null;
+    },
+  };
+}
+
+export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes, isAllowed, refererFor, altReferer, refererHints, limiter, fetcher, archive, drive }) {
+  const fx = fetcher ?? createImageFetcher({ fetchFn, refererFor, altReferer, refererHints, limiter });
   const allow = isAllowed || ((u) => isAllowedHost(u, allowSuffixes || []));
   app.get('/img', async (req, res) => {
     // ?i= là URL đã gói (mặc định); ?u= giữ lại cho tương thích
@@ -80,62 +147,11 @@ export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes, is
         } catch { /* Drive lỗi thì rơi xuống lấy từ nguồn */ }
       }
     }
-    const headers = {
-      // CDN truyện thường chặn user-agent lạ
-      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
-      Accept: 'image/avif,image/webp,image/*,*/*;q=0.8',
-    };
-
-    const candidatesFor = mirrorsFor;
-
-    // Gọi lên CDN, nhưng XẾP HÀNG theo host: trang đọc nạp trước rất hăng, dội cả
-    // chùm vào một CDN thì bị chặn bớt -> ảnh vỡ lỗ chỗ, dù thử lẻ từng ảnh vẫn ngon.
-    async function fetchOnce(u, referer, timeoutMs) {
-      const call = async () => {
-        const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), timeoutMs);
-        try {
-          return await fetchFn(u, { headers: { ...headers, Referer: referer }, signal: ctrl.signal });
-        } finally { clearTimeout(t); }
-      };
-      if (!limiter) return call();
-      let host = '';
-      try { host = new URL(u).hostname; } catch { /* URL lạ: không xếp hàng */ }
-      return host ? limiter.run(host, call) : call();
-    }
-
-    const referersFor = (u) => buildReferers(u, { refererFor, altReferer, refererHints });
-
-    // Thử host × referer. Chia theo TẦNG LỖI, không theo mã HTTP:
-    //  - Không nối được / quá hạn  -> host chết, referer nào cũng vậy -> sang host khác.
-    //  - Có trả lời nhưng lỗi      -> host sống, có thể do referer -> thử referer tiếp.
-    // Nhờ vậy một host chết chỉ tốn 1 lần thử (trước đây 3 host x 5 referer x 8s
-    // = tới 80 giây thật đo được), mà vẫn quét đủ referer trên host còn sống.
-    const deadline = Date.now() + TOTAL_BUDGET_MS;
-    const candidates = candidatesFor(url);
-    nextHost:
-    for (const u of candidates) {
-      for (const ref of referersFor(u)) {
-        const left = deadline - Date.now();
-        if (left < 700) break nextHost;               // hết giờ: thà báo lỗi sớm
-        let upstream;
-        try {
-          upstream = await fetchOnce(u, ref, Math.min(ATTEMPT_MS, left));
-        } catch {
-          continue nextHost;                          // host không phản hồi
-        }
-        if (upstream.ok) {
-          const contentType = upstream.headers.get('content-type') || 'image/jpeg';
-          const buf = Buffer.from(await upstream.arrayBuffer());
-          refererHints?.set?.(u, ref);        // nhớ tổ hợp vừa ăn -> ảnh sau đi thẳng
-          cache.put(url, buf, contentType);   // cache theo URL gốc
-          return send(buf, contentType);
-        }
-        // Máy chủ CÓ trả lời (dù mã gì) = host còn sống -> đáng thử referer khác.
-        // Đừng đoán mã nào là "chặn hotlink": mỗi CDN từ chối một kiểu (403, 404,
-        // 429, trang lỗi...). Đoán hẹp là không bao giờ tới được referer đúng.
-      }
-    }
-    return res.status(502).end();
+    // Ảnh nạp trước/ủ cache mang nhãn ?bg=1 -> đi làn nền, nhường ảnh đang nhìn.
+    const lane = req.query.bg === '1' ? 'bg' : 'fg';
+    const got = await fx.get(url, { lane });
+    if (!got) return res.status(502).end();
+    cache.put(url, got.buf, got.contentType);   // cache theo URL gốc (không dính nhãn bg)
+    return send(got.buf, got.contentType);
   });
 }

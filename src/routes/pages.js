@@ -288,6 +288,9 @@ export function mountPages(app) {
       if (idx === -1) return res.status(404).send('Không tìm thấy chương');
       const cur = chapters[idx];
       const { images } = await svcs.source.chapter(cur.api_url);
+      // Máy chủ tự ủ cả chương vào cache đĩa (chạy nền, làn nhường): người đọc
+      // cuộn tới đâu phần lớn ảnh đã nằm sẵn, không phải chờ CDN từng tấm.
+      svcs.prewarm?.queue(`${slug}/${chapterName}`, images.map(im => im.url));
       const prev = idx > 0 ? chapters[idx - 1].chapter_name : null;
       const next = idx < chapters.length - 1 ? chapters[idx + 1].chapter_name : null;
       const progress = svcs.library.getProgress(slug);

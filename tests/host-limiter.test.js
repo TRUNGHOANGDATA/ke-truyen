@@ -44,7 +44,7 @@ test('việc ném lỗi vẫn nhả chỗ cho người sau (không kẹt hàng �
   let chay = false;
   await l.run('cdn.com', async () => { chay = true; });
   assert.equal(chay, true);
-  assert.deepEqual(l.stats('cdn.com'), { running: 0, queued: 0 });
+  assert.deepEqual(l.stats('cdn.com'), { running: 0, queued: 0, bgRunning: 0 });
 });
 
 test('trả về đúng giá trị của việc', async () => {
@@ -67,5 +67,49 @@ test('chờ quá lâu thì cho đi luôn, thà chậm còn hơn treo', async () 
 test('dọn sạch sau khi xong, không rò bộ nhớ theo host', async () => {
   const l = createHostLimiter({ limit: 2 });
   await peakOf(l, 'cdn.com', 4, 2);
-  assert.deepEqual(l.stats('cdn.com'), { running: 0, queued: 0 });
+  assert.deepEqual(l.stats('cdn.com'), { running: 0, queued: 0, bgRunning: 0 });
+});
+
+/* ---------- Hai làn: fg (ảnh đang nhìn) chen trước, bg (nạp trước) phải nhường ---------- */
+
+test('làn bg không vượt bgLimit dù host còn chỗ trống', async () => {
+  const l = createHostLimiter({ limit: 3, bgLimit: 1 });
+  let dangChay = 0, dinh = 0;
+  await Promise.all(Array.from({ length: 6 }, () => l.run('cdn.com', async () => {
+    dangChay++; dinh = Math.max(dinh, dangChay);
+    await sleep(15);
+    dangChay--;
+  }, 'bg')));
+  assert.equal(dinh, 1, 'bg chỉ được 1 slot dù limit tổng là 3');
+});
+
+test('fg đến sau vẫn được vào TRƯỚC đám bg đang xếp hàng', async () => {
+  const l = createHostLimiter({ limit: 1, bgLimit: 1 });
+  const thuTu = [];
+  const giu = l.run('cdn.com', () => sleep(40));                 // chiếm chỗ
+  const bgs = Array.from({ length: 2 }, (_, i) =>
+    l.run('cdn.com', async () => { thuTu.push('bg' + i); }, 'bg').catch(() => {}));
+  await sleep(5);
+  const fg = l.run('cdn.com', async () => { thuTu.push('fg'); });
+  await Promise.all([giu, fg, ...bgs]);
+  assert.equal(thuTu[0], 'fg', 'fg phải chen trước bg, thấy: ' + thuTu.join(','));
+});
+
+test('bg chờ quá lâu thì bị trả lỗi busy (không giành chỗ của fg)', async () => {
+  const l = createHostLimiter({ limit: 1, bgLimit: 1, bgMaxWaitMs: 30 });
+  const giu = l.run('cdn.com', () => sleep(200));
+  await assert.rejects(() => l.run('cdn.com', async () => {}, 'bg'), (e) => e.busy === true);
+  await giu;
+});
+
+test('fg và bg cộng lại vẫn không vượt limit tổng của host', async () => {
+  const l = createHostLimiter({ limit: 2, bgLimit: 1 });
+  let dangChay = 0, dinh = 0;
+  const job = (lane) => l.run('cdn.com', async () => {
+    dangChay++; dinh = Math.max(dinh, dangChay);
+    await sleep(15);
+    dangChay--;
+  }, lane).catch(() => {});
+  await Promise.all([job('fg'), job('fg'), job('fg'), job('bg'), job('bg')]);
+  assert.equal(dinh, 2);
 });

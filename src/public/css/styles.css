@@ -511,3 +511,9 @@ a.link { text-decoration: none; }
   text-transform: uppercase; letter-spacing: .04em; padding: 6px 10px; border-bottom: 1px solid var(--line); }
 .probe td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; word-break: break-word; }
 .probe tr:last-child td { border-bottom: 0; }
+/* Ô "ảnh lỗi — bấm để thử lại" trong trang đọc (thay icon vỡ chết cứng) */
+.mpage.perr { display: grid; place-items: center; min-height: 200px; aspect-ratio: auto; background: #17161C; }
+.mpage.perr img { display: none; }
+.perr-tile { background: rgba(255,255,255,.07); border: 1px dashed rgba(255,255,255,.25); color: #9C98A6;
+  font-family: inherit; font-size: 13px; padding: 12px 18px; border-radius: 6px; cursor: pointer; }
+.perr-tile:hover { color: #EDEBF0; border-color: rgba(255,255,255,.5); }

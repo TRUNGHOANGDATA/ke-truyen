@@ -11,41 +11,82 @@ const track = document.getElementById('track');
 const pageLabel = document.getElementById('pageLabel');
 const total = imgs.length;
 
-// Tải một trang: ĐO tỉ lệ thật bằng bộ nạp rời, đặt aspect-ratio ĐÚNG cho ô chứa
-// TRƯỚC khi ảnh hiện -> ô không đổi kích thước lúc ảnh tải xong -> hết rung.
-function loadImg(im) {
-  if (!im || !im.dataset.src) return Promise.resolve();
-  const src = im.dataset.src; delete im.dataset.src;
+/* ---------- Nạp ảnh: ưu tiên cái ĐANG NHÌN, nền phải nhường, lỗi tự thử lại ----------
+   CDN nguồn chịu tải lẻ tốt nhưng dội song song là chặn (đo thật: 8 ảnh cùng lúc
+   rớt 7). Nên: ảnh trong tầm nhìn đi làn nhanh; tải nền mang nhãn ?bg=1 để máy
+   chủ xếp làn chậm, và tự dừng khi có ảnh tầm-nhìn đang chờ. */
+let fgPending = 0;        // số ảnh tầm-nhìn đang tải -> tải nền nhìn vào đây mà nhường
+let loadedCount = 0;
+
+// Ảnh lỗi sau 3 lần thử: hiện ô bấm-để-thử-lại thay vì icon vỡ chết cứng.
+function tileError(im, src) {
   const mpage = im.closest('.mpage');
-  return new Promise(res => {
-    const pre = new Image();
-    const show = () => { im.src = src; im.dataset.ok = '1'; res(); };
-    pre.onload = () => {
-      if (pre.naturalWidth && pre.naturalHeight) mpage.style.aspectRatio = pre.naturalWidth + ' / ' + pre.naturalHeight;
-      show();
-    };
-    pre.onerror = show;
-    pre.src = src;
+  mpage.classList.add('perr');
+  const tile = document.createElement('button');
+  tile.type = 'button'; tile.className = 'perr-tile';
+  tile.textContent = '⟳ Ảnh lỗi — bấm để thử lại';
+  tile.addEventListener('click', () => {
+    mpage.classList.remove('perr'); tile.remove();
+    attempt(im, src, 0, false, null);
   });
+  mpage.appendChild(tile);
 }
 
-// Ưu tiên vùng nhìn: nạp trang vào tầm nhìn + vài trang kế tiếp.
+// Một lượt tải: ĐO tỉ lệ thật bằng bộ nạp rời, đặt aspect-ratio ĐÚNG cho ô chứa
+// TRƯỚC khi ảnh hiện -> ô không đổi kích thước lúc ảnh tải xong -> hết rung.
+// Lỗi thì tự thử lại (1.2s rồi 3.5s) — 502/504 do CDN chặn nhất thời, thử lại là ăn.
+function attempt(im, src, tryNo, bg, settle) {
+  const mpage = im.closest('.mpage');
+  if (!bg) fgPending++;
+  const fin = () => {
+    if (!bg) fgPending--;
+    if (settle) { settle(); settle = null; }   // người xếp hàng chỉ chờ lượt đầu
+  };
+  const pre = new Image();
+  pre.onload = () => {
+    fin();
+    if (pre.naturalWidth && pre.naturalHeight) mpage.style.aspectRatio = pre.naturalWidth + ' / ' + pre.naturalHeight;
+    im.src = pre.src; im.dataset.ok = '1';
+    loadedCount++;
+    if (loadedCount >= total) prefetchNext();
+  };
+  pre.onerror = () => {
+    fin();
+    if (tryNo < 2) setTimeout(() => attempt(im, src, tryNo + 1, bg, null), tryNo === 0 ? 1200 : 3500);
+    else tileError(im, src);
+  };
+  pre.src = src + (bg ? '&bg=1' : '');
+}
+
+function loadImg(im, { bg = false } = {}) {
+  if (!im || !im.dataset.src) return Promise.resolve();
+  const src = im.dataset.src; delete im.dataset.src;
+  return new Promise(res => attempt(im, src, 0, bg, res));
+}
+
+// Ưu tiên vùng nhìn: ảnh vào tầm + 2 ảnh kế đi làn nhanh.
 const io = new IntersectionObserver((entries) => {
   for (const e of entries) {
     if (!e.isIntersecting) continue;
     const idx = imgs.indexOf(e.target);
-    for (let i = idx; i < Math.min(imgs.length, idx + 6); i++) loadImg(imgs[i]);
+    for (let i = idx; i < Math.min(imgs.length, idx + 3); i++) loadImg(imgs[i]);
     io.unobserve(e.target);
   }
 }, { rootMargin: '1600px 0px' });
 imgs.forEach(im => io.observe(im));
 
-// Tải trước CẢ chương ở nền (4 ảnh cùng lúc, top-down).
+// Tải nền cả chương: 2 luồng, đi làn chậm, và DỪNG khi có ảnh tầm-nhìn đang chờ.
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 (async function warmAll() {
+  await sleep(1000);                       // nhường trọn đợt đầu cho ảnh trước mắt
   let i = 0;
-  const worker = async () => { while (i < imgs.length) await loadImg(imgs[i++]); };
-  await new Promise(r => setTimeout(r, 400));
-  await Promise.all(Array.from({ length: 4 }, worker));
+  const worker = async () => {
+    while (i < imgs.length) {
+      while (fgPending > 0) await sleep(200);   // đang có ảnh trước mắt -> nhường
+      await loadImg(imgs[i++], { bg: true });
+    }
+  };
+  await Promise.all(Array.from({ length: 2 }, worker));
 })();
 
 // Tải trước chương kế tiếp: xin danh sách ảnh (làm ấm cache) + nạp vài ảnh đầu.
@@ -56,7 +97,8 @@ async function prefetchNext() {
   try {
     const { images = [] } = await api(
       `/api/chapter-images?slug=${encodeURIComponent(slug)}&chapter=${encodeURIComponent(nextChap)}`);
-    images.slice(0, 5).forEach(u => { const im = new Image(); im.src = u; });
+    // Chỉ vài ảnh đầu, đi làn nền — chương này còn chưa xong thì không giành đường.
+    images.slice(0, 3).forEach(u => { const im = new Image(); im.src = u + '&bg=1'; });
   } catch { /* bỏ qua */ }
 }
 
@@ -75,7 +117,7 @@ function onScroll() {
   const cur = currentPage();
   if (track) track.style.width = ((cur + 1) / total * 100) + '%';
   if (pageLabel) pageLabel.innerHTML = `Trang ${cur + 1} <s>/ ${total}</s>`;
-  if (cur + 1 >= total * 0.5) prefetchNext();
+  if (cur + 1 >= total) prefetchNext();     // đọc tới trang cuối thì chắc chắn ủ chương sau
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     api('/api/progress', { method: 'POST', body: JSON.stringify({ slug, chapter, page: cur }) }).catch(() => {});

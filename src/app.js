@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { config, IMAGE_HOSTS, refererFor } from './config.js';
 import { requireAuth, mountAuth } from './routes/auth.js';
 import { createImageCache } from './cache/imageCache.js';
-import { mountImageProxy, packImg } from './routes/image.js';
+import { mountImageProxy, packImg, createImageFetcher } from './routes/image.js';
 import { openDb } from './db/index.js';
 import { createSchema } from './db/migrations.js';
 import { withCache } from './source/cached.js';
@@ -17,6 +17,7 @@ import { createKvCache } from './services/kv-cache.js';
 import { createAltSources } from './services/alt-sources.js';
 import { createImageDoctor } from './services/image-doctor.js';
 import { createHostLimiter } from './services/host-limiter.js';
+import { createChapterPrewarm } from './services/chapter-prewarm.js';
 import { createTruyenfullSource } from './source/truyenfull.js';
 import { createLibrary } from './services/library.js';
 import { createUpdates } from './services/updates.js';
@@ -104,22 +105,24 @@ export function buildApp(deps = {}) {
     return [...new Set([qq, ...bases])].filter(Boolean).map(b => b + '/');
   };
 
-  // Gõ cửa từng CDN từ tốn: dội cả chùm thì bị chặn bớt, ảnh vỡ lỗ chỗ.
-  const imageLimiter = deps.imageLimiter ?? createHostLimiter({ limit: 3 });
+  // Gõ cửa từng CDN từ tốn: dội cả chùm thì bị chặn bớt (đo thật: 8 ảnh song
+  // song rớt 7 với 502/504). Làn fg cho ảnh đang nhìn, làn bg (1 slot) cho nạp trước.
+  const imageLimiter = deps.imageLimiter ?? createHostLimiter({ limit: 3, bgLimit: 1 });
+  const refererHints = { get: (u) => imageHosts.knownReferer(u), set: (u, r) => imageHosts.rememberReferer(u, r) };
+  // Bộ lấy ảnh dùng CHUNG cho route /img và bộ ủ chương (cùng hàng đợi, cùng referer đã học).
+  const imageFetcher = deps.imageFetcher
+    ?? createImageFetcher({ fetchFn: deps.imageFetchFn ?? fetch, refererFor, altReferer, refererHints, limiter: imageLimiter });
 
   const cache = createImageCache({ dir: cacheDir, maxBytes: 2 * 1024 * 1024 * 1024 });
   mountImageProxy(app, {
-    fetchFn: deps.imageFetchFn ?? fetch,
     cache,
     isAllowed: (u) => imageHosts.allowed(u),
-    refererFor,
-    altReferer,
-    // Nhớ referer nào lấy được ảnh cho từng host CDN -> lần sau đi thẳng.
-    refererHints: { get: (u) => imageHosts.knownReferer(u), set: (u, r) => imageHosts.rememberReferer(u, r) },
-    limiter: imageLimiter,
+    fetcher: imageFetcher,
     archive,
     drive,
   });
+  // Mở trang đọc là máy chủ lặng lẽ ủ cả chương vào cache đĩa (làn nền).
+  const prewarm = deps.prewarm ?? createChapterPrewarm({ cache, fetcher: imageFetcher });
 
   const kv = createKvCache(db, { prefix: 'kv:' });
   // "Bộ này đọc được ở nguồn nào" — trang đọc dựng sẵn nút từ cache, /api tra khi cần.
@@ -130,7 +133,7 @@ export function buildApp(deps = {}) {
   // Chẩn đoán "vì sao ảnh vỡ" từ máy chủ — hết phải sửa mò.
   const imageDoctor = deps.imageDoctor
     ?? createImageDoctor({ source, imageHosts, refererFor, altReferer, fetchFn: deps.imageFetchFn ?? fetch });
-  app.locals.services = { db, source, novelSource, library, updates, archive, drive, settings, manager, prober, altSources, imageDoctor };
+  app.locals.services = { db, source, novelSource, library, updates, archive, drive, settings, manager, prober, altSources, imageDoctor, prewarm };
 
   // Link chi tiết theo loại: slug truyện chữ mang tiền tố "tf~" -> /chu/...
   app.locals.detailUrl = (slug) => (String(slug).startsWith('tf~') ? '/chu/' + slug.slice(3) : '/truyen/' + slug);

@@ -248,3 +248,48 @@ test('vẫn lấy được ảnh khi host đầu chết nhưng host dự phòng 
   const res = await a.get('/img?i=' + packImg(MIRRORED));
   assert.equal(res.status, 200);
 });
+
+/* ---------- Phân làn: ?bg=1 (nạp trước) phải đi làn nền, còn lại đi làn nhanh ---------- */
+
+test('/img xếp làn theo nhãn bg, và không để nhãn lây vào khoá cache', async () => {
+  const lanes = [];
+  const db = openDb(':memory:'); createSchema(db);
+  const app = buildApp({
+    passwordHash: hash, sessionSecret: 't', db,
+    cacheDir: mkdtempSync(join(tmpdir(), 'lane-')),
+    imageFetcher: { async get(url, { lane } = {}) { lanes.push([url, lane]); return { buf: Buffer.from('a'), contentType: 'image/jpeg' }; } },
+  });
+  const a = request.agent(app);
+  await a.post('/login').type('form').send({ password: 'secret123' });
+
+  const u1 = 'https://i178.truyenvua.com/1/2/0.jpg';
+  const u2 = 'https://i178.truyenvua.com/1/2/1.jpg';
+  assert.equal((await a.get('/img?i=' + packImg(u1))).status, 200);
+  assert.equal((await a.get('/img?i=' + packImg(u2) + '&bg=1')).status, 200);
+  assert.deepEqual(lanes, [[u1, 'fg'], [u2, 'bg']]);
+
+  // đã ủ bằng bg thì lượt xem thẳng sau đó trúng cache đĩa, không gọi lại CDN
+  lanes.length = 0;
+  assert.equal((await a.get('/img?i=' + packImg(u2))).status, 200);
+  assert.deepEqual(lanes, [], 'phải trúng cache, không được gọi CDN lần hai');
+});
+
+test('mở trang đọc thì máy chủ xếp hàng ủ cả chương (đúng key + URL gốc)', async () => {
+  const calls = [];
+  const db = openDb(':memory:'); createSchema(db);
+  const source = {
+    async detail() { return { slug: 's', name: 'S', thumbUrl: '', origin: '', content: '', status: 'ongoing', categories: [],
+      chapters: [{ name: '1', title: '', apiUrl: 'https://x/chuong-1', order: 0 }] }; },
+    async chapter() { return { images: [
+      { page: 0, url: 'https://sv1.otruyencdn.com/u/0.jpg' },
+      { page: 1, url: 'https://sv1.otruyencdn.com/u/1.jpg' },
+    ] }; },
+  };
+  const app = buildApp({ passwordHash: hash, sessionSecret: 't', db, source,
+    cacheDir: mkdtempSync(join(tmpdir(), 'pw-')),
+    prewarm: { queue: (key, urls) => calls.push([key, urls]) } });
+  const a = request.agent(app);
+  await a.post('/login').type('form').send({ password: 'secret123' });
+  await a.get('/doc/s/1');
+  assert.deepEqual(calls, [['s/1', ['https://sv1.otruyencdn.com/u/0.jpg', 'https://sv1.otruyencdn.com/u/1.jpg']]]);
+});
