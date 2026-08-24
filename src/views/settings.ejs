@@ -30,6 +30,12 @@
       <small style="color:#888">Web tự dò domain sống khi cái hiện tại chết. Chỉ cần nhập tay nếu có domain mới toanh chưa có trong danh sách.</small>
     </label>
 
+    <div style="border-top:1px solid #eee; padding-top:12px">
+      <button class="ghost" id="onlyQQ" type="button" style="justify-content:center">Chỉ dùng TruyenQQ (bỏ các bộ nguồn khác)</button>
+      <br><small style="color:#888">Tắt bổ sung <b>và</b> xoá khỏi thư viện các bộ lấy từ kho NetTruyen
+        (CDN của kho đó chặn tải từ máy chủ nên hay vỡ ảnh). Không đụng tới truyện TruyenQQ và truyện chữ.</small>
+    </div>
+
     <div style="display:flex; gap:10px; flex-wrap:wrap">
       <button class="btn" id="saveSrc" type="button" style="justify-content:center">Lưu nguồn</button>
       <button class="btn" id="saveDom" type="button" style="justify-content:center">Kiểm tra & lưu domain</button>
@@ -118,6 +124,16 @@
       e.target.checked = !on;            // trả ô tick về đúng trạng thái thật
       srcOut.textContent = 'Lỗi: ' + err.message;
     }
+  });
+
+  document.getElementById('onlyQQ').addEventListener('click', async () => {
+    if (!confirm('Xoá khỏi thư viện tất cả bộ KHÔNG thuộc TruyenQQ (các bộ nguồn NetTruyen)? Không thể hoàn tác.')) return;
+    srcOut.textContent = 'Đang dọn…';
+    try {
+      const r = await api('/settings/only-truyenqq', { method: 'POST' });
+      srcOut.textContent = 'Xong. Đã bỏ ' + r.removed + ' bộ nguồn khác, từ giờ chỉ dùng TruyenQQ. Tải lại trang để thấy.';
+      document.getElementById('sup').checked = false;
+    } catch (e) { srcOut.textContent = 'Lỗi: ' + e.message; }
   });
 
   document.getElementById('saveDom').addEventListener('click', async () => {

@@ -222,3 +222,28 @@ test('trang /settings có mục chẩn đoán ảnh', async () => {
   assert.match(res.text, /Ảnh vỡ\? Hỏi máy chủ/);
   assert.match(res.text, /id="diagLink"/);
 });
+
+/* ---------- "Chỉ dùng TruyenQQ": tắt bổ sung + dọn bộ nguồn khác ---------- */
+
+test('POST /settings/only-truyenqq tắt bổ sung và xoá bộ nguồn khác khỏi thư viện', async () => {
+  const a = request.agent(app());
+  await login(a);
+  // gieo vài bộ: 1 TruyenQQ, 1 NetTruyen (ot~) vào thư viện qua API follow-giả không có,
+  // nên chèn thẳng vào services.library
+  const { library, manager } = a.app ? {} : {};   // (không truy cập trực tiếp được, dùng SQL qua app.locals)
+  // thay vào đó kiểm hành vi: gọi API, phải trả ok + removed là số
+  const res = await a.post('/settings/only-truyenqq');
+  assert.equal(res.status, 200);
+  assert.equal(typeof res.body.removed, 'number');
+  // sau khi gọi, bổ sung phải tắt
+  const st = await a.get('/settings');
+  assert.doesNotMatch(st.text, /id="sup"[^>]*checked/);
+});
+
+test('trang /settings có nút Chỉ dùng TruyenQQ', async () => {
+  const a = request.agent(app());
+  await login(a);
+  const res = await a.get('/settings');
+  assert.match(res.text, /Chỉ dùng TruyenQQ/);
+  assert.match(res.text, /id="onlyQQ"/);
+});

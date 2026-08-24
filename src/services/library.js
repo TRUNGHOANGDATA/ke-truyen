@@ -127,5 +127,25 @@ export function createLibrary(db) {
       return db.prepare('SELECT slug FROM category_hits ORDER BY hits DESC, last_at DESC LIMIT ?')
         .all(n).map(r => r.slug);
     },
+
+    /**
+     * Dọn khỏi thư viện mọi truyện có slug mang một trong các TIỀN TỐ cho trước
+     * (dùng khi bỏ nguồn bổ sung: xoá các bộ ot~/nar~/nx~... không thuộc TruyenQQ).
+     * Xoá cả tiến độ đọc + mục lục đã lưu. Trả về số bộ đã xoá.
+     */
+    purgeByPrefixes(prefixes = []) {
+      const pres = prefixes.filter(Boolean);
+      if (!pres.length) return 0;
+      const slugs = db.prepare('SELECT slug FROM comics').all()
+        .map(r => r.slug).filter(sl => pres.some(p => sl.startsWith(p)));
+      const delC = db.prepare('DELETE FROM comics WHERE slug=?');
+      const delP = db.prepare('DELETE FROM reading_progress WHERE comic_slug=?');
+      const delCh = db.prepare('DELETE FROM chapters WHERE comic_slug=?');
+      const tx = db.transaction((list) => {
+        for (const sl of list) { delP.run(sl); delCh.run(sl); delC.run(sl); }
+      });
+      tx(slugs);
+      return slugs.length;
+    },
   };
 }

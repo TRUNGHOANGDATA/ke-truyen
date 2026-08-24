@@ -200,6 +200,23 @@ export function mountPages(app) {
     res.json({ ok: true, supplement: svc().manager.setSupplement(on) });
   });
 
+  /**
+   * "Chỉ dùng TruyenQQ": tắt bổ sung + DỌN các bộ nguồn khác khỏi thư viện. Lý do
+   * người dùng chọn cái này: CDN của kho NetTruyen chặn tải từ máy chủ (đo thật:
+   * dội 8 ảnh rớt 7), nên các bộ chỉ có ở đó đọc rất chật vật; bỏ cho gọn.
+   * Là hành động XOÁ nên chỉ chạy khi bấm nút, không tự động.
+   */
+  app.post('/settings/only-truyenqq', (req, res) => {
+    const { manager, library } = svc();
+    try {
+      // Tiền tố của mọi kho bổ sung (ot~, nar~, nx~...) — trừ nguồn chính TruyenQQ ('').
+      const prefixes = manager.comicSources().map(s => s.prefix).filter(Boolean);
+      const removed = library.purgeByPrefixes(prefixes);
+      manager.setSupplement(false);        // từ giờ duyệt/tìm chỉ ra bộ TruyenQQ
+      res.json({ ok: true, removed });
+    } catch (e) { res.status(502).json({ error: e.message }); }
+  });
+
   // Đổi domain TruyenQQ thủ công — kiểm tra sống trước khi lưu
   app.post('/settings/domain', async (req, res) => {
     const { manager } = svc();
