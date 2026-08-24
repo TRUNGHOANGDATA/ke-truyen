@@ -133,6 +133,31 @@ export function createLibrary(db) {
      * (dùng khi bỏ nguồn bổ sung: xoá các bộ ot~/nar~/nx~... không thuộc TruyenQQ).
      * Xoá cả tiến độ đọc + mục lục đã lưu. Trả về số bộ đã xoá.
      */
+    /**
+     * Dọn RÁC MỒ CÔI: truyện có tiền tố slug (dạng "xxx~") mà KHÔNG thuộc bộ tiền
+     * tố nào còn dùng -> không nguồn nào đọc được nữa. Xảy ra khi gỡ một kho
+     * (vd bỏ kho ot~ vì CDN chết). Chỉ xoá cái thật sự mồ côi nên an toàn chạy
+     * mỗi lần khởi động. Trả về số bộ đã dọn.
+     */
+    purgeOrphans(keepPrefixes = []) {
+      const keep = new Set(keepPrefixes.filter(Boolean));
+      const orphans = db.prepare('SELECT slug FROM comics').all().map(r => r.slug).filter(sl => {
+        const m = String(sl).match(/^([a-z0-9]+~)/i);
+        return m && !keep.has(m[1]);
+      });
+      return this.purgeByPrefixesExact(orphans);
+    },
+
+    /** Xoá đúng danh sách slug (nội bộ). */
+    purgeByPrefixesExact(slugs = []) {
+      if (!slugs.length) return 0;
+      const delC = db.prepare('DELETE FROM comics WHERE slug=?');
+      const delP = db.prepare('DELETE FROM reading_progress WHERE comic_slug=?');
+      const delCh = db.prepare('DELETE FROM chapters WHERE comic_slug=?');
+      db.transaction((list) => { for (const sl of list) { delP.run(sl); delCh.run(sl); delC.run(sl); } })(slugs);
+      return slugs.length;
+    },
+
     purgeByPrefixes(prefixes = []) {
       const pres = prefixes.filter(Boolean);
       if (!pres.length) return 0;

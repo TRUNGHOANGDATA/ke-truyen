@@ -43,10 +43,10 @@ export const config = {
    * Ghi đè bằng .env: NETTRUYEN_SITES=id|Nhãn|https://a.com|pre~,id2|...
    */
   NETTRUYEN_SITES: parseSites(process.env.NETTRUYEN_SITES) || [
-    { id: 'nettruyen', label: 'NetTruyen', base: process.env.NETTRUYEN_BASE || 'https://nettruyen.id', prefix: 'ot~', apiBase: 'https://nettruyen-api.clubc.org' },
-    { id: 'nettruyenar', label: 'NetTruyen 2', base: 'https://nettruyenar.com', prefix: 'nar~' },
-    { id: 'nettruyenx', label: 'NetTruyen 3', base: 'https://nettruyenx.net', prefix: 'nx~' },
-    { id: 'nettruyenco', label: 'NetTruyen 4', base: 'https://nettruyen.co.com', prefix: 'nco~' },
+    // KHÔNG dùng nettruyen.id (prefix ot~): CDN images.truyenonline.cc chặn tải từ
+    // máy chủ (đo thật: dội 8 ảnh rớt 7, giãn nhịp 2.5s vẫn 0/5). Hai kho dưới CDN khoẻ.
+    { id: 'nettruyenar', label: 'NetTruyen', base: 'https://nettruyenar.com', prefix: 'nar~' },
+    { id: 'nettruyenx', label: 'NetTruyen 2', base: 'https://nettruyenx.net', prefix: 'nx~' },
   ],
   // Ứng viên để trang Cài đặt bấm "dò từ máy chủ" (máy ở nhà hay bị chặn, máy chủ thì không).
   PROBE_CANDIDATES: (process.env.PROBE_CANDIDATES ||
@@ -66,6 +66,7 @@ export const IMAGE_HOSTS = [
   // OTruyen / NetTruyen (kho bổ sung: bìa + ảnh chương)
   'img.otruyenapi.com', 'otruyencdn.com', 'sv1.otruyencdn.com',
   'nettruyen-api.clubc.org', 'images.truyenonline.cc', 'truyenonline.cc', 'nettruyen.id',
+  'cloud-zzz.com', 'kptackpte.com', 'nettruyenar.com', 'nettruyenx.net',   // CDN nar~/nx~
   // TruyenQQ (bìa + ảnh chương)
   'truyenvua.com', 'hinhhinh.com', 'tintruyen.net', 'truyenqqko.com', 'hinhtruyen.com',
   // Truyện chữ (chỉ ảnh bìa; nhiều host: CDN riêng, 8cache, ảnh Google Drive)

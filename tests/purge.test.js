@@ -32,3 +32,25 @@ test('purgeByPrefixes rỗng thì không xoá gì', () => {
   assert.equal(lib.purgeByPrefixes([]), 0);
   assert.equal(db.prepare('SELECT COUNT(*) n FROM comics').get().n, 1);
 });
+
+test('purgeOrphans xoá slug tiền tố lạ (kho đã gỡ), giữ TruyenQQ + truyện chữ + kho còn dùng', () => {
+  const db = openDb(':memory:'); createSchema(db);
+  const lib = createLibrary(db);
+  ['nguyen-ton-3755', 'ot~dai-duong', 'ot~bien-hoang', 'nar~con-lai', 'nx~abc', 'tf~chu'].forEach(s => {
+    db.prepare('INSERT INTO comics (slug,name,followed,followed_at) VALUES (?,?,1,?)').run(s, 'B', Date.now());
+  });
+  // Sau khi bỏ kho ot~: chỉ còn nar~, nx~ (và truyện chữ tf~)
+  const removed = lib.purgeOrphans(['nar~', 'nx~', 'tf~']);
+  assert.equal(removed, 2, 'xoá 2 bộ ot~ mồ côi');
+  const left = db.prepare('SELECT slug FROM comics ORDER BY slug').all().map(r => r.slug);
+  assert.deepEqual(left, ['nar~con-lai', 'nguyen-ton-3755', 'nx~abc', 'tf~chu']);
+});
+
+test('purgeOrphans không đụng gì khi mọi tiền tố đều còn dùng', () => {
+  const db = openDb(':memory:'); createSchema(db);
+  const lib = createLibrary(db);
+  ['abc-123', 'nar~x', 'tf~y'].forEach(s =>
+    db.prepare('INSERT INTO comics (slug,name,followed,followed_at) VALUES (?,?,1,?)').run(s, 'B', Date.now()));
+  assert.equal(lib.purgeOrphans(['nar~', 'nx~', 'tf~']), 0);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM comics').get().n, 3);
+});
