@@ -168,3 +168,68 @@ test('/img đổi sang host dự phòng khi host chính lỗi (ảnh chương kh
   assert.equal(res.status, 200);                 // lấy được nhờ đổi sang otruyencdn.com
   assert.equal(res.headers['content-type'], 'image/jpeg');
 });
+
+/* ---------- Ảnh hỏng phải BỎ SỚM, không quét hết ma trận host × referer ----------
+   Từng có lỗi: một ảnh chết ngốn 80 giây rồi mới 502, kéo sập tốc độ đọc cả chương. */
+
+function proxyApp(imageFetchFn) {
+  const db = openDb(':memory:'); createSchema(db);
+  return buildApp({
+    passwordHash: hash, sessionSecret: 't', db, imageFetchFn,
+    cacheDir: mkdtempSync(join(tmpdir(), 'imgb-')),
+    // 4 nguồn -> referersFor() dài, đúng tình huống đã gây chậm
+    manager: { comicSources: () => ['a', 'b', 'c', 'd'].map((x, i) => ({
+      id: x, label: x, prefix: i ? x + '~' : '', src: { getBase: () => `https://nguon${i}.com` } })) },
+  });
+}
+async function authedProxy(fetchFn) {
+  const a = request.agent(proxyApp(fetchFn));
+  await a.post('/login').type('form').send({ password: 'secret123' });
+  return a;
+}
+// host có bản sao: images.truyenonline.cc <-> sv1.otruyencdn.com <-> otruyencdn.com
+const MIRRORED = 'https://images.truyenonline.cc/u/chapter_1/page_1.jpg';
+
+test('host không phản hồi: mỗi host thử ĐÚNG 1 lần, không lặp qua từng referer', async () => {
+  const tried = [];
+  const a = await authedProxy(async (u) => {
+    tried.push(new URL(u).hostname);
+    throw Object.assign(new Error('timeout'), { name: 'AbortError' });
+  });
+  const res = await a.get('/img?i=' + packImg(MIRRORED));
+  assert.equal(res.status, 502);
+  assert.deepEqual(tried, ['images.truyenonline.cc', 'sv1.otruyencdn.com', 'otruyencdn.com'],
+    'phải sang host khác ngay, không thử lại referer trên host đã chết');
+});
+
+test('lỗi không phải hotlink (404): cũng đổi host luôn, không đổi referer', async () => {
+  const tried = [];
+  const a = await authedProxy(async (u) => {
+    tried.push(new URL(u).hostname);
+    return { ok: false, status: 404, headers: { get: () => 'text/html' }, arrayBuffer: async () => new ArrayBuffer(0) };
+  });
+  const res = await a.get('/img?i=' + packImg(MIRRORED));
+  assert.equal(res.status, 502);
+  assert.equal(tried.length, 3, 'đúng 3 host, mỗi host 1 lần');
+});
+
+test('403 (chặn hotlink) thì MỚI thử referer khác trên cùng host', async () => {
+  const perHost = new Map();
+  const a = await authedProxy(async (u) => {
+    const h = new URL(u).hostname;
+    perHost.set(h, (perHost.get(h) || 0) + 1);
+    return { ok: false, status: 403, headers: { get: () => 'text/html' }, arrayBuffer: async () => new ArrayBuffer(0) };
+  });
+  await a.get('/img?i=' + packImg(MIRRORED));
+  assert.ok(perHost.get('images.truyenonline.cc') > 1,
+    'bị 403 thì phải thử thêm referer, thấy: ' + perHost.get('images.truyenonline.cc'));
+});
+
+test('vẫn lấy được ảnh khi host đầu chết nhưng host dự phòng sống', async () => {
+  const a = await authedProxy(async (u) => {
+    if (new URL(u).hostname === 'images.truyenonline.cc') throw new Error('chết');
+    return { ok: true, status: 200, headers: { get: () => 'image/jpeg' }, arrayBuffer: async () => new Uint8Array([7]).buffer };
+  });
+  const res = await a.get('/img?i=' + packImg(MIRRORED));
+  assert.equal(res.status, 200);
+});

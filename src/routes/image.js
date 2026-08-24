@@ -13,6 +13,11 @@ export function isAllowedHost(url, allowSuffixes) {
   return allowSuffixes.some(s => host === s || host.endsWith('.' + s) || host.endsWith(s));
 }
 
+// Một lời gọi /img không bao giờ được vượt quá ngần này, kể cả khi phải thử
+// nhiều host/referer — người đọc thà thấy ảnh lỗi còn hơn ngồi chờ.
+const TOTAL_BUDGET_MS = 14000;
+const ATTEMPT_MS = 7000;
+
 export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes, isAllowed, refererFor, altReferer, refererHints, archive, drive }) {
   const allow = isAllowed || ((u) => isAllowedHost(u, allowSuffixes || []));
   app.get('/img', async (req, res) => {
@@ -86,19 +91,32 @@ export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes, is
       return [...new Set(list.filter(Boolean))];
     }
 
-    // Thử lần lượt: từng host mirror × từng referer, tới khi lấy được ảnh.
+    // Thử host × referer, nhưng KHÔNG quét hết ma trận: đổi referer chỉ có nghĩa
+    // khi CDN chặn hotlink (401/403). Host chết/timeout thì referer nào cũng vậy
+    // -> sang host khác ngay. Không có luật này, một ảnh chết ngốn hàng chục giây
+    // (đo thật: 80s rồi mới 502) và kéo sập tốc độ đọc cả chương.
+    const deadline = Date.now() + TOTAL_BUDGET_MS;
     const candidates = candidatesFor(url);
+    nextHost:
     for (const u of candidates) {
       for (const ref of referersFor(u)) {
+        const left = deadline - Date.now();
+        if (left < 700) break nextHost;               // hết giờ: thà báo lỗi sớm
+        let upstream;
         try {
-          const upstream = await fetchOnce(u, ref, 8000);
-          if (!upstream.ok) continue;      // referer/host này chưa được -> thử tiếp
+          upstream = await fetchOnce(u, ref, Math.min(ATTEMPT_MS, left));
+        } catch {
+          continue nextHost;                          // host không phản hồi
+        }
+        if (upstream.ok) {
           const contentType = upstream.headers.get('content-type') || 'image/jpeg';
           const buf = Buffer.from(await upstream.arrayBuffer());
           refererHints?.set?.(u, ref);        // nhớ tổ hợp vừa ăn -> ảnh sau đi thẳng
           cache.put(url, buf, contentType);   // cache theo URL gốc
           return send(buf, contentType);
-        } catch { /* thử tổ hợp kế tiếp */ }
+        }
+        // Chỉ 401/403 mới là "chặn hotlink" -> đáng thử referer khác.
+        if (upstream.status !== 401 && upstream.status !== 403) continue nextHost;
       }
     }
     return res.status(502).end();
