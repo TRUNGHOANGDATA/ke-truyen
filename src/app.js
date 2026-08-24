@@ -15,6 +15,7 @@ import { createImageHosts } from './services/image-hosts.js';
 import { createSiteProber } from './services/site-prober.js';
 import { createKvCache } from './services/kv-cache.js';
 import { createAltSources } from './services/alt-sources.js';
+import { createImageDoctor } from './services/image-doctor.js';
 import { createTruyenfullSource } from './source/truyenfull.js';
 import { createLibrary } from './services/library.js';
 import { createUpdates } from './services/updates.js';
@@ -91,22 +92,24 @@ export function buildApp(deps = {}) {
   });
   const archive = createArchive({ db, drive, source, fetchFn: deps.imageFetchFn ?? fetch });
 
+  // Referer dự phòng = base của MỌI nguồn đang đăng ký. CDN ảnh của các nguồn
+  // đều chống hotlink theo đúng trang của họ, nên khi nguồn đổi host ảnh (hoặc
+  // khi thêm nguồn mới) thì ảnh vẫn lấy được, không cần sửa code.
+  const altReferer = () => {
+    const qq = (settings.get('truyenqq_base', config.TRUYENQQ_BASE) || config.TRUYENQQ_BASE || '').replace(/\/+$/, '');
+    const bases = (manager.comicSources?.() || [])
+      .map(s => { try { return s.src.getBase?.(); } catch { return ''; } })
+      .filter(Boolean).map(b => String(b).replace(/\/+$/, ''));
+    return [...new Set([qq, ...bases])].filter(Boolean).map(b => b + '/');
+  };
+
   const cache = createImageCache({ dir: cacheDir, maxBytes: 2 * 1024 * 1024 * 1024 });
   mountImageProxy(app, {
     fetchFn: deps.imageFetchFn ?? fetch,
     cache,
     isAllowed: (u) => imageHosts.allowed(u),
     refererFor,
-    // Referer dự phòng = base của MỌI nguồn đang đăng ký. CDN ảnh của các nguồn
-    // đều chống hotlink theo đúng trang của họ, nên khi nguồn đổi host ảnh (hoặc
-    // khi thêm nguồn mới) thì ảnh vẫn lấy được, không cần sửa code.
-    altReferer: () => {
-      const qq = (settings.get('truyenqq_base', config.TRUYENQQ_BASE) || config.TRUYENQQ_BASE || '').replace(/\/+$/, '');
-      const bases = (manager.comicSources?.() || [])
-        .map(s => { try { return s.src.getBase?.(); } catch { return ''; } })
-        .filter(Boolean).map(b => String(b).replace(/\/+$/, ''));
-      return [...new Set([qq, ...bases])].filter(Boolean).map(b => b + '/');
-    },
+    altReferer,
     // Nhớ referer nào lấy được ảnh cho từng host CDN -> lần sau đi thẳng.
     refererHints: { get: (u) => imageHosts.knownReferer(u), set: (u, r) => imageHosts.rememberReferer(u, r) },
     archive,
@@ -119,7 +122,10 @@ export function buildApp(deps = {}) {
   mountApi(app, { source, novelSource, library, updates, cacheDir, archive, drive, refererFor, altSources });
   // Dò nguồn TỪ MÁY CHỦ (máy ở nhà hay bị nhà mạng chặn nên dò ở đó không tin được).
   const prober = deps.prober ?? createSiteProber();
-  app.locals.services = { db, source, novelSource, library, updates, archive, drive, settings, manager, prober, altSources };
+  // Chẩn đoán "vì sao ảnh vỡ" từ máy chủ — hết phải sửa mò.
+  const imageDoctor = deps.imageDoctor
+    ?? createImageDoctor({ source, imageHosts, refererFor, altReferer, fetchFn: deps.imageFetchFn ?? fetch });
+  app.locals.services = { db, source, novelSource, library, updates, archive, drive, settings, manager, prober, altSources, imageDoctor };
 
   // Link chi tiết theo loại: slug truyện chữ mang tiền tố "tf~" -> /chu/...
   app.locals.detailUrl = (slug) => (String(slug).startsWith('tf~') ? '/chu/' + slug.slice(3) : '/truyen/' + slug);

@@ -72,6 +72,21 @@ xử lý bằng hai lớp TỰ HỌC trong [src/services/image-hosts.js](src/ser
   **mọi nguồn đang đăng ký** (`manager.comicSources()`). Tổ hợp nào lấy được ảnh thì nhớ
   lại theo host, ảnh sau đi thẳng (đo thật: 4852ms → 1323ms).
 
+**Vòng thử host × referer — hai cái bẫy ĐÃ SẬP, đừng lặp lại:**
+1. *Đừng quét cả ma trận.* 3 host × 5 referer × 8s = một ảnh chết ngốn **80 giây thật đo được**,
+   kéo sập cả chương (reader tải trước 4 ảnh cùng lúc). Có `TOTAL_BUDGET_MS` chặn trần, và
+   lỗi **tầng mạng** (không nối được/quá hạn) thì bỏ luôn host đó, không thử referer khác.
+2. *Đừng đoán mã nào là "chặn hotlink".* Từng thu hẹp thành `401/403` → CDN từ chối bằng 404
+   thì không bao giờ tới được referer đúng, **ảnh vỡ sạch**. Quy tắc đúng: máy chủ CÓ trả lời
+   (mã gì cũng được) = host còn sống = đáng thử referer tiếp.
+
+**Chẩn đoán ảnh vỡ:** [src/services/image-doctor.js](src/services/image-doctor.js)
+`createImageDoctor` + `POST /settings/diagnose-image` (mục "Ảnh vỡ? Hỏi máy chủ"). Dán link
+chương lỗi → máy chủ lấy ảnh đầu, thử từng tổ hợp, báo **nguyên văn mã trả về**. Phân biệt
+"CDN chết hẳn" với "chặn hotlink" — nhìn từ trình duyệt thì giống hệt, mà cách chữa khác hẳn.
+Dùng lại `buildReferers`/`mirrorsFor` export từ [image.js](src/routes/image.js) nên thử đúng
+cái proxy thật sự thử.
+
 **Lưu offline (Google Drive):** [src/storage/drive.js](src/storage/drive.js) (OAuth refresh
 token, scope `drive.file`) + [src/services/archive.js](src/services/archive.js) (`archiveComic`
 chạy nền, resume được, bỏ qua ảnh lỗi sau 3 lần thử). Nút "⬇ Lưu offline" ở **trang chi

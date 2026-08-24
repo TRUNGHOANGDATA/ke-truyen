@@ -227,6 +227,26 @@ export function mountPages(app) {
     } catch (e) { res.status(502).json({ error: e.message }); }
   });
 
+  /**
+   * Chẩn đoán "vì sao ảnh vỡ" TỪ MÁY CHỦ. Dán link chương đang lỗi vào; máy chủ
+   * lấy ảnh đầu của chương rồi thử từng tổ hợp host x referer, báo lại nguyên văn
+   * mã trả về. Phân biệt được "CDN chết hẳn" với "chặn hotlink" — hai thứ chữa
+   * khác nhau, mà nhìn từ trình duyệt thì giống hệt nhau.
+   */
+  app.post('/settings/diagnose-image', async (req, res) => {
+    const doctor = svc().imageDoctor;
+    if (!doctor) return res.status(400).json({ error: 'Chưa có công cụ chẩn đoán' });
+    const raw = String(req.body.link || '').trim();
+    if (!raw) return res.status(400).json({ error: 'Dán link chương đang lỗi vào đây' });
+    try {
+      // Chấp nhận cả URL đầy đủ lẫn đường dẫn: /doc/<slug>/<chương>
+      const path = raw.replace(/^https?:\/\/[^/]+/i, '');
+      const m = path.match(/\/doc\/([^/?#]+)\/([^/?#]+)/);
+      if (!m) return res.status(400).json({ error: 'Không nhận ra link chương (dạng /doc/<truyện>/<chương>)' });
+      res.json({ ok: true, ...await doctor.diagnoseChapter(decodeURIComponent(m[1]), decodeURIComponent(m[2])) });
+    } catch (e) { res.status(502).json({ error: String(e.message || e) }); }
+  });
+
   // Tự dò lại domain sống ngay lập tức
   app.post('/settings/reprobe', async (req, res) => {
     try {

@@ -202,18 +202,33 @@ test('host không phản hồi: mỗi host thử ĐÚNG 1 lần, không lặp qu
     'phải sang host khác ngay, không thử lại referer trên host đã chết');
 });
 
-test('lỗi không phải hotlink (404): cũng đổi host luôn, không đổi referer', async () => {
-  const tried = [];
-  const a = await authedProxy(async (u) => {
-    tried.push(new URL(u).hostname);
-    return { ok: false, status: 404, headers: { get: () => 'text/html' }, arrayBuffer: async () => new ArrayBuffer(0) };
+// Mỗi CDN từ chối hotlink một kiểu (403, 404, 429, trang lỗi...). Từng có lỗi:
+// chỉ coi 401/403 là "đáng thử referer khác" -> CDN từ chối bằng 404 thì không
+// bao giờ tới được referer đúng, ảnh vỡ sạch.
+for (const status of [403, 404, 429, 500]) {
+  test(`host trả lời ${status}: van thử referer khác trên chính host đó`, async () => {
+    const perHost = new Map();
+    const a = await authedProxy(async (u) => {
+      const h = new URL(u).hostname;
+      perHost.set(h, (perHost.get(h) || 0) + 1);
+      return { ok: false, status, headers: { get: () => 'text/html' }, arrayBuffer: async () => new ArrayBuffer(0) };
+    });
+    await a.get('/img?i=' + packImg(MIRRORED));
+    assert.ok(perHost.get('images.truyenonline.cc') > 1,
+      `host con song thi phai quet them referer, thay: ${perHost.get('images.truyenonline.cc')}`);
   });
+}
+
+test('CDN từ chối bằng 404 nhưng đúng referer thì cho ảnh -> vẫn phải lấy được', async () => {
+  const OK_REF = 'https://nguon2.com/';
+  const a = await authedProxy(async (_u, opts) => (opts.headers.Referer === OK_REF
+    ? { ok: true, status: 200, headers: { get: () => 'image/jpeg' }, arrayBuffer: async () => new Uint8Array([5]).buffer }
+    : { ok: false, status: 404, headers: { get: () => 'text/html' }, arrayBuffer: async () => new ArrayBuffer(0) }));
   const res = await a.get('/img?i=' + packImg(MIRRORED));
-  assert.equal(res.status, 502);
-  assert.equal(tried.length, 3, 'đúng 3 host, mỗi host 1 lần');
+  assert.equal(res.status, 200, 'phải quét tới referer đúng chứ không bỏ host sớm');
 });
 
-test('403 (chặn hotlink) thì MỚI thử referer khác trên cùng host', async () => {
+test('403 thì thử referer khác trên cùng host', async () => {
   const perHost = new Map();
   const a = await authedProxy(async (u) => {
     const h = new URL(u).hostname;

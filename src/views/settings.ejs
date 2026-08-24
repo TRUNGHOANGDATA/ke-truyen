@@ -74,6 +74,18 @@
 </div>
 
 <div class="box">
+  <div class="boxhead"><h2>Ảnh vỡ? Hỏi máy chủ</h2></div>
+  <div style="padding:14px; display:flex; flex-direction:column; gap:12px; max-width:760px">
+    <small style="color:#888">Dán link chương đang lỗi vào đây. Máy chủ sẽ lấy ảnh đầu của chương rồi thử
+      từng tổ hợp host và referer, báo lại nguyên văn mã trả về — để biết CDN của nguồn chết hẳn hay chỉ
+      chặn hotlink. Nhìn từ trình duyệt thì hai thứ giống hệt nhau, nhưng cách chữa khác hẳn.</small>
+    <input id="diagLink" class="field" type="text" spellcheck="false" placeholder="/doc/ten-truyen/19">
+    <div><button class="btn" id="diagBtn" type="button" style="justify-content:center">Chẩn đoán</button></div>
+    <div id="diagOut"></div>
+  </div>
+</div>
+
+<div class="box">
   <div class="boxhead"><h2>Đổi mật khẩu</h2></div>
   <div style="padding:14px; display:flex; flex-direction:column; gap:10px; max-width:420px">
     <input id="cur" class="field" type="password" placeholder="Mật khẩu hiện tại" autocomplete="current-password">
@@ -154,6 +166,32 @@
         + '</tbody></table>';
     } catch (e) { probeOut.innerHTML = '<div class="sysbox">Lỗi: ' + esc(e.message) + '</div>'; }
     finally { probeBtn.disabled = false; }
+  });
+
+  // Chẩn đoán ảnh vỡ: bày ra đúng những gì máy chủ nhận được, không diễn giải thêm.
+  const diagBtn = document.getElementById('diagBtn');
+  const diagOut = document.getElementById('diagOut');
+  diagBtn.addEventListener('click', async () => {
+    diagBtn.disabled = true;
+    diagOut.innerHTML = '<div class="sysbox">Máy chủ đang thử tải ảnh…</div>';
+    try {
+      const r = await api('/settings/diagnose-image', { method: 'POST',
+        body: JSON.stringify({ link: document.getElementById('diagLink').value }) });
+      if (r.error) { diagOut.innerHTML = '<div class="sysbox">' + esc(r.error) + '</div>'; return; }
+      const rows = (r.attempts || []).map(a =>
+        '<tr><td>' + esc(a.host) + '</td><td>' + esc(a.referer) + '</td><td>'
+        + (a.ok ? '<b style="color:#1a7f37">OK ' + a.bytes + ' byte</b>'
+                : '<span style="color:#b42318">' + esc(a.error || ('HTTP ' + a.status)) + '</span>')
+        + '</td><td>' + a.ms + 'ms</td></tr>').join('');
+      diagOut.innerHTML =
+        '<div class="sysbox">' + esc(r.comic || '') + (r.chapter ? ' · chương ' + esc(r.chapter) : '')
+          + (r.imageCount ? ' · ' + r.imageCount + ' ảnh' : '')
+          + (r.allowed === false ? '<br><b>Host ảnh này chưa được proxy cho qua.</b>' : '')
+          + '<br>' + esc(r.verdict || '') + '</div>'
+        + (rows ? '<table class="probe"><thead><tr><th>Host</th><th>Referer đã thử</th><th>Kết quả</th><th>Thời gian</th></tr></thead><tbody>'
+            + rows + '</tbody></table>' : '');
+    } catch (e) { diagOut.innerHTML = '<div class="sysbox">Lỗi: ' + esc(e.message) + '</div>'; }
+    finally { diagBtn.disabled = false; }
   });
 
   document.getElementById('save').addEventListener('click', async () => {

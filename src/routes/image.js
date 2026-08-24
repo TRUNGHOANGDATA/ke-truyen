@@ -13,6 +13,41 @@ export function isAllowedHost(url, allowSuffixes) {
   return allowSuffixes.some(s => host === s || host.endsWith('.' + s) || host.endsWith(s));
 }
 
+/**
+ * Danh sách referer để thử, theo thứ tự rẻ nhất trước:
+ *  1. referer ĐÃ HỌC cho host này (lần trước lấy được ảnh) -> thường trúng ngay;
+ *  2. referer mặc định theo host;
+ *  3. base của các nguồn đang đăng ký (CDN của họ chống hotlink theo đúng trang
+ *     nguồn — nên khi nguồn đổi host ảnh, ảnh vẫn không vỡ).
+ * Tách ra ngoài để trang chẩn đoán thử ĐÚNG những gì proxy thật sự thử.
+ */
+export function buildReferers(u, { refererFor, altReferer, refererHints } = {}) {
+  const list = [];
+  const known = refererHints?.get?.(u);
+  if (known) list.push(known);
+  try { list.push(refererFor ? refererFor(u) : new URL(u).origin + '/'); } catch { /* URL lạ */ }
+  const alt = typeof altReferer === 'function' ? altReferer() : altReferer;
+  for (const a of [].concat(alt || [])) if (a) list.push(a);
+  return [...new Set(list.filter(Boolean))];
+}
+
+/** Các host mang cùng đường dẫn ảnh — host này chết thì thử host kia. */
+export const MIRROR_HOSTS = ['images.truyenonline.cc', 'sv1.otruyencdn.com', 'otruyencdn.com'];
+
+export function mirrorsFor(u) {
+  const list = [u];
+  try {
+    const parsed = new URL(u);
+    if (MIRROR_HOSTS.includes(parsed.hostname)) {
+      for (const h of MIRROR_HOSTS) {
+        if (h === parsed.hostname) continue;
+        const alt = new URL(u); alt.hostname = h; list.push(alt.href);
+      }
+    }
+  } catch { /* URL lạ: chỉ dùng nguyên bản */ }
+  return list;
+}
+
 // Một lời gọi /img không bao giờ được vượt quá ngần này, kể cả khi phải thử
 // nhiều host/referer — người đọc thà thấy ảnh lỗi còn hơn ngồi chờ.
 const TOTAL_BUDGET_MS = 14000;
@@ -51,22 +86,7 @@ export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes, is
       Accept: 'image/avif,image/webp,image/*,*/*;q=0.8',
     };
 
-    // Ảnh chương kho bổ sung có mặt trên nhiều host cùng đường dẫn; nếu host này
-    // chậm/chết thì thử host kia (giảm "mất ảnh" khi 1 CDN chập chờn từ máy chủ).
-    const MIRRORS = ['images.truyenonline.cc', 'sv1.otruyencdn.com', 'otruyencdn.com'];
-    function candidatesFor(u) {
-      const list = [u];
-      try {
-        const parsed = new URL(u);
-        if (MIRRORS.includes(parsed.hostname)) {
-          for (const h of MIRRORS) {
-            if (h === parsed.hostname) continue;
-            const alt = new URL(u); alt.hostname = h; list.push(alt.href);
-          }
-        }
-      } catch { /* URL lạ: chỉ dùng nguyên bản */ }
-      return list;
-    }
+    const candidatesFor = mirrorsFor;
 
     async function fetchOnce(u, referer, timeoutMs) {
       const ctrl = new AbortController();
@@ -76,25 +96,13 @@ export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes, is
       } finally { clearTimeout(t); }
     }
 
-    // Danh sách referer để thử, theo thứ tự rẻ nhất trước:
-    //  1. referer ĐÃ HỌC cho host này (lần trước lấy được ảnh) -> thường trúng ngay;
-    //  2. referer mặc định theo host;
-    //  3. base của các nguồn đang đăng ký (CDN của họ chống hotlink theo đúng trang
-    //     nguồn — nên khi nguồn đổi host ảnh, ảnh vẫn không vỡ).
-    function referersFor(u) {
-      const list = [];
-      const known = refererHints?.get?.(u);
-      if (known) list.push(known);
-      list.push(refererFor ? refererFor(u) : new URL(u).origin + '/');
-      const alt = typeof altReferer === 'function' ? altReferer() : altReferer;
-      for (const a of [].concat(alt || [])) if (a) list.push(a);
-      return [...new Set(list.filter(Boolean))];
-    }
+    const referersFor = (u) => buildReferers(u, { refererFor, altReferer, refererHints });
 
-    // Thử host × referer, nhưng KHÔNG quét hết ma trận: đổi referer chỉ có nghĩa
-    // khi CDN chặn hotlink (401/403). Host chết/timeout thì referer nào cũng vậy
-    // -> sang host khác ngay. Không có luật này, một ảnh chết ngốn hàng chục giây
-    // (đo thật: 80s rồi mới 502) và kéo sập tốc độ đọc cả chương.
+    // Thử host × referer. Chia theo TẦNG LỖI, không theo mã HTTP:
+    //  - Không nối được / quá hạn  -> host chết, referer nào cũng vậy -> sang host khác.
+    //  - Có trả lời nhưng lỗi      -> host sống, có thể do referer -> thử referer tiếp.
+    // Nhờ vậy một host chết chỉ tốn 1 lần thử (trước đây 3 host x 5 referer x 8s
+    // = tới 80 giây thật đo được), mà vẫn quét đủ referer trên host còn sống.
     const deadline = Date.now() + TOTAL_BUDGET_MS;
     const candidates = candidatesFor(url);
     nextHost:
@@ -115,8 +123,9 @@ export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes, is
           cache.put(url, buf, contentType);   // cache theo URL gốc
           return send(buf, contentType);
         }
-        // Chỉ 401/403 mới là "chặn hotlink" -> đáng thử referer khác.
-        if (upstream.status !== 401 && upstream.status !== 403) continue nextHost;
+        // Máy chủ CÓ trả lời (dù mã gì) = host còn sống -> đáng thử referer khác.
+        // Đừng đoán mã nào là "chặn hotlink": mỗi CDN từ chối một kiểu (403, 404,
+        // 429, trang lỗi...). Đoán hẹp là không bao giờ tới được referer đúng.
       }
     }
     return res.status(502).end();

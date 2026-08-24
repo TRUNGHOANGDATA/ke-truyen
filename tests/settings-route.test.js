@@ -14,14 +14,14 @@ const hash = bcrypt.hashSync('secret123', 10);
 const PAGE_OK = '<html><head><title>Truyện tranh</title></head><body>' +
   'Thể loại <a href="/truyen-tranh/x-1">x</a>'.repeat(20) + '</body></html>';
 
-function app({ probeFetch, prober } = {}) {
+function app({ probeFetch, prober, imageDoctor } = {}) {
   const db = openDb(':memory:');
   createSchema(db);
   return buildApp({
     passwordHash: hash, sessionSecret: 't', db,
     cacheDir: mkdtempSync(join(tmpdir(), 'imgc-')),
     imageFetchFn: async () => ({ ok: true, status: 200, headers: { get: () => 'image/jpeg' }, arrayBuffer: async () => new Uint8Array([1]).buffer }),
-    probeFetch, prober,
+    probeFetch, prober, imageDoctor,
   });
 }
 
@@ -164,4 +164,61 @@ test('trang /settings hiện ô tick bổ sung theo trạng thái đang lưu', a
   await a.post('/settings/supplement').send({ on: false });
   const tat = await a.get('/settings');
   assert.doesNotMatch(tat.text, /id="sup"[^>]*checked/);
+});
+
+/* ---------- Chẩn đoán ảnh vỡ từ máy chủ ---------- */
+
+const fakeDoctor = (sink = []) => ({
+  async diagnoseChapter(slug, chap) {
+    sink.push([slug, chap]);
+    return { imageUrl: 'https://cdn/x.jpg', allowed: true, comic: 'Bộ Thử', chapter: chap, imageCount: 35,
+      attempts: [{ host: 'cdn', referer: 'https://a/', ok: false, status: 404, ms: 30 }],
+      verdict: 'Host còn sống nhưng từ chối hết (mã 404)' };
+  },
+  async diagnoseUrl() { return { attempts: [], verdict: '' }; },
+});
+
+test('POST /settings/diagnose-image bóc đúng slug + chương từ link đầy đủ', async () => {
+  const sink = [];
+  const a = request.agent(app({ imageDoctor: fakeDoctor(sink) }));
+  await login(a);
+  const res = await a.post('/settings/diagnose-image')
+    .send({ link: 'https://truyen.tradadata.com/doc/ot~dai-duong-song-long-truyen/19' });
+  assert.equal(res.status, 200);
+  assert.deepEqual(sink[0], ['ot~dai-duong-song-long-truyen', '19']);
+  assert.equal(res.body.verdict, 'Host còn sống nhưng từ chối hết (mã 404)');
+  assert.equal(res.body.attempts.length, 1);
+});
+
+test('POST /settings/diagnose-image nhận cả đường dẫn trống host', async () => {
+  const sink = [];
+  const a = request.agent(app({ imageDoctor: fakeDoctor(sink) }));
+  await login(a);
+  await a.post('/settings/diagnose-image').send({ link: '/doc/abc/7' });
+  assert.deepEqual(sink[0], ['abc', '7']);
+});
+
+test('POST /settings/diagnose-image từ chối link không phải trang đọc', async () => {
+  const a = request.agent(app({ imageDoctor: fakeDoctor() }));
+  await login(a);
+  const res = await a.post('/settings/diagnose-image').send({ link: 'https://truyen.tradadata.com/truyen/abc' });
+  assert.equal(res.status, 400);
+  assert.match(res.body.error, /Không nhận ra link chương/);
+});
+
+test('POST /settings/diagnose-image cần link, và cần đăng nhập', async () => {
+  const chua = await request(app()).post('/settings/diagnose-image').send({ link: '/doc/a/1' });
+  assert.equal(chua.status, 302);
+  const a = request.agent(app({ imageDoctor: fakeDoctor() }));
+  await login(a);
+  const res = await a.post('/settings/diagnose-image').send({ link: '' });
+  assert.equal(res.status, 400);
+});
+
+test('trang /settings có mục chẩn đoán ảnh', async () => {
+  const a = request.agent(app());
+  await login(a);
+  const res = await a.get('/settings');
+  assert.match(res.text, /Ảnh vỡ\? Hỏi máy chủ/);
+  assert.match(res.text, /id="diagLink"/);
 });
