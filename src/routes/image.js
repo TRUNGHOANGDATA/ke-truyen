@@ -34,6 +34,8 @@ export function buildReferers(u, { refererFor, altReferer, refererHints } = {}) 
 /** Các host mang cùng đường dẫn ảnh — host này chết thì thử host kia. */
 export const MIRROR_HOSTS = ['images.truyenonline.cc', 'sv1.otruyencdn.com', 'otruyencdn.com'];
 
+export const hostOf = (u) => { try { return new URL(u).hostname; } catch { return ''; } };
+
 export function mirrorsFor(u) {
   const list = [u];
   try {
@@ -103,12 +105,17 @@ export function createImageFetcher({ fetchFn = fetch, refererFor, altReferer, re
           } catch {
             continue nextHost;                        // host không phản hồi / làn nền bận
           }
+          const host = hostOf(u);
           if (upstream.ok) {
             const contentType = upstream.headers.get('content-type') || 'image/jpeg';
             const buf = Buffer.from(await upstream.arrayBuffer());
             refererHints?.set?.(u, ref);      // nhớ tổ hợp vừa ăn -> ảnh sau đi thẳng
+            if (host) limiter?.reward?.(host); // CDN trả ảnh ngon -> gỡ dần "ốm"
             return { buf, contentType };
           }
+          // 5xx/429 = CDN quá tải/chặn dội -> đánh dấu host "ốm" để tự siết nhịp
+          // (CDN NetTruyen chặn kiểu này; TruyenQQ không bao giờ 5xx nên không dính).
+          if (host && (upstream.status >= 500 || upstream.status === 429)) limiter?.penalize?.(host);
           // Máy chủ CÓ trả lời (dù mã gì) = host còn sống -> đáng thử referer khác.
           // Đừng đoán mã nào là "chặn hotlink": mỗi CDN từ chối một kiểu (403, 404,
           // 429, trang lỗi...). Đoán hẹp là không bao giờ tới được referer đúng.

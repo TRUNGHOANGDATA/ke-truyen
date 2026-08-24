@@ -44,7 +44,7 @@ test('việc ném lỗi vẫn nhả chỗ cho người sau (không kẹt hàng �
   let chay = false;
   await l.run('cdn.com', async () => { chay = true; });
   assert.equal(chay, true);
-  assert.deepEqual(l.stats('cdn.com'), { running: 0, queued: 0, bgRunning: 0 });
+  assert.deepEqual(l.stats('cdn.com'), { running: 0, queued: 0, bgRunning: 0, sick: false });
 });
 
 test('trả về đúng giá trị của việc', async () => {
@@ -67,7 +67,7 @@ test('chờ quá lâu thì cho đi luôn, thà chậm còn hơn treo', async () 
 test('dọn sạch sau khi xong, không rò bộ nhớ theo host', async () => {
   const l = createHostLimiter({ limit: 2 });
   await peakOf(l, 'cdn.com', 4, 2);
-  assert.deepEqual(l.stats('cdn.com'), { running: 0, queued: 0, bgRunning: 0 });
+  assert.deepEqual(l.stats('cdn.com'), { running: 0, queued: 0, bgRunning: 0, sick: false });
 });
 
 /* ---------- Hai làn: fg (ảnh đang nhìn) chen trước, bg (nạp trước) phải nhường ---------- */
@@ -112,4 +112,58 @@ test('fg và bg cộng lại vẫn không vượt limit tổng của host', asyn
   }, lane).catch(() => {});
   await Promise.all([job('fg'), job('fg'), job('fg'), job('bg'), job('bg')]);
   assert.equal(dinh, 2);
+});
+
+/* ---------- Tự siết theo sức khoẻ CDN: host hay 5xx thì hạ về 1 luồng + nghỉ ---------- */
+
+test('penalize -> host ốm chỉ cho 1 request một lúc (dù limit=3)', async () => {
+  const l = createHostLimiter({ limit: 3, cooldownMs: 0 });
+  l.penalize('sick.com');
+  let dangChay = 0, dinh = 0;
+  await Promise.all(Array.from({ length: 6 }, () => l.run('sick.com', async () => {
+    dangChay++; dinh = Math.max(dinh, dangChay); await sleep(10); dangChay--;
+  })));
+  assert.equal(dinh, 1, 'host ốm phải tuần tự');
+  assert.equal(l.stats('sick.com').sick, true);
+});
+
+test('host khoẻ không bị siết dù host khác đang ốm', async () => {
+  const l = createHostLimiter({ limit: 3, cooldownMs: 0 });
+  l.penalize('sick.com');
+  assert.equal(await peakOf(l, 'ok.com', 9), 3, 'host khoẻ vẫn full tốc');
+});
+
+test('host ốm: có khoảng NGHỈ giữa hai phát (cooldown)', async () => {
+  const l = createHostLimiter({ limit: 3, cooldownMs: 60 });
+  l.penalize('sick.com');
+  const mocs = [];
+  for (let i = 0; i < 3; i++) await l.run('sick.com', async () => { mocs.push(Date.now()); });
+  assert.ok(mocs[1] - mocs[0] >= 50, 'phát 2 phải cách phát 1 ~cooldown, thấy: ' + (mocs[1] - mocs[0]));
+  assert.ok(mocs[2] - mocs[1] >= 50, 'phát 3 cũng vậy');
+});
+
+test('reward đủ chuỗi OK thì khỏi ốm, chạy full tốc lại', async () => {
+  const l = createHostLimiter({ limit: 3, cooldownMs: 0, healAfter: 3 });
+  l.penalize('cdn.com');
+  assert.equal(l.stats('cdn.com').sick, true);
+  l.reward('cdn.com'); l.reward('cdn.com');
+  assert.equal(l.stats('cdn.com').sick, true, 'chưa đủ chuỗi thì vẫn ốm');
+  l.reward('cdn.com');
+  assert.equal(l.stats('cdn.com').sick, false, 'đủ 3 OK liên tiếp -> khỏi');
+  assert.equal(await peakOf(l, 'cdn.com', 6), 3);
+});
+
+test('một lần 5xx giữa chuỗi OK làm reset, phải ốm lại từ đầu', async () => {
+  const l = createHostLimiter({ cooldownMs: 0, healAfter: 3 });
+  l.penalize('cdn.com');
+  l.reward('cdn.com'); l.reward('cdn.com');   // 2/3
+  l.penalize('cdn.com');                       // rớt lại -> reset
+  l.reward('cdn.com'); l.reward('cdn.com');
+  assert.equal(l.stats('cdn.com').sick, true, 'mới 2 OL sau reset, chưa đủ');
+});
+
+test('reward host chưa từng ốm không gây lỗi', () => {
+  const l = createHostLimiter();
+  assert.doesNotThrow(() => l.reward('la.com'));
+  assert.equal(l.stats('la.com').sick, false);
 });

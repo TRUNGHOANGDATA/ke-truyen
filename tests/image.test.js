@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { openDb } from '../src/db/index.js';
 import { createSchema } from '../src/db/migrations.js';
 import { buildApp } from '../src/app.js';
-import { isAllowedHost, packImg, unpackImg } from '../src/routes/image.js';
+import { isAllowedHost, packImg, unpackImg, createImageFetcher } from '../src/routes/image.js';
 import { IMAGE_HOSTS, refererFor } from '../src/config.js';
 
 const hash = bcrypt.hashSync('secret123', 10);
@@ -292,4 +292,41 @@ test('mở trang đọc thì máy chủ xếp hàng ủ cả chương (đúng ke
   await a.post('/login').type('form').send({ password: 'secret123' });
   await a.get('/doc/s/1');
   assert.deepEqual(calls, [['s/1', ['https://sv1.otruyencdn.com/u/0.jpg', 'https://sv1.otruyencdn.com/u/1.jpg']]]);
+});
+
+/* ---------- Fetcher báo sức khoẻ CDN về limiter (tự siết host hay 5xx) ---------- */
+
+function fetcherWith(responder) {
+  const events = [];
+  const limiter = {
+    run: (host, fn) => fn(),
+    penalize: (h) => events.push(['penalize', h]),
+    reward: (h) => events.push(['reward', h]),
+  };
+  return { fx: createImageFetcher({ fetchFn: responder, refererFor, limiter }), events };
+}
+const okImg = () => ({ ok: true, status: 200, headers: { get: () => 'image/jpeg' }, arrayBuffer: async () => new Uint8Array([1]).buffer });
+
+test('CDN trả 502 -> penalize host đó', async () => {
+  const { fx, events } = fetcherWith(async () => ({ ok: false, status: 502, headers: { get: () => 'text/html' }, arrayBuffer: async () => new ArrayBuffer(0) }));
+  await fx.get('https://images.truyenonline.cc/a.jpg');
+  assert.ok(events.some(e => e[0] === 'penalize' && e[1] === 'images.truyenonline.cc'));
+});
+
+test('CDN trả 429 -> cũng penalize', async () => {
+  const { fx, events } = fetcherWith(async () => ({ ok: false, status: 429, headers: { get: () => 'text/html' }, arrayBuffer: async () => new ArrayBuffer(0) }));
+  await fx.get('https://x.cc/a.jpg');
+  assert.ok(events.some(e => e[0] === 'penalize'));
+});
+
+test('CDN trả ảnh OK -> reward host', async () => {
+  const { fx, events } = fetcherWith(async () => okImg());
+  await fx.get('https://truyenvua.com/a.jpg');
+  assert.deepEqual(events, [['reward', 'truyenvua.com']]);
+});
+
+test('403 (chặn hotlink) KHÔNG bị coi là ốm (đó là referer sai, không phải quá tải)', async () => {
+  const { fx, events } = fetcherWith(async () => ({ ok: false, status: 403, headers: { get: () => 'text/html' }, arrayBuffer: async () => new ArrayBuffer(0) }));
+  await fx.get('https://x.cc/a.jpg');
+  assert.ok(!events.some(e => e[0] === 'penalize'), '403 không được penalize');
 });
