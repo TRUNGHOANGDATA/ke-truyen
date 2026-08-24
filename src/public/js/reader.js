@@ -117,9 +117,11 @@ document.addEventListener('keydown', (e) => {
    Tra "bộ này có ở nguồn nào" ngay khi mở trang (không đợi bấm) rồi hiện nút,
    nên lúc ảnh lỗi là bấm đổi được liền. Máy chủ nhớ kết quả 12 tiếng nên các
    chương sau của cùng bộ hiện gần như tức thì. Chỉ hiện khi có TỪ 2 NGUỒN trở
-   lên — một nguồn thì chẳng có gì để chọn. */
+   lên — một nguồn thì chẳng có gì để chọn.
+   Máy chủ dựng sẵn được thì thôi (thường gặp): khỏi gọi lại, cũng khỏi chèn
+   muộn làm nhảy thanh header. */
 const srcPick = document.getElementById('srcPick');
-if (srcPick) (async function loadSources() {
+if (srcPick && !srcPick.children.length) (async function loadSources() {
   const name = pages.dataset.name || '';
   if (!name) return;
   try {

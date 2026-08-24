@@ -1,7 +1,6 @@
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { packImg } from './image.js';
-import { titleKey } from '../source/title-key.js';
 
 function dirSize(dir) {
   try {
@@ -11,57 +10,22 @@ function dirSize(dir) {
   } catch { return 0; }
 }
 
-/** Bộ này nằm ở nguồn nào, slug là gì. Nguồn lỗi thì bỏ qua. */
-async function resolveSlugs(sources, name, key) {
-  const out = [];
-  await Promise.all(sources.map(async (cs) => {
-    try {
-      const items = (await cs.src.search(name)).items || [];
-      const hit = items.find(i => titleKey(i.name) === key)
-        || items.find(i => titleKey(i.name).includes(key) || key.includes(titleKey(i.name)));
-      if (hit) out.push({ id: cs.id, slug: hit.slug });
-    } catch { /* nguồn lỗi thì bỏ qua */ }
-  }));
-  return out;
-}
-
-export function mountApi(app, { source, novelSource, library, updates, cacheDir, archive, drive, refererFor, manager, kv }) {
+export function mountApi(app, { source, novelSource, library, updates, cacheDir, archive, drive, refererFor, altSources }) {
   app.get('/api/library', (req, res) => res.json({ items: library.listFollowed() }));
-
-  // Bộ này có ở những nguồn nào -> nhớ 12 tiếng. Tra một lần phải gọi search()
-  // tới TỪNG nguồn (~3 giây) trong khi câu trả lời gần như cố định theo bộ truyện,
-  // nên không cache thì mỗi lần mở chương lại phải chờ.
-  const ALT_TTL = 12 * 60 * 60 * 1000;
 
   /**
    * Các nguồn đọc được bộ đang xem, kèm link CÙNG chương ở nguồn đó — để trang
    * đọc bày sẵn nút chọn nguồn. Nguồn đang đọc cũng có mặt (current: true) để
    * đánh dấu, vì slug của nó đã biết sẵn từ URL.
+   * Trang đọc thường đã có sẵn danh sách này trong HTML; endpoint chỉ dùng khi
+   * chưa kịp làm ấm cache (xem services/alt-sources.js).
    */
   app.get('/api/other-sources', async (req, res) => {
     const slug = String(req.query.slug || '');
     const name = String(req.query.name || '');
     const chapter = String(req.query.chapter || '');
-    if (!name || !manager?.comicSources) return res.json({ sources: [] });
-
-    const all = manager.comicSources();
-    // Nguồn đang đọc = nguồn có tiền tố khớp đầu slug ('' = nguồn chính).
-    const curPrefix = all.map(s => s.prefix).filter(Boolean).find(p => slug.startsWith(p)) || '';
-    const key = titleKey(name);
-    // Khoá cache mang danh sách nguồn: thêm/bớt nguồn thì bản cũ tự hết giá trị.
-    const cacheKey = `${all.map(s => s.id).join('+')}:${key}`;
-    const found = kv
-      ? await kv.wrap(cacheKey, ALT_TTL, () => resolveSlugs(all, name, key))
-      : await resolveSlugs(all, name, key);
-
-    const bySrc = new Map(found.map(f => [f.id, f.slug]));
-    const sources = all.map((cs, i) => {
-      const current = cs.prefix === curPrefix;
-      const s = current ? slug.slice(cs.prefix.length) : bySrc.get(cs.id);
-      if (!s) return null;                                  // nguồn này không có bộ đó
-      return { n: i + 1, id: cs.id, label: cs.label, current, url: `/doc/${cs.prefix}${s}/${encodeURIComponent(chapter)}` };
-    }).filter(Boolean);
-    res.json({ sources });
+    if (!name || !altSources) return res.json({ sources: [] });
+    res.json({ sources: await altSources.list(slug, name, chapter) });
   });
 
   // Danh sách URL ảnh (đã gói qua /img) của một chương — để reader tải trước

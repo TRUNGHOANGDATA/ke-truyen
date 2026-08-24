@@ -9,7 +9,16 @@
   <div class="ti"><div class="a"><%= name %></div><div class="b">Chương <%= chapterName %> · <%= images.length %> trang</div></div>
   <div class="sp"></div>
   <div class="rnav">
-    <div class="srcpick" id="srcPick" role="group" aria-label="Chọn nguồn" hidden></div>
+    <%
+      // Máy chủ đã biết bộ này có ở nguồn nào -> dựng sẵn dãy nút ngay trong HTML,
+      // khỏi chèn muộn bằng JS làm nhảy thanh header. Chưa biết thì reader.js tự tra.
+      const alts = (locals.altList && locals.altList.length >= 2) ? locals.altList : null;
+    %>
+    <div class="srcpick" id="srcPick" role="group" aria-label="Chọn nguồn" <%= alts ? '' : 'hidden' %>><% if (alts) { %>
+      <span class="sp-lb">Nguồn</span><% alts.forEach(s => { %><% if (s.current) { %>
+      <span class="sp-i on" title="<%= s.label %> (đang đọc)" aria-current="true"><%= s.n %></span><% } else { %>
+      <a class="sp-i" href="<%= s.url %>" title="Đọc từ <%= s.label %>"><%= s.n %></a><% } %><% }) %>
+    <% } %></div>
     <button class="txt-btn" id="autoBtn" type="button" aria-label="Tự cuộn" title="Tự cuộn">▶</button>
     <% if (prev) { %><a class="link" href="/doc/<%= slug %>/<%= encodeURIComponent(prev) %>"><button type="button">←<span class="lbl"> Chương trước</span></button></a><% } %>
     <% if (next) { %><a class="link" href="/doc/<%= slug %>/<%= encodeURIComponent(next) %>"><button class="pri" type="button"><span class="lbl">Chương sau </span>→</button></a><% } %>

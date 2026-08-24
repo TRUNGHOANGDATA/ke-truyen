@@ -130,3 +130,56 @@ test('/api/other-sources nhớ kết quả: chương sau của cùng bộ không
   assert.equal(ch1.body.sources[1].url, '/doc/ot~tu-dai-danh-bo/1');
   assert.equal(ch2.body.sources[1].url, '/doc/ot~tu-dai-danh-bo/2');
 });
+
+/* ---------- Nút chọn nguồn phải có sẵn TRONG HTML (không chèn muộn làm nhảy header) ---------- */
+
+function readerWith(altSources) {
+  const db = openDb(':memory:'); createSchema(db);
+  const detail = { slug: 's', name: 'S', thumbUrl: '', origin: '', content: '', status: 'ongoing', categories: [],
+    chapters: [{ name: '1', title: '', apiUrl: 'https://sv1.otruyencdn.com/v1/api/chapter/a', order: 0 }] };
+  const source = {
+    async detail() { return detail; },
+    async chapter() { return { images: [{ page: 0, url: 'https://sv1.otruyencdn.com/u/0.jpg' }] }; },
+  };
+  return buildApp({ passwordHash: hash, sessionSecret: 't', db, source, altSources,
+    cacheDir: mkdtempSync(join(tmpdir(), 'sp-')) });
+}
+
+const ALTS = [
+  { n: 1, id: 'truyenqq', label: 'TruyenQQ', current: true, url: '/doc/s/1' },
+  { n: 2, id: 'nettruyen', label: 'NetTruyen', current: false, url: '/doc/ot~s/1' },
+];
+
+test('đã ấm cache: trang đọc dựng sẵn dãy nút nguồn ngay trong HTML', async () => {
+  const a = request.agent(readerWith({ cached: () => ALTS, warm() {}, async list() { return ALTS; } }));
+  await a.post('/login').type('form').send({ password: 'secret123' });
+  const res = await a.get('/doc/s/1');
+  assert.equal(res.status, 200);
+  assert.doesNotMatch(res.text, /id="srcPick"[^>]*hidden/, 'phải hiện ngay, không bị hidden');
+  assert.match(res.text, /class="sp-i on"[^>]*>1</, 'nguồn đang đọc được đánh dấu');
+  assert.match(res.text, /href="\/doc\/ot~s\/1"[^>]*>2</, 'nguồn kia là link bấm được');
+});
+
+test('chưa ấm cache: để trống + ẩn, nhường JS tra sau (không dựng nút rỗng)', async () => {
+  const a = request.agent(readerWith({ cached: () => null, warm() {}, async list() { return ALTS; } }));
+  await a.post('/login').type('form').send({ password: 'secret123' });
+  const res = await a.get('/doc/s/1');
+  assert.match(res.text, /id="srcPick"[^>]*hidden/);
+  assert.doesNotMatch(res.text, /class="sp-i/);
+});
+
+test('chỉ một nguồn thì không bày nút (chẳng có gì để chọn)', async () => {
+  const one = [{ n: 1, id: 'truyenqq', label: 'TruyenQQ', current: true, url: '/doc/s/1' }];
+  const a = request.agent(readerWith({ cached: () => one, warm() {}, async list() { return one; } }));
+  await a.post('/login').type('form').send({ password: 'secret123' });
+  const res = await a.get('/doc/s/1');
+  assert.match(res.text, /id="srcPick"[^>]*hidden/);
+});
+
+test('mở trang chi tiết thì làm ấm sẵn danh sách nguồn cho trang đọc', async () => {
+  let warmed = null;
+  const a = request.agent(readerWith({ cached: () => null, warm: (name) => { warmed = name; }, async list() { return ALTS; } }));
+  await a.post('/login').type('form').send({ password: 'secret123' });
+  await a.get('/truyen/s');
+  assert.equal(warmed, 'S');
+});

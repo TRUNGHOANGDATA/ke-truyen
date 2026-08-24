@@ -238,6 +238,9 @@ export function mountPages(app) {
   app.get('/truyen/:slug', async (req, res) => {
     try {
       const detail = await svc().source.detail(req.params.slug);
+      // Làm ấm "bộ này có ở nguồn nào" (chạy nền, không giữ request): tới lúc
+      // bấm đọc thì trang đọc dựng sẵn được dãy nút chọn nguồn từ HTML.
+      svc().altSources?.warm(detail.name);
       const followed = svc().library.isFollowed(detail.slug);
       const progress = svc().library.getProgress(detail.slug);
       res.render('detail', {
@@ -280,9 +283,12 @@ export function mountPages(app) {
       const categories = detail
         ? detail.categories
         : (row?.categories || '').split(', ').filter(Boolean);
+      // Chỉ đọc cache: có sẵn thì nhúng thẳng dãy nút chọn nguồn vào HTML (không
+      // nhảy thanh header); chưa có thì để trang tự gọi /api/other-sources.
+      const altList = svcs.altSources?.cached(slug, name, chapterName) || null;
       res.render('reader', {
         title: `${name} — Chương ${chapterName}`,
-        slug, name, chapterName, images, prev, next, startPage,
+        slug, name, chapterName, images, prev, next, startPage, altList,
         total: chapters.length, index: idx,
         categories, author: detail?.author || '', status: detail?.status || row?.status || '',
       });

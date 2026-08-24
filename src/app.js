@@ -14,6 +14,7 @@ import { createSourceManager } from './services/source-manager.js';
 import { createImageHosts } from './services/image-hosts.js';
 import { createSiteProber } from './services/site-prober.js';
 import { createKvCache } from './services/kv-cache.js';
+import { createAltSources } from './services/alt-sources.js';
 import { createTruyenfullSource } from './source/truyenfull.js';
 import { createLibrary } from './services/library.js';
 import { createUpdates } from './services/updates.js';
@@ -113,10 +114,12 @@ export function buildApp(deps = {}) {
   });
 
   const kv = createKvCache(db, { prefix: 'kv:' });
-  mountApi(app, { source, novelSource, library, updates, cacheDir, archive, drive, refererFor, manager, kv });
+  // "Bộ này đọc được ở nguồn nào" — trang đọc dựng sẵn nút từ cache, /api tra khi cần.
+  const altSources = deps.altSources ?? createAltSources({ manager, kv });
+  mountApi(app, { source, novelSource, library, updates, cacheDir, archive, drive, refererFor, altSources });
   // Dò nguồn TỪ MÁY CHỦ (máy ở nhà hay bị nhà mạng chặn nên dò ở đó không tin được).
   const prober = deps.prober ?? createSiteProber();
-  app.locals.services = { db, source, novelSource, library, updates, archive, drive, settings, manager, prober };
+  app.locals.services = { db, source, novelSource, library, updates, archive, drive, settings, manager, prober, altSources };
 
   // Link chi tiết theo loại: slug truyện chữ mang tiền tố "tf~" -> /chu/...
   app.locals.detailUrl = (slug) => (String(slug).startsWith('tf~') ? '/chu/' + slug.slice(3) : '/truyen/' + slug);

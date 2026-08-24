@@ -86,11 +86,20 @@ tách "trong thư viện" khỏi "đang theo dõi"; `remember()` ghi tiến đ�
 
 **Chọn nguồn ở trang đọc:** thanh đọc bày sẵn dãy nút `Nguồn [1][2][3]` (số đang đọc
 sáng lên) — [reader.ejs](src/views/reader.ejs) `#srcPick` + [reader.js](src/public/js/reader.js).
-Dữ liệu từ `GET /api/other-sources` (tìm cùng bộ ở các nguồn khác, so tên qua `titleKey`),
-gọi **ngay khi mở trang** chứ không đợi bấm. Phép tra này phải gọi `search()` tới TỪNG
-nguồn (~2-3 giây) nên kết quả được nhớ 12 tiếng bằng [kv-cache.js](src/services/kv-cache.js)
-— khoá gồm danh sách id nguồn nên thêm/bớt nguồn thì bản cũ tự hết giá trị; chỉ nhớ ánh xạ
-*bộ → slug ở từng nguồn*, còn số chương ghép vào lúc trả lời (đo thật: 2276ms → 2ms).
+Logic gom trong [src/services/alt-sources.js](src/services/alt-sources.js) `createAltSources`,
+dùng chung cho trang đọc và `/api/other-sources`.
+
+Phép tra "bộ này có ở nguồn nào" phải gọi `search()` tới TỪNG nguồn (~2-3 giây) nên có
+ba lối vào theo độ sẵn sàng, và kết quả nhớ 12 tiếng qua [kv-cache.js](src/services/kv-cache.js):
+- `warm(name)` — trang chi tiết `/truyen/:slug` gọi ngầm (không chờ, không chặn request).
+- `cached(...)` — trang đọc chỉ ĐỌC CACHE (đồng bộ, không chạm mạng) rồi **nhúng thẳng dãy
+  nút vào HTML**. Đây là điểm mấu chốt: chèn muộn bằng JS sẽ làm nhảy thanh header.
+- `list(...)` — `/api/other-sources`, cho trường hợp chưa kịp làm ấm; reader.js chỉ gọi khi
+  `#srcPick` còn rỗng.
+
+Chỉ nhớ ánh xạ *bộ → slug ở từng nguồn*; **số chương ghép vào lúc dựng link** nên chương nào
+cũng ra đúng link. Khoá cache gồm danh sách id nguồn → thêm/bớt nguồn thì bản cũ tự hết giá
+trị. Đo thật: 2276ms → 2ms.
 
 **Routes:** [pages.js](src/routes/pages.js) (trang + /settings), [api.js](src/routes/api.js)
 (/api/archive, /api/status…), [image.js](src/routes/image.js), [auth.js](src/routes/auth.js).
