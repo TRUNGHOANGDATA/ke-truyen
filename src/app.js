@@ -16,6 +16,7 @@ import { createSiteProber } from './services/site-prober.js';
 import { createKvCache } from './services/kv-cache.js';
 import { createAltSources } from './services/alt-sources.js';
 import { createImageDoctor } from './services/image-doctor.js';
+import { createHostLimiter } from './services/host-limiter.js';
 import { createTruyenfullSource } from './source/truyenfull.js';
 import { createLibrary } from './services/library.js';
 import { createUpdates } from './services/updates.js';
@@ -103,6 +104,9 @@ export function buildApp(deps = {}) {
     return [...new Set([qq, ...bases])].filter(Boolean).map(b => b + '/');
   };
 
+  // Gõ cửa từng CDN từ tốn: dội cả chùm thì bị chặn bớt, ảnh vỡ lỗ chỗ.
+  const imageLimiter = deps.imageLimiter ?? createHostLimiter({ limit: 3 });
+
   const cache = createImageCache({ dir: cacheDir, maxBytes: 2 * 1024 * 1024 * 1024 });
   mountImageProxy(app, {
     fetchFn: deps.imageFetchFn ?? fetch,
@@ -112,6 +116,7 @@ export function buildApp(deps = {}) {
     altReferer,
     // Nhớ referer nào lấy được ảnh cho từng host CDN -> lần sau đi thẳng.
     refererHints: { get: (u) => imageHosts.knownReferer(u), set: (u, r) => imageHosts.rememberReferer(u, r) },
+    limiter: imageLimiter,
     archive,
     drive,
   });

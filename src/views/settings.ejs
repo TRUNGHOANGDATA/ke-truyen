@@ -187,7 +187,12 @@
         '<div class="sysbox">' + esc(r.comic || '') + (r.chapter ? ' · chương ' + esc(r.chapter) : '')
           + (r.imageCount ? ' · ' + r.imageCount + ' ảnh' : '')
           + (r.allowed === false ? '<br><b>Host ảnh này chưa được proxy cho qua.</b>' : '')
-          + '<br>' + esc(r.verdict || '') + '</div>'
+          + '<br>' + esc(r.verdict || '')
+          + (r.burst ? '<br><br><b>Thử tải ' + r.burst.tried + ' ảnh cùng lúc:</b> '
+              + r.burst.ok + ' được / ' + r.burst.failed + ' rớt (' + r.burst.ms + 'ms)'
+              + (r.burst.codes && r.burst.codes.length ? ' · ' + esc(r.burst.codes.join(', ')) : '')
+              + '<br>' + esc(r.burst.verdict) : '')
+          + '</div>'
         + (rows ? '<table class="probe"><thead><tr><th>Host</th><th>Referer đã thử</th><th>Kết quả</th><th>Thời gian</th></tr></thead><tbody>'
             + rows + '</tbody></table>' : '');
     } catch (e) { diagOut.innerHTML = '<div class="sysbox">Lỗi: ' + esc(e.message) + '</div>'; }

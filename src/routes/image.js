@@ -53,7 +53,7 @@ export function mirrorsFor(u) {
 const TOTAL_BUDGET_MS = 14000;
 const ATTEMPT_MS = 7000;
 
-export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes, isAllowed, refererFor, altReferer, refererHints, archive, drive }) {
+export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes, isAllowed, refererFor, altReferer, refererHints, limiter, archive, drive }) {
   const allow = isAllowed || ((u) => isAllowedHost(u, allowSuffixes || []));
   app.get('/img', async (req, res) => {
     // ?i= là URL đã gói (mặc định); ?u= giữ lại cho tương thích
@@ -88,12 +88,20 @@ export function mountImageProxy(app, { fetchFn = fetch, cache, allowSuffixes, is
 
     const candidatesFor = mirrorsFor;
 
+    // Gọi lên CDN, nhưng XẾP HÀNG theo host: trang đọc nạp trước rất hăng, dội cả
+    // chùm vào một CDN thì bị chặn bớt -> ảnh vỡ lỗ chỗ, dù thử lẻ từng ảnh vẫn ngon.
     async function fetchOnce(u, referer, timeoutMs) {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), timeoutMs);
-      try {
-        return await fetchFn(u, { headers: { ...headers, Referer: referer }, signal: ctrl.signal });
-      } finally { clearTimeout(t); }
+      const call = async () => {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), timeoutMs);
+        try {
+          return await fetchFn(u, { headers: { ...headers, Referer: referer }, signal: ctrl.signal });
+        } finally { clearTimeout(t); }
+      };
+      if (!limiter) return call();
+      let host = '';
+      try { host = new URL(u).hostname; } catch { /* URL lạ: không xếp hàng */ }
+      return host ? limiter.run(host, call) : call();
     }
 
     const referersFor = (u) => buildReferers(u, { refererFor, altReferer, refererHints });

@@ -54,6 +54,25 @@ export function createImageDoctor({
     return `Host còn sống nhưng từ chối hết (mã ${codes}) — nhiều khả năng chặn hotlink và chưa có referer nào đúng.`;
   }
 
+
+  /**
+   * Tải nhiều ảnh CÙNG LÚC bằng referer đã biết là chạy được, rồi đếm bao nhiêu
+   * cái rớt. Lẻ thì ngon mà chùm thì rớt = CDN chặn vì bị dội, không phải hỏng.
+   */
+  async function burstTest(images, referer, n = 8) {
+    const pick = images.slice(0, n);
+    const t0 = now();
+    const rs = await Promise.all(pick.map(im => attempt(im.url, referer)));
+    const ok = rs.filter(r => r.ok).length;
+    const codes = [...new Set(rs.filter(r => !r.ok).map(r => r.error || ('HTTP ' + r.status)))];
+    return {
+      tried: pick.length, ok, failed: pick.length - ok, ms: now() - t0, codes,
+      verdict: ok === pick.length
+        ? `Tải ${pick.length} ảnh cùng lúc vẫn ổn cả — máy chủ không phải thủ phạm.`
+        : `Tải lẻ thì được nhưng ${pick.length - ok}/${pick.length} ảnh rớt khi tải cùng lúc — CDN chặn vì bị dội quá nhanh.`,
+    };
+  }
+
   return {
     /** Thử mọi tổ hợp cho MỘT url ảnh cụ thể. */
     async diagnoseUrl(imageUrl) {
@@ -87,7 +106,11 @@ export function createImageDoctor({
       catch (e) { return { error: 'Không đọc được chương: ' + (e.message || e) }; }
       if (!images.length) return { error: 'Chương này nguồn không trả về ảnh nào' };
       const out = await this.diagnoseUrl(images[0].url);
-      return { ...out, comic: detail.name, chapter: cur.name, imageCount: images.length };
+      // Thử LẺ ngon mà đọc vẫn vỡ thì thủ phạm thường là "dội cả chùm": trang đọc
+      // nạp trước nhiều ảnh cùng lúc, CDN thấy vậy chặn bớt. Đo luôn để khỏi đoán.
+      const win = out.attempts?.find(a => a.ok);
+      const burst = win ? await burstTest(images, win.referer) : null;
+      return { ...out, comic: detail.name, chapter: cur.name, imageCount: images.length, burst };
     },
   };
 }

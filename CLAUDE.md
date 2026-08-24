@@ -79,10 +79,15 @@ xử lý bằng hai lớp TỰ HỌC trong [src/services/image-hosts.js](src/ser
 2. *Đừng đoán mã nào là "chặn hotlink".* Từng thu hẹp thành `401/403` → CDN từ chối bằng 404
    thì không bao giờ tới được referer đúng, **ảnh vỡ sạch**. Quy tắc đúng: máy chủ CÓ trả lời
    (mã gì cũng được) = host còn sống = đáng thử referer tiếp.
+3. *Đừng dội cả chùm vào một CDN.* Trang đọc nạp trước rất hăng (4 luồng + 6 ảnh nhìn
+   trước + tải trước chương sau) → CDN chặn bớt → **ảnh vỡ lỗ chỗ** dù thử LẺ vẫn ngon
+   (đo thật: 1 ảnh = 315ms OK ngay). Có [host-limiter.js](src/services/host-limiter.js)
+   xếp hàng tối đa 3 request đồng thời **theo từng host** (nguồn khác nhau vẫn song song).
 
 **Chẩn đoán ảnh vỡ:** [src/services/image-doctor.js](src/services/image-doctor.js)
 `createImageDoctor` + `POST /settings/diagnose-image` (mục "Ảnh vỡ? Hỏi máy chủ"). Dán link
-chương lỗi → máy chủ lấy ảnh đầu, thử từng tổ hợp, báo **nguyên văn mã trả về**. Phân biệt
+chương lỗi → máy chủ lấy ảnh đầu, thử từng tổ hợp, báo **nguyên văn mã trả về**, rồi
+**dội thử 8 ảnh cùng lúc** (lẻ ngon mà chùm rớt = đang bị CDN chặn vì dội). Phân biệt
 "CDN chết hẳn" với "chặn hotlink" — nhìn từ trình duyệt thì giống hệt, mà cách chữa khác hẳn.
 Dùng lại `buildReferers`/`mirrorsFor` export từ [image.js](src/routes/image.js) nên thử đúng
 cái proxy thật sự thử.

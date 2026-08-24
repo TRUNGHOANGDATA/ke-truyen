@@ -72,3 +72,35 @@ test('chương không có ảnh nào thì nói thẳng', async () => {
   const r = await d.diagnoseChapter('x', '19');
   assert.match(r.error, /không trả về ảnh nào/);
 });
+
+/* ---------- Thử dội chùm: lẻ thì ngon mà chùm thì rớt = CDN chặn vì bị dội ---------- */
+
+test('lẻ được, chùm rớt -> kết luận CDN chặn do dội quá nhanh', async () => {
+  let dangChay = 0;
+  const d = createImageDoctor({ ...base, fetchFn: async () => {
+    dangChay++;
+    try {
+      await new Promise(r => setTimeout(r, 5));
+      return dangChay > 1 ? res({ status: 429 }) : okRes();   // quá 1 cùng lúc thì chặn
+    } finally { dangChay--; }
+  } });
+  const r = await d.diagnoseChapter('bo-thu', '19');
+  assert.ok(r.burst, 'phải có phần thử chùm');
+  assert.equal(r.burst.tried, 2, 'chương giả chỉ có 2 ảnh');
+  assert.ok(r.burst.failed > 0);
+  assert.match(r.burst.verdict, /rớt khi tải cùng lúc|CDN chặn/);
+  assert.ok(r.burst.codes.some(c => /429/.test(c)));
+});
+
+test('chùm cũng ổn -> nói rõ máy chủ không phải thủ phạm', async () => {
+  const d = createImageDoctor({ ...base, fetchFn: async () => okRes() });
+  const r = await d.diagnoseChapter('bo-thu', '19');
+  assert.equal(r.burst.failed, 0);
+  assert.match(r.burst.verdict, /không phải thủ phạm/);
+});
+
+test('không lấy được ảnh nào thì bỏ qua phép thử chùm', async () => {
+  const d = createImageDoctor({ ...base, fetchFn: async () => res({ status: 403 }) });
+  const r = await d.diagnoseChapter('bo-thu', '19');
+  assert.equal(r.burst, null);
+});
