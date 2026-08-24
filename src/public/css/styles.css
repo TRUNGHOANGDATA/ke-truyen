@@ -496,8 +496,15 @@ a.link { text-decoration: none; }
   background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); color: #EDEBF0; }
 .srcpick a.sp-i:hover { background: rgba(255,255,255,.18); }
 .srcpick .sp-i.on { background: var(--hot); border-color: var(--hot); font-weight: 600; cursor: default; }
-/* Điện thoại: bỏ chữ "Nguồn", chỉ còn dãy số cho đỡ chật */
-@media (max-width: 560px) { .srcpick .sp-lb { display: none; } }
+/* Bộ chỉ có ở đúng nguồn đang đọc: nói thẳng, để biết là đã tra chứ không phải hỏng */
+.srcpick .sp-none { font-family: var(--font-mono); font-size: 10.5px; color: #9C98A6; white-space: nowrap; }
+.srcpick .sp-none i { font-style: normal; }
+.srcpick .sp-short { display: none; }
+/* Điện thoại: bỏ chữ "Nguồn" và rút gọn ghi chú cho đỡ chật */
+@media (max-width: 560px) {
+  .srcpick .sp-lb, .srcpick .sp-full { display: none; }
+  .srcpick .sp-short { display: inline; }
+}
 /* Bảng kết quả "Dò nguồn từ máy chủ" (trang Cài đặt) */
 .probe { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .probe th { text-align: left; font-weight: 600; color: var(--text-dim); font-size: 11.5px;

@@ -127,10 +127,14 @@ if (srcPick && !srcPick.children.length) (async function loadSources() {
   try {
     const q = `slug=${encodeURIComponent(slug)}&name=${encodeURIComponent(name)}&chapter=${encodeURIComponent(chapter)}`;
     const { sources = [] } = await api('/api/other-sources?' + q);
-    if (sources.length < 2) return;
-    srcPick.innerHTML = '<span class="sp-lb">Nguồn</span>' + sources.map(s => (s.current
-      ? `<span class="sp-i on" title="${s.label} (đang đọc)" aria-current="true">${s.n}</span>`
-      : `<a class="sp-i" href="${s.url}" title="Đọc từ ${s.label}">${s.n}</a>`)).join('');
+    if (!sources.length) return;
+    // Chỉ 1 nguồn có bộ này thì nói thẳng, để biết là đã tra chứ không phải hỏng.
+    srcPick.innerHTML = sources.length < 2
+      ? '<span class="sp-none" title="Chỉ 1 nguồn có bộ này">'
+        + '<i class="sp-full">Chỉ 1 nguồn có bộ này</i><i class="sp-short">1 nguồn</i></span>'
+      : '<span class="sp-lb">Nguồn</span>' + sources.map(s => (s.current
+        ? `<span class="sp-i on" title="${s.label} (đang đọc)" aria-current="true">${s.n}</span>`
+        : `<a class="sp-i" href="${s.url}" title="Đọc từ ${s.label}">${s.n}</a>`)).join('');
     srcPick.hidden = false;
   } catch { /* không tra được thì thôi, không làm phiền lúc đang đọc */ }
 })();

@@ -168,12 +168,23 @@ test('chưa ấm cache: để trống + ẩn, nhường JS tra sau (không dựn
   assert.doesNotMatch(res.text, /class="sp-i/);
 });
 
-test('chỉ một nguồn thì không bày nút (chẳng có gì để chọn)', async () => {
+test('chỉ một nguồn có bộ: nói thẳng thay vì để trống (đã tra, không phải hỏng)', async () => {
   const one = [{ n: 1, id: 'truyenqq', label: 'TruyenQQ', current: true, url: '/doc/s/1' }];
   const a = request.agent(readerWith({ cached: () => one, warm() {}, async list() { return one; } }));
   await a.post('/login').type('form').send({ password: 'secret123' });
   const res = await a.get('/doc/s/1');
+  assert.doesNotMatch(res.text, /id="srcPick"[^>]*hidden/, 'phải hiện ghi chú');
+  assert.match(res.text, /Chỉ 1 nguồn có bộ này/);
+  assert.match(res.text, /class="sp-short">1 nguồn</, 'điện thoại dùng bản rút gọn');
+  assert.doesNotMatch(res.text, /class="sp-i/, 'không dựng nút bấm khi chỉ có 1 nguồn');
+});
+
+test('không tra được nguồn nào thì vẫn để trống + ẩn (không hiện ghi chú sai)', async () => {
+  const a = request.agent(readerWith({ cached: () => [], warm() {}, async list() { return []; } }));
+  await a.post('/login').type('form').send({ password: 'secret123' });
+  const res = await a.get('/doc/s/1');
   assert.match(res.text, /id="srcPick"[^>]*hidden/);
+  assert.doesNotMatch(res.text, /Chỉ 1 nguồn/);
 });
 
 test('mở trang chi tiết thì làm ấm sẵn danh sách nguồn cho trang đọc', async () => {

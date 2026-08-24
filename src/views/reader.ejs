@@ -10,14 +10,20 @@
   <div class="sp"></div>
   <div class="rnav">
     <%
-      // Máy chủ đã biết bộ này có ở nguồn nào -> dựng sẵn dãy nút ngay trong HTML,
-      // khỏi chèn muộn bằng JS làm nhảy thanh header. Chưa biết thì reader.js tự tra.
-      const alts = (locals.altList && locals.altList.length >= 2) ? locals.altList : null;
+      // Máy chủ đã biết bộ này có ở nguồn nào -> dựng sẵn ngay trong HTML, khỏi
+      // chèn muộn bằng JS làm nhảy thanh header. Chưa biết thì reader.js tự tra.
+      // Chỉ 1 nguồn có bộ này thì nói thẳng, để người đọc biết là đã tra chứ
+      // không phải chức năng hỏng.
+      const alts = locals.altList || null;
+      const many = (alts && alts.length >= 2) ? alts : null;
+      const lone = !!(alts && alts.length === 1);
     %>
-    <div class="srcpick" id="srcPick" role="group" aria-label="Chọn nguồn" <%= alts ? '' : 'hidden' %>><% if (alts) { %>
-      <span class="sp-lb">Nguồn</span><% alts.forEach(s => { %><% if (s.current) { %>
+    <div class="srcpick" id="srcPick" role="group" aria-label="Chọn nguồn" <%= (many || lone) ? '' : 'hidden' %>><% if (many) { %>
+      <span class="sp-lb">Nguồn</span><% many.forEach(s => { %><% if (s.current) { %>
       <span class="sp-i on" title="<%= s.label %> (đang đọc)" aria-current="true"><%= s.n %></span><% } else { %>
       <a class="sp-i" href="<%= s.url %>" title="Đọc từ <%= s.label %>"><%= s.n %></a><% } %><% }) %>
+    <% } else if (lone) { %>
+      <span class="sp-none" title="Chỉ 1 nguồn có bộ này"><i class="sp-full">Chỉ 1 nguồn có bộ này</i><i class="sp-short">1 nguồn</i></span>
     <% } %></div>
     <button class="txt-btn" id="autoBtn" type="button" aria-label="Tự cuộn" title="Tự cuộn">▶</button>
     <% if (prev) { %><a class="link" href="/doc/<%= slug %>/<%= encodeURIComponent(prev) %>"><button type="button">←<span class="lbl"> Chương trước</span></button></a><% } %>

@@ -3,7 +3,7 @@
 // - Ảnh (/img): cache-first (ảnh bất biến) -> đọc lại chương cũ khi mất mạng + nhanh.
 // - Trang đọc/chi tiết: network-first, mất mạng thì lấy bản đã lưu; không có thì
 //   hiện trang "offline" gọn.
-const SHELL = 'shell-v17';
+const SHELL = 'shell-v18';
 const PAGES = 'pages-v1';
 const IMGS = 'imgs-v1';
 const ASSETS = ['/public/css/styles.css', '/public/js/common.js', '/public/js/home.js', '/public/js/reader.js', '/public/js/reader-novel.js'];
