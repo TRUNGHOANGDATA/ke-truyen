@@ -10,10 +10,13 @@
       <span class="kindflag <%= _nv ? 'novel' : 'comic' %>"><%= _nv ? 'Truyện chữ' : 'Truyện tranh' %></span>
       <img loading="lazy" src="<%= img(comic.thumbUrl) %>" alt="<%= comic.name %>">
       <% if (comic.progress) { %><span class="when">Đang đọc</span><% } %>
-      <% if (comic.unread) { %><span class="hotflag"><%= comic.unread %></span><% } %>
-      <% if (comic.latestChapter) { %><span class="newflag">Chương <b><%= comic.latestChapter %></b></span><% } %>
+      <%# Badge góc trên phải: đang đọc dở -> số chương đang đọc; chưa đọc -> số chương chưa xem %>
+      <% if (comic.progress) { %><span class="hotflag" title="Đang đọc chương <%= comic.progress.chapterName %>">C.<%= comic.progress.chapterName %></span>
+      <% } else if (comic.unread) { %><span class="hotflag" title="<%= comic.unread %> chương chưa đọc">+<%= comic.unread %></span><% } %>
+      <% if (comic.latestChapter) { %><span class="newflag">Mới nhất <b><%= comic.latestChapter %></b></span><% } %>
     </div>
     <div class="tt"><%= comic.name %></div>
-    <% if (comic.latestChapter) { %><div class="row"><span class="ch">Chương <%= comic.latestChapter %></span></div><% } %>
+    <% if (comic.progress) { %><div class="row"><span class="ch">Đang đọc chương <%= comic.progress.chapterName %></span></div>
+    <% } else if (comic.latestChapter) { %><div class="row"><span class="ch">Chương <%= comic.latestChapter %></span></div><% } %>
   </a>
 </div>
