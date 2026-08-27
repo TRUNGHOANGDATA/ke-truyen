@@ -126,6 +126,21 @@ function onScroll() {
 window.addEventListener('scroll', onScroll, { passive: true });
 onScroll();
 
+/* Tự ẩn thanh trên/dưới khi đang đọc (cuộn xuống); hiện lại khi cuộn lên hoặc
+   chạm giữa trang. Nhường trọn màn cho ảnh. */
+let chromeY = window.scrollY;
+window.addEventListener('scroll', () => {
+  const y = window.scrollY;
+  if (y > chromeY + 8 && y > 140) document.body.classList.add('chrome-hide');
+  else if (y < chromeY - 8) document.body.classList.remove('chrome-hide');
+  chromeY = y;
+}, { passive: true });
+// Chạm vào ảnh/nền (không phải nút/link/menu nguồn) -> bật tắt thanh.
+document.addEventListener('click', (e) => {
+  if (e.target.closest('a, button, .srcpick, .rdbar, .rdfoot')) return;
+  document.body.classList.toggle('chrome-hide');
+});
+
 // Tự cuộn (nhớ tốc độ trong localStorage). Cuộn ngược lên tay -> tự tắt.
 const autoBtn = document.getElementById('autoBtn');
 let speed = Math.min(9, Math.max(1, Number(localStorage.getItem('rd-auto-speed')) || 3));

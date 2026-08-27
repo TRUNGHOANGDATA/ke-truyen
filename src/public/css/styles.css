@@ -145,6 +145,11 @@ a { color: inherit; }
 
 /* ============ READER ============ */
 .rd { background: var(--readerbg); }
+/* Tự ẩn thanh khi ĐANG ĐỌC (cuộn xuống) -> nhường trọn màn cho nội dung; cuộn
+   lên hoặc chạm giữa trang thì hiện lại. Thêm class ở body qua JS. */
+.rdbar, .rdfoot { transition: transform .25s ease; will-change: transform; }
+body.chrome-hide .rdbar { transform: translateY(-100%); }
+body.chrome-hide .rdfoot { transform: translateY(100%); }
 .rdbar { position: sticky; top: 0; z-index: 25; background: rgba(11,10,13,.96); border-bottom: 1px solid rgba(255,255,255,.1); color: #EDEBF0; display: flex; align-items: center; gap: 13px; padding: 10px 16px; }
 .rdbar .bk { background: none; border: none; color: #EDEBF0; font-size: 19px; cursor: pointer; text-decoration: none; }
 .rdbar .ti { min-width: 0; }
@@ -457,7 +462,22 @@ a.link { text-decoration: none; }
 .novel-col .endblk .bg { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 
 /* Panel tuỳ chỉnh đọc truyện chữ */
-.nvcfg { position: sticky; top: 44px; z-index: 20; background: #1c1b22; color: #eee; border-bottom: 1px solid rgba(255,255,255,.12); padding: 8px 12px; display: flex; flex-direction: column; gap: 8px; }
+/* Bảng tuỳ chỉnh truyện chữ = DRAWER nổi bên phải (không đẩy nội dung đọc).
+   [hidden] phải thắng display:flex nên khai riêng, nếu không nút ⚙ bấm mà không ẩn. */
+.nvcfg[hidden] { display: none; }
+.nvcfg { position: fixed; top: 0; right: 0; z-index: 40; width: min(360px, 90vw); height: 100%;
+  overflow-y: auto; background: #1c1b22; color: #eee; border-left: 1px solid rgba(255,255,255,.12);
+  padding: 8px 14px 20px; display: flex; flex-direction: column; gap: 10px;
+  box-shadow: -8px 0 30px rgba(0,0,0,.45); animation: nvcfg-in .18s ease; }
+@keyframes nvcfg-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.nvcfg-head { display: flex; align-items: center; justify-content: space-between; font-family: var(--font-head);
+  font-size: 15px; font-weight: 600; padding: 6px 2px 10px; border-bottom: 1px solid rgba(255,255,255,.1); margin-bottom: 4px; }
+.nvcfg-x { background: rgba(255,255,255,.1); border: 0; color: #eee; width: 30px; height: 30px; border-radius: 50%;
+  font-size: 15px; cursor: pointer; line-height: 1; }
+.nvcfg-x:hover { background: rgba(255,255,255,.22); }
+.nvcfg-back[hidden] { display: none; }
+.nvcfg-back { position: fixed; inset: 0; z-index: 39; background: rgba(0,0,0,.4); animation: fade-in .18s ease; }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 .nvrow { display: flex; align-items: center; gap: 10px; }
 .nvrow > span { flex: 0 0 92px; font-size: 12.5px; color: #b8b4c0; }
 .nvbtns { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }

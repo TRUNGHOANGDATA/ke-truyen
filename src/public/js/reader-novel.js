@@ -37,9 +37,19 @@ function applyAll() {
 applyAll();
 
 /* Panel mở/đóng */
-document.getElementById('cfgBtn')?.addEventListener('click', () => {
-  const p = document.getElementById('nvcfg'); if (p) p.hidden = !p.hidden;
+/* Bảng tuỳ chỉnh = drawer nổi: mở/đóng bằng ⚙, chạm nền mờ, nút ✕, phím Esc. */
+const cfgPanel = document.getElementById('nvcfg');
+const cfgBack = document.getElementById('nvcfgBack');
+function openCfg() { if (cfgPanel) cfgPanel.hidden = false; if (cfgBack) cfgBack.hidden = false; showChrome(); }
+function closeCfg() { if (cfgPanel) cfgPanel.hidden = true; if (cfgBack) cfgBack.hidden = true; }
+document.getElementById('cfgBtn')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  cfgPanel && cfgPanel.hidden ? openCfg() : closeCfg();
 });
+document.getElementById('cfgClose')?.addEventListener('click', closeCfg);
+cfgBack?.addEventListener('click', closeCfg);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && cfgPanel && !cfgPanel.hidden) closeCfg(); });
+
 document.querySelectorAll('[data-group="theme"] button').forEach(b =>
   b.addEventListener('click', () => { theme = b.dataset.th; store.set('theme', theme); applyAll(); }));
 document.querySelectorAll('[data-group="ff"] button').forEach(b =>
@@ -70,6 +80,22 @@ function onScroll() {
 }
 window.addEventListener('scroll', onScroll, { passive: true });
 onScroll();
+
+/* Tự ẩn thanh trên/dưới khi đang đọc (cuộn xuống); hiện lại khi cuộn lên hoặc
+   chạm giữa trang. Nhường trọn màn cho chữ. */
+const showChrome = () => document.body.classList.remove('chrome-hide');
+let chromeY = window.scrollY;
+window.addEventListener('scroll', () => {
+  const y = window.scrollY;
+  if (y > chromeY + 8 && y > 140) document.body.classList.add('chrome-hide');
+  else if (y < chromeY - 8) showChrome();
+  chromeY = y;
+}, { passive: true });
+// Chạm vào vùng chữ (không phải nút/link/panel) -> bật tắt thanh.
+document.addEventListener('click', (e) => {
+  if (e.target.closest('a, button, .nvcfg, .nvcfg-back, .rdbar, .rdfoot')) return;
+  document.body.classList.toggle('chrome-hide');
+});
 
 /* ==================== #3 Tự cuộn ==================== */
 const autoBtn = document.getElementById('autoBtn');
