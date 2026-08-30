@@ -330,6 +330,7 @@ export function mountPages(app) {
         title: `${name} — Chương ${chapterName}`,
         slug, name, chapterName, images, prev, next, startPage, altList,
         total: chapters.length, index: idx,
+        chapterNames: chapters.map(c => c.chapter_name),   // cho danh sách chương nhảy nhanh
         categories, author: detail?.author || '', status: detail?.status || row?.status || '',
       });
     } catch (e) {
@@ -423,6 +424,7 @@ export function mountPages(app) {
         title: `${name} — Chương ${chapterName}`,
         slug: pslug, clean, name, chapterName, chapterTitle: title, paragraphs,
         prev, next, startPercent, total: chapters.length, index: idx,
+        chapterNames: chapters.map(c => c.chapter_name),   // cho danh sách chương nhảy nhanh
       });
     } catch (e) {
       res.status(502).render('reader-error', {

@@ -1,0 +1,11 @@
+<%# Danh sách chương nhảy nhanh — drawer nổi bên phải. Dùng chung reader tranh + chữ.
+    base: tiền tố link ('/doc/<slug>/' hoặc '/doc-chu/<clean>/'); chapterName: chương đang đọc. %>
+<div class="drawer-back" id="chBack" hidden></div>
+<div class="chdrawer" id="chDrawer" hidden>
+  <div class="drawer-head">Danh sách chương <button class="drawer-x" id="chClose" type="button" aria-label="Đóng">✕</button></div>
+  <div class="chlist">
+    <% (chapterNames || []).forEach(cn => { const cur = String(cn) === String(chapterName); %>
+      <a class="chitem <%= cur ? 'cur' : '' %>"<%= cur ? ' aria-current="true"' : '' %> href="<%= base %><%= encodeURIComponent(cn) %>">Chương <%= cn %></a>
+    <% }) %>
+  </div>
+</div>

@@ -5,10 +5,12 @@
 <link rel="stylesheet" href="/public/css/styles.css"><title><%= title %></title>
 </head><body class="rd">
 <div class="rdbar">
-  <a class="bk" href="/truyen/<%= slug %>" aria-label="Quay lại">‹</a>
+  <a class="bk" href="/truyen/<%= slug %>" aria-label="Quay lại truyện">‹</a>
+  <a class="bk" href="/" aria-label="Trang chủ" title="Trang chủ">⌂</a>
   <div class="ti"><div class="a"><%= name %></div><div class="b">Chương <%= chapterName %> · <%= images.length %> trang</div></div>
   <div class="sp"></div>
   <div class="rnav">
+    <button class="txt-btn" id="chBtn" type="button" aria-label="Danh sách chương" title="Danh sách chương">☰</button>
     <%
       // Máy chủ đã biết bộ này có ở nguồn nào -> dựng sẵn ngay trong HTML, khỏi
       // chèn muộn bằng JS làm nhảy thanh header. Chưa biết thì reader.js tự tra.
@@ -30,6 +32,7 @@
     <% if (next) { %><a class="link" href="/doc/<%= slug %>/<%= encodeURIComponent(next) %>"><button class="pri" type="button"><span class="lbl">Chương sau </span>→</button></a><% } %>
   </div>
 </div>
+<%- include('partials/chapter-drawer', { chapterNames, chapterName, base: '/doc/' + slug + '/' }) %>
 
 <% if ((categories && categories.length) || author) { %>
 <div class="rdinfo">

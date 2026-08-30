@@ -5,10 +5,12 @@
 <link rel="stylesheet" href="/public/css/styles.css"><title><%= title %></title>
 </head><body class="rd">
 <div class="rdbar">
-  <a class="bk" href="/chu/<%= clean %>" aria-label="Quay lại">‹</a>
+  <a class="bk" href="/chu/<%= clean %>" aria-label="Quay lại truyện">‹</a>
+  <a class="bk" href="/" aria-label="Trang chủ" title="Trang chủ">⌂</a>
   <div class="ti"><div class="a"><%= name %></div><div class="b">Chương <%= chapterName %><%= chapterTitle ? ' · ' + chapterTitle.replace(/^Ch[uươ]+ng\s*[\d.]+\s*:?\s*/i,'') : '' %></div></div>
   <div class="sp"></div>
   <div class="rnav">
+    <button class="txt-btn" id="chBtn" type="button" aria-label="Danh sách chương" title="Danh sách chương">☰</button>
     <button class="txt-btn" id="ttsBtn" type="button" aria-label="Nghe truyện" title="Nghe">🔊</button>
     <button class="txt-btn" id="autoBtn" type="button" aria-label="Tự cuộn" title="Tự cuộn">▶</button>
     <button class="txt-btn" id="cfgBtn" type="button" aria-label="Tuỳ chỉnh" title="Tuỳ chỉnh">⚙</button>
@@ -17,6 +19,7 @@
   </div>
 </div>
 
+<%- include('partials/chapter-drawer', { chapterNames, chapterName, base: '/doc-chu/' + clean + '/' }) %>
 <div class="nvcfg-back" id="nvcfgBack" hidden></div>
 <div class="nvcfg" id="nvcfg" hidden>
   <div class="nvcfg-head">Tuỳ chỉnh đọc <button class="nvcfg-x" id="cfgClose" type="button" aria-label="Đóng">✕</button></div>

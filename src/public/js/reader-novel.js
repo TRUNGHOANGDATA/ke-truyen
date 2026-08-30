@@ -84,6 +84,24 @@ onScroll();
 /* Tự ẩn thanh trên/dưới khi đang đọc (cuộn xuống); hiện lại khi cuộn lên hoặc
    chạm giữa trang. Nhường trọn màn cho chữ. */
 const showChrome = () => document.body.classList.remove('chrome-hide');
+
+/* Danh sách chương: drawer nổi, mở bằng ☰, cuộn thẳng tới chương đang đọc. */
+(function chapterDrawer() {
+  const btn = document.getElementById('chBtn');
+  const drawer = document.getElementById('chDrawer');
+  const back = document.getElementById('chBack');
+  if (!btn || !drawer) return;
+  const open = () => {
+    drawer.hidden = false; if (back) back.hidden = false; showChrome();
+    const cur = drawer.querySelector('.chitem.cur');
+    if (cur) cur.scrollIntoView({ block: 'center' });
+  };
+  const close = () => { drawer.hidden = true; if (back) back.hidden = true; };
+  btn.addEventListener('click', (e) => { e.stopPropagation(); drawer.hidden ? open() : close(); });
+  document.getElementById('chClose')?.addEventListener('click', close);
+  back?.addEventListener('click', close);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !drawer.hidden) close(); });
+})();
 let chromeY = window.scrollY;
 window.addEventListener('scroll', () => {
   const y = window.scrollY;
@@ -93,7 +111,7 @@ window.addEventListener('scroll', () => {
 }, { passive: true });
 // Chạm vào vùng chữ (không phải nút/link/panel) -> bật tắt thanh.
 document.addEventListener('click', (e) => {
-  if (e.target.closest('a, button, .nvcfg, .nvcfg-back, .rdbar, .rdfoot')) return;
+  if (e.target.closest('a, button, .nvcfg, .nvcfg-back, .chdrawer, .drawer-back, .rdbar, .rdfoot')) return;
   document.body.classList.toggle('chrome-hide');
 });
 
