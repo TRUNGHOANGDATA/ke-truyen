@@ -169,6 +169,15 @@ body.chrome-hide .rdfoot { transform: translateY(100%); }
    chỗ giữ tạm trước khi biết tỉ lệ thật. overflow-anchor giữ vùng nhìn ổn định. */
 .mpage { position: relative; border-bottom: 1px solid rgba(255,255,255,.07); aspect-ratio: 2 / 3; overflow: hidden; }
 .mpage img { display: block; width: 100%; height: 100%; object-fit: cover; background: #17161c; }
+/* Skeleton trong khi ảnh đang tải: nền loang + vòng xoay, ẩn icon vỡ mặc định
+   của trình duyệt (ảnh chưa có src). Xong tải -> thêm class 'loaded' -> ảnh hiện dần. */
+.mpage:not(.loaded):not(.perr) { background: linear-gradient(100deg, #17161c 20%, #201f28 50%, #17161c 80%); background-size: 200% 100%; animation: mpage-sk 1.3s ease-in-out infinite; }
+.mpage:not(.loaded):not(.perr)::after { content: ""; position: absolute; top: 50%; left: 50%; width: 26px; height: 26px; margin: -13px; border: 3px solid rgba(255,255,255,.14); border-top-color: rgba(255,255,255,.5); border-radius: 50%; animation: mpage-spin .8s linear infinite; z-index: 2; }
+.mpage:not(.loaded) img { opacity: 0; }
+.mpage.loaded img { opacity: 1; transition: opacity .3s ease; }
+@keyframes mpage-sk { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@keyframes mpage-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .mpage:not(.loaded):not(.perr), .mpage:not(.loaded):not(.perr)::after { animation: none; } }
 .mpage .pn { position: absolute; top: 8px; right: 9px; font-family: var(--font-mono); font-size: 10px; color: rgba(255,255,255,.55); background: rgba(0,0,0,.55); padding: 2px 6px; border-radius: 3px; font-variant-numeric: tabular-nums; z-index: 3; }
 .endblk { padding: 28px 16px 36px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
 .endblk .lb { font-family: var(--font-mono); font-size: 11px; color: #7C7987; }

@@ -47,6 +47,7 @@ function attempt(im, src, tryNo, bg, settle) {
     fin();
     if (pre.naturalWidth && pre.naturalHeight) mpage.style.aspectRatio = pre.naturalWidth + ' / ' + pre.naturalHeight;
     im.src = pre.src; im.dataset.ok = '1';
+    mpage.classList.add('loaded');           // tắt skeleton, ảnh hiện dần
     loadedCount++;
     if (loadedCount >= total) prefetchNext();
   };
