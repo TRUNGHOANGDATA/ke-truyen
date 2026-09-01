@@ -16,19 +16,44 @@ export function withCache(db, source, { ttlMs = 30 * MIN, keyPrefix = '', detail
   `);
   const sweep = db.prepare('DELETE FROM api_cache WHERE expires_at < ?');
 
+  const parse = (s) => { try { return { ok: true, v: JSON.parse(s) }; } catch { return { ok: false }; } };
+
+  // Làm mới ở NỀN: crawl lại rồi ghi cache, không chặn ai. Gộp trùng theo key để
+  // 5 người mở cùng lúc chỉ crawl 1 lần.
+  const refreshing = new Set();
+  function refreshBg(key, fn, ttl) {
+    if (refreshing.has(key)) return;
+    refreshing.add(key);
+    Promise.resolve().then(fn)
+      .then(v => putRow.run(key, JSON.stringify(v), Date.now() + ttl))
+      .catch(() => { /* nguồn lỗi thì giữ bản cũ, lần sau thử lại */ })
+      .finally(() => refreshing.delete(key));
+  }
+
+  /**
+   * stale-while-revalidate: còn hạn -> trả ngay; HẾT HẠN mà còn bản cũ -> vẫn
+   * trả bản cũ NGAY rồi crawl lại ở nền (người đọc không phải chờ 15s). Chỉ khi
+   * chưa có bản nào mới phải chờ crawl.
+   */
   async function cached(key, fn, ttl = ttlMs) {
     const now = Date.now();
     const row = getRow.get(key);
-    if (row && row.expires_at > now) {
-      try { return JSON.parse(row.payload); } catch { /* hỏng thì lấy lại */ }
+    if (row) {
+      const p = parse(row.payload);
+      if (p.ok) {
+        if (row.expires_at > now) return p.v;      // còn tươi
+        refreshBg(key, fn, ttl);                    // hết hạn: làm mới ở nền
+        return p.v;                                 // trả bản cũ ngay
+      }
     }
+    // Chưa có bản nào -> đành chờ crawl (lần đầu tuyệt đối / sau khi mất cache).
     try {
       const value = await fn();
       putRow.run(key, JSON.stringify(value), now + ttl);
       if (Math.random() < 0.02) sweep.run(now); // dọn bản hết hạn thưa thớt
       return value;
     } catch (err) {
-      if (row) { try { return JSON.parse(row.payload); } catch { /* bỏ qua */ } }
+      if (row) { const p = parse(row.payload); if (p.ok) return p.v; }
       throw err;
     }
   }

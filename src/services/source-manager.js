@@ -70,7 +70,10 @@ export function createSourceManager({
 
   function build(name) {
     raw = buildRaw(name);
-    active = wrap(db, raw, { searchTtlMs: 10 * 60 * 1000 });
+    // detailTtlMs 5': mở trang chi tiết (mục lục) lần 2 gần như tức thì thay vì
+    // crawl lại ~6.5s. Nhờ stale-while-revalidate, hết 5' vẫn trả ngay bản cũ +
+    // làm mới ở nền -> mục lục chậm nhất trễ 5', đổi lấy tốc độ mở truyện.
+    active = wrap(db, raw, { searchTtlMs: 10 * 60 * 1000, detailTtlMs: 5 * 60 * 1000 });
   }
 
   build(settings.get('source', 'truyenqq'));

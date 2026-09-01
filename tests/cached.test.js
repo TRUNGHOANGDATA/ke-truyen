@@ -29,14 +29,27 @@ test('different category/page are cached separately', async () => {
   assert.equal(calls, 3);
 });
 
-test('re-fetches after the cache entry expires', async () => {
+test('stale-while-revalidate: hết hạn trả NGAY bản cũ rồi làm mới ở nền', async () => {
   let calls = 0;
   const { db, src } = setup({ async home() { calls++; return { items: [{ slug: 's' + calls }], pagination: null }; } });
+  await src.home();                       // calls=1 -> s1
+  expireAll(db);
+  const second = await src.home();        // hết hạn: trả bản cũ s1 NGAY, refresh nền
+  assert.equal(second.items[0].slug, 's1', 'người đọc không phải chờ crawl -> nhận bản cũ');
+  await new Promise(r => setTimeout(r, 20));   // để refresh nền chạy xong
+  assert.equal(calls, 2, 'nền đã crawl lại');
+  const third = await src.home();         // giờ đã có bản mới
+  assert.equal(third.items[0].slug, 's2');
+});
+
+test('nhiều request cùng lúc lúc hết hạn chỉ crawl lại MỘT lần (gộp trùng)', async () => {
+  let calls = 0;
+  const { db, src } = setup({ async home() { calls++; await new Promise(r => setTimeout(r, 15)); return { items: [{ n: calls }], pagination: null }; } });
   await src.home();
   expireAll(db);
-  const second = await src.home();
-  assert.equal(calls, 2);
-  assert.equal(second.items[0].slug, 's2');
+  await Promise.all([src.home(), src.home(), src.home()]);  // 3 cùng lúc
+  await new Promise(r => setTimeout(r, 40));
+  assert.equal(calls, 2, 'chỉ 1 lần refresh nền dù 3 request');
 });
 
 test('falls back to the stale entry when the source fails after expiry', async () => {
@@ -76,5 +89,25 @@ test('không bật chapterTtlMs thì chapter không cache (mặc định)', asyn
   let calls = 0;
   const { src } = setup({ async chapter() { calls++; return { images: [] }; } });
   await src.chapter('u'); await src.chapter('u');
+  assert.equal(calls, 2);
+});
+
+test('detail được cache + SWR khi bật detailTtlMs (mở truyện lần 2 tức thì)', async () => {
+  let calls = 0;
+  const { db, src } = setup({ async detail(slug) { calls++; return { slug, name: 'n' + calls }; } }, { detailTtlMs: 5 * 60 * 1000 });
+  const a = await src.detail('abc');
+  const b = await src.detail('abc');
+  assert.equal(calls, 1, 'lần 2 lấy từ cache, không crawl lại');
+  assert.deepEqual(a, b);
+  expireAll(db);
+  const c = await src.detail('abc');
+  assert.equal(c.name, 'n1', 'hết hạn vẫn trả bản cũ ngay');
+});
+
+test('không bật detailTtlMs thì detail KHÔNG cache (mặc định, mục lục luôn mới)', async () => {
+  let calls = 0;
+  const { src } = setup({ async detail(slug) { calls++; return { slug }; } });
+  await src.detail('x');
+  await src.detail('x');
   assert.equal(calls, 2);
 });

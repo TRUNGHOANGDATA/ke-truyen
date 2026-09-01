@@ -25,7 +25,11 @@ try {
 // chờ lần tải nguội ~9s+ (nặng vì nhiều dải thể loại + kho bổ sung qua CDN chậm).
 const WARM_MS = 20 * 60 * 1000;
 const warm = () => Promise.resolve(app.locals.warmHome?.()).catch(() => {});
-setTimeout(warm, 3000);
+// Làm ấm SỚM + thử lại vài nhịp đầu: lúc pod vừa lên nguồn có thể chưa sẵn, mà
+// cache lại vừa trống (mỗi lần deploy) -> người vào đầu tiên dễ ăn ~15s tải nguội.
+// Nhờ stale-while-revalidate, chỉ cần ấm THÀNH CÔNG một lần là các lần sau luôn
+// có bản cũ trả ngay. Warm lặp lại thì cache hit nên rất nhẹ.
+[800, 8000, 25000, 60000].forEach(ms => setTimeout(warm, ms));
 setInterval(warm, WARM_MS);
 
 // nightly maintenance: backup DB + prune cache. Keeps the Always-Free VPS non-idle.
