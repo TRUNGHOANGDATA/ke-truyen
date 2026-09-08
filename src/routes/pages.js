@@ -294,14 +294,23 @@ export function mountPages(app) {
     const chapterName = decodeURIComponent(req.params.chapter);
     const svcs = svc();
     try {
+      const detailToChapters = (d) => d.chapters.map((c, i) => ({ comic_slug: slug, chapter_name: c.name,
+        chapter_title: c.title, api_url: c.apiUrl, order_index: i }));
       let chapters = svcs.library.chaptersOf(slug);
       let detail = null;
       if (!chapters.length) {
         detail = await svcs.source.detail(slug);
-        chapters = detail.chapters.map((c, i) => ({ comic_slug: slug, chapter_name: c.name,
-          chapter_title: c.title, api_url: c.apiUrl, order_index: i }));
+        chapters = detailToChapters(detail);
       }
-      const idx = chapters.findIndex(c => c.chapter_name === chapterName);
+      let idx = chapters.findIndex(c => c.chapter_name === chapterName);
+      // Chương chưa có trong mục lục ĐÃ LƯU (chương mới ra sau lần theo dõi) -> lấy
+      // mục lục mới từ nguồn rồi tìm lại. Không có bước này thì bộ đã trong thư
+      // viện sẽ không bao giờ đọc được chương mới (DB không tự cập nhật).
+      if (idx === -1 && !detail) {
+        detail = await svcs.source.detail(slug);
+        chapters = detailToChapters(detail);
+        idx = chapters.findIndex(c => c.chapter_name === chapterName);
+      }
       if (idx === -1) return res.status(404).send('Không tìm thấy chương');
       const cur = chapters[idx];
       const { images } = await svcs.source.chapter(cur.api_url);

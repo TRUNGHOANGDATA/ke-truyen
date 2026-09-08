@@ -194,3 +194,49 @@ test('mở trang chi tiết thì làm ấm sẵn danh sách nguồn cho trang đ
   await a.get('/truyen/s');
   assert.equal(warmed, 'S');
 });
+
+test('chương MỚI chưa có trong mục lục đã lưu vẫn đọc được (refresh từ nguồn)', async () => {
+  // Bộ đã trong thư viện với mục lục CŨ (chỉ chương 1); nguồn nay có thêm chương 2.
+  const db = openDb(':memory:'); createSchema(db);
+  let detailCalls = 0;
+  const source = {
+    async detail() {
+      detailCalls++;
+      return { slug: 's', name: 'S', thumbUrl: '', origin: '', content: '', status: 'ongoing', categories: [],
+        chapters: [
+          { name: '1', title: '', apiUrl: 'https://x/c1', order: 0 },
+          { name: '2', title: '', apiUrl: 'https://x/c2', order: 1 },   // chương mới
+        ] };
+    },
+    async chapter() { return { images: [{ page: 0, url: 'https://sv1.otruyencdn.com/u/0.jpg' }] }; },
+  };
+  const app = buildApp({ passwordHash: hash, sessionSecret: 't', db, source,
+    cacheDir: mkdtempSync(join(tmpdir(), 'newch-')) });
+  const a = request.agent(app);
+  await a.post('/login').type('form').send({ password: 'secret123' });
+
+  // Gieo thư viện với mục lục CŨ: chỉ có chương 1
+  db.prepare('INSERT INTO comics (slug,name,followed,followed_at) VALUES (?,?,1,?)').run('s', 'S', Date.now());
+  db.prepare('INSERT INTO chapters (comic_slug,chapter_name,api_url,order_index) VALUES (?,?,?,?)').run('s', '1', 'https://x/c1', 0);
+
+  const res = await a.get('/doc/s/2');            // chương mới, chưa có trong DB
+  assert.equal(res.status, 200, 'phải refresh mục lục từ nguồn thay vì 404');
+  assert.match(res.text, /\/img\?i=/);
+  // và mục lục DB đã được cập nhật -> lần sau khỏi refresh
+  const inDb = db.prepare("SELECT 1 FROM chapters WHERE comic_slug='s' AND chapter_name='2'").get();
+  assert.ok(inDb, 'chương mới đã lưu vào DB');
+});
+
+test('chương thật sự KHÔNG tồn tại thì vẫn 404 (không lặp vô hạn)', async () => {
+  const db = openDb(':memory:'); createSchema(db);
+  const source = {
+    async detail() { return { slug: 's', name: 'S', thumbUrl: '', origin: '', content: '', status: 'ongoing', categories: [],
+      chapters: [{ name: '1', title: '', apiUrl: 'https://x/c1', order: 0 }] }; },
+    async chapter() { return { images: [] }; },
+  };
+  const app = buildApp({ passwordHash: hash, sessionSecret: 't', db, source, cacheDir: mkdtempSync(join(tmpdir(), 'no404-')) });
+  const a = request.agent(app);
+  await a.post('/login').type('form').send({ password: 'secret123' });
+  const res = await a.get('/doc/s/999');
+  assert.equal(res.status, 404);
+});
