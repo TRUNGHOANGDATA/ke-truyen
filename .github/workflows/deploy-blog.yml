@@ -1,0 +1,112 @@
+# deploy-blog — rollout container `blog` (tradadata.com) vào cụm k8s nhà.
+#
+# Vì sao workflow này nằm ở repo `ke-truyen` chứ không phải repo `tradadata-blog`:
+#   Khoá SSH vào cụm (SSH_PRIVATE_KEY...) chỉ có ở repo NÀY. Repo `tradadata-blog`
+#   là PUBLIC nên CỐ Ý không giữ khoá SSH — ai có quyền write repo public đó cũng
+#   moi được khoá để SSH thẳng vào LAN. Nên phần build image ở repo blog, còn phần
+#   rollout (cần khoá) đặt ở đây.
+#
+# Repo blog (`ci.yml`) build & push image lên ghcr:
+#   ghcr.io/trunghoangdata/tradadata-blog:<sha>   (và :latest)
+# Workflow này KHÔNG build gì — chỉ trỏ Deployment sang image đã có sẵn trên ghcr.
+#
+# ─── Chỉ chạy KHI BẤM TAY ─────────────────────────────────────────────────────
+# Không có trigger `push`. Đây là nút bấm thủ công: vào Actions > deploy-blog >
+# Run workflow, nhập SHA của commit blog cần deploy (lấy trong Summary của run
+# `ci` bên repo tradadata-blog — nó in sẵn tên image kèm SHA).
+#
+# ─── PIN THEO SHA, KHÔNG dùng :latest ─────────────────────────────────────────
+# `blog` và `ke-truyen` là 2 container riêng trong cùng Deployment `tradadata`.
+# `kubectl set image ... blog=<sha>` chỉ đổi field image của `blog`, không đụng
+# `ke-truyen`. Ngược lại, deploy.yml (deploy truyện) chỉ đổi `ke-truyen`, không
+# đụng `blog`. Vì pin bằng SHA cụ thể nên khi pod bị Recreate (do deploy bên nào
+# đó), `blog` pull lại ĐÚNG SHA cũ — không bị đổi ngoài ý muốn. Đừng đổi sang
+# :latest, sẽ mất tính xác định này.
+#
+# ⚠️ `blog` chung 1 pod với `ke-truyen`, strategy `Recreate` ⇒ rollout blog thì
+#    truyen.tradadata.com CŨNG downtime ~1-2 phút. Đây là cái dính nhau có sẵn do
+#    chung pod, không phải do workflow này.
+#
+# ─── Secrets dùng lại của repo này (đã khai sẵn cho deploy.yml) ────────────────
+#   SSH_PRIVATE_KEY  SSH_KNOWN_HOSTS  SSH_USER  SSH_GATEWAY  K8S_HOST
+
+name: deploy-blog
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: 'Commit SHA (40 ký tự) của blog cần deploy — lấy trong Summary của run `ci` bên repo tradadata-blog.'
+        required: true
+        type: string
+
+concurrency:
+  # DÙNG CHUNG group với job deploy của deploy.yml, để không có 2 lệnh kubectl
+  # cùng thúc vào Deployment `tradadata` một lúc, để cụm nửa vời.
+  group: ke-truyen-deploy-cum
+  cancel-in-progress: false
+
+jobs:
+  deploy-blog:
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://www.tradadata.com
+    env:
+      NAMESPACE: bizflow
+      DEPLOYMENT: tradadata
+      CONTAINER: blog
+      IMAGE: ghcr.io/trunghoangdata/tradadata-blog:${{ inputs.sha }}
+    steps:
+      - name: Kiểm SHA đầu vào (đúng 40 ký tự hex)
+        run: |
+          SHA="${{ inputs.sha }}"
+          if ! printf '%s' "$SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::SHA không hợp lệ: '$SHA'. Phải là 40 ký tự hex (đầy đủ, không rút gọn)."
+            exit 1
+          fi
+
+      - name: Chuẩn bị SSH (ProxyJump qua gateway public vào LAN)
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/ci_key
+          chmod 600 ~/.ssh/ci_key
+          printf '%s\n' "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<EOF
+          Host gw
+            HostName ${{ secrets.SSH_GATEWAY }}
+            User ${{ secrets.SSH_USER }}
+            IdentityFile ~/.ssh/ci_key
+            IdentitiesOnly yes
+          Host cp
+            HostName ${{ secrets.K8S_HOST }}
+            User ${{ secrets.SSH_USER }}
+            IdentityFile ~/.ssh/ci_key
+            IdentitiesOnly yes
+            ProxyJump gw
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Đổi image container blog + chờ rollout
+        run: |
+          echo "deploy $IMAGE"
+          ssh cp "kubectl set image deployment/$DEPLOYMENT $CONTAINER=$IMAGE -n $NAMESPACE"
+          ssh cp "kubectl rollout status deployment/$DEPLOYMENT -n $NAMESPACE --timeout=10m"
+
+      - name: Nghiệm thu — /api/health phải trả đúng SHA
+        run: |
+          ssh cp "kubectl get deploy $DEPLOYMENT -n $NAMESPACE -o jsonpath='{range .spec.template.spec.containers[*]}{.name}={.image}{\"\n\"}{end}'"
+          # Rollout xong KHÔNG có nghĩa code mới đang phục vụ — APP_VERSION được
+          # nướng vào image lúc build, khớp SHA mới coi là xong.
+          LIVE=$(curl -s -m 20 https://www.tradadata.com/api/health | grep -oE '"version":"[0-9a-f]{40}"' | cut -d'"' -f4)
+          echo "version đang phục vụ: $LIVE"
+          echo "SHA vừa deploy:      ${{ inputs.sha }}"
+          if [ "$LIVE" != "${{ inputs.sha }}" ]; then
+            echo "::error::/api/health version ($LIVE) KHÔNG khớp SHA vừa deploy. Rollout chưa thật sự phục vụ code mới."
+            exit 1
+          fi
+          echo "OK — blog đang phục vụ đúng SHA."
+
+      - name: Dọn khoá SSH
+        if: always()
+        run: rm -f ~/.ssh/ci_key
