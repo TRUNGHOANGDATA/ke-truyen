@@ -35,6 +35,15 @@ name: deploy
 on:
   push:
     branches: [main]
+    # Push CHỈ đụng file workflow thì KHÔNG deploy truyện: sửa/thêm workflow (vd
+    # deploy-blog.yml) không phải là đổi code app, không cần recreate pod. Nhờ vậy
+    # merge một PR thuần-workflow không làm downtime chéo. Push có đụng code app
+    # (dù kèm sửa workflow) vẫn deploy như thường — paths-ignore chỉ bỏ qua khi
+    # MỌI file thay đổi đều khớp mẫu dưới.
+    # ⚠️ Mẫu phải phủ HẾT thư mục workflows. Trước đây từng để mẫu hẹp
+    # (`blog-*.yml`) hụt mất file khác nên vẫn deploy ngoài ý muốn.
+    paths-ignore:
+      - '.github/workflows/**'
   pull_request:
   # Vẫn giữ để bấm lại tay khi cần (rollback, deploy lại không đổi code).
   workflow_dispatch:
