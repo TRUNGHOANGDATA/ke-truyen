@@ -24,12 +24,13 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: 'diagnose = chỉ xem; force-restart = xoá pod kẹt tạo lại; rollout-undo = quay về revision trước'
+        description: 'diagnose = chỉ xem; fix-pullsecret = làm mới ghcr-secret rồi tạo lại pod; force-restart = xoá pod kẹt tạo lại; rollout-undo = quay về revision trước'
         required: true
         type: choice
         default: diagnose
         options:
           - diagnose
+          - fix-pullsecret
           - force-restart
           - rollout-undo
 
@@ -81,6 +82,38 @@ jobs:
           echo ""
           echo "===== EVENTS (40 dòng cuối — nói thẳng lý do kẹt) ====="
           ssh cp "kubectl get events -n $NAMESPACE --sort-by=.lastTimestamp | tail -40"
+
+      - name: Sửa — làm mới ghcr-secret (PAT hết hạn gây 403 ImagePullBackOff)
+        if: ${{ inputs.action == 'fix-pullsecret' }}
+        env:
+          PAT: ${{ secrets.GHCR_PULL_PAT }}
+          GH_USER: TRUNGHOANGDATA
+        run: |
+          if [ -z "$PAT" ]; then
+            echo "::error::Thiếu secret GHCR_PULL_PAT — khai ở ke-truyen > Settings > Secrets and variables > Actions (PAT classic, scope read:packages)."
+            exit 1
+          fi
+          # Dựng dockerconfigjson NGAY TẠI RUNNER; PAT được GitHub che trong log.
+          # KHÔNG echo các biến này. Đẩy manifest qua stdin -> kubectl, không lộ ra
+          # args/log ở máy remote.
+          AUTH=$(printf '%s:%s' "$GH_USER" "$PAT" | base64 -w0)
+          DOCKERCFG=$(printf '{"auths":{"ghcr.io":{"auth":"%s"}}}' "$AUTH" | base64 -w0)
+          printf '%s\n' \
+            "apiVersion: v1" \
+            "kind: Secret" \
+            "metadata:" \
+            "  name: ghcr-secret" \
+            "  namespace: $NAMESPACE" \
+            "type: kubernetes.io/dockerconfigjson" \
+            "data:" \
+            "  .dockerconfigjson: $DOCKERCFG" \
+            | ssh cp "kubectl apply -n $NAMESPACE -f -" >/dev/null
+          echo "Đã ghi lại secret ghcr-secret."
+          # Đảm bảo deployment tham chiếu ghcr-secret (idempotent).
+          ssh cp "kubectl patch deployment $DEPLOYMENT -n $NAMESPACE --type merge -p '{\"spec\":{\"template\":{\"spec\":{\"imagePullSecrets\":[{\"name\":\"ghcr-secret\"}]}}}}'"
+          # Cập nhật Secret KHÔNG tự restart pod -> phải xoá pod để pull lại với cred mới.
+          ssh cp "kubectl delete pod -n $NAMESPACE -l app=$DEPLOYMENT --force --grace-period=0 || true"
+          ssh cp "kubectl rollout status deployment/$DEPLOYMENT -n $NAMESPACE --timeout=6m"
 
       - name: Sửa — force-restart (xoá pod kẹt, tạo lại)
         if: ${{ inputs.action == 'force-restart' }}
