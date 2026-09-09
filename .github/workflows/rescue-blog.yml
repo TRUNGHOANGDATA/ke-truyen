@@ -1,0 +1,108 @@
+# rescue-blog — công cụ cấp cứu cụm khi KHÔNG SSH vào được.
+#
+# Sinh ra trong sự cố 2026-09-10: đổi image container `blog` làm pod `tradadata`
+# bị Recreate rồi KHÔNG lên lại (0/1 available) — kể cả khi trỏ về image cũ đang
+# chạy tốt. Tức pod không recreate nổi vì lý do tầng cụm (không phải code blog),
+# mà 2 workflow cũ (`deploy`, `deploy-blog`) chỉ biết set image + rollout status,
+# không nhìn thấy pod kẹt vì sao. Workflow này chạy kubectl chẩn đoán + sửa qua SSH.
+#
+# ⚠️ Repo PUBLIC ⇒ CHỈ in thứ KHÔNG chứa giá trị secret: `get pods`, `get events`,
+#    trạng thái container. TUYỆT ĐỐI không `describe pod` đầy đủ (mục Environment
+#    có thể lộ giá trị env) và không in log ứng dụng.
+#
+# Chạy bằng tay (workflow_dispatch), chọn 1 trong các chế độ:
+#   diagnose      — chỉ đọc: pods, events, trạng thái từng container, ảnh đang khai.
+#   force-restart — xoá cứng pod của deployment để k8s tạo lại (gỡ pod kẹt
+#                   Terminating/Pending), rồi chờ rollout.
+#   rollout-undo  — quay Deployment về revision trước đó, rồi chờ rollout.
+#
+# Dùng lại secret SSH sẵn có: SSH_PRIVATE_KEY SSH_KNOWN_HOSTS SSH_USER SSH_GATEWAY K8S_HOST
+
+name: rescue-blog
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'diagnose = chỉ xem; force-restart = xoá pod kẹt tạo lại; rollout-undo = quay về revision trước'
+        required: true
+        type: choice
+        default: diagnose
+        options:
+          - diagnose
+          - force-restart
+          - rollout-undo
+
+concurrency:
+  # Group RIÊNG (không phải ke-truyen-deploy-cum) để chạy được NGAY cả khi một run
+  # deploy-blog đang treo ở bước rollout status — các lệnh này độc lập.
+  group: bizflow-rescue
+  cancel-in-progress: false
+
+jobs:
+  rescue:
+    runs-on: ubuntu-latest
+    env:
+      NAMESPACE: bizflow
+      DEPLOYMENT: tradadata
+    steps:
+      - name: Chuẩn bị SSH (ProxyJump qua gateway public vào LAN)
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/ci_key
+          chmod 600 ~/.ssh/ci_key
+          printf '%s\n' "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<EOF
+          Host gw
+            HostName ${{ secrets.SSH_GATEWAY }}
+            User ${{ secrets.SSH_USER }}
+            IdentityFile ~/.ssh/ci_key
+            IdentitiesOnly yes
+          Host cp
+            HostName ${{ secrets.K8S_HOST }}
+            User ${{ secrets.SSH_USER }}
+            IdentityFile ~/.ssh/ci_key
+            IdentitiesOnly yes
+            ProxyJump gw
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Chẩn đoán (luôn chạy, an toàn)
+        run: |
+          echo "===== PODS ====="
+          ssh cp "kubectl get pods -n $NAMESPACE -o wide"
+          echo "===== DEPLOYMENT ====="
+          ssh cp "kubectl get deploy $DEPLOYMENT -n $NAMESPACE -o wide"
+          echo "===== ẢNH ĐANG KHAI (image mỗi container) ====="
+          ssh cp "kubectl get deploy $DEPLOYMENT -n $NAMESPACE -o jsonpath='{range .spec.template.spec.containers[*]}{.name}={.image}{\"\n\"}{end}'"
+          echo ""
+          echo "===== TRẠNG THÁI TỪNG CONTAINER (lý do waiting nếu có) ====="
+          ssh cp "kubectl get pods -n $NAMESPACE -l app=$DEPLOYMENT -o jsonpath='{range .items[*]}POD {.metadata.name} phase={.status.phase}{\"\n\"}{range .status.containerStatuses[*]}  {.name} ready={.ready} restarts={.restartCount} state={.state}{\"\n\"}{end}{end}'"
+          echo ""
+          echo "===== EVENTS (40 dòng cuối — nói thẳng lý do kẹt) ====="
+          ssh cp "kubectl get events -n $NAMESPACE --sort-by=.lastTimestamp | tail -40"
+
+      - name: Sửa — force-restart (xoá pod kẹt, tạo lại)
+        if: ${{ inputs.action == 'force-restart' }}
+        run: |
+          echo "Xoá cứng pod của $DEPLOYMENT để k8s tạo lại..."
+          ssh cp "kubectl delete pod -n $NAMESPACE -l app=$DEPLOYMENT --force --grace-period=0 || true"
+          ssh cp "kubectl rollout status deployment/$DEPLOYMENT -n $NAMESPACE --timeout=6m"
+
+      - name: Sửa — rollout undo (quay về revision trước)
+        if: ${{ inputs.action == 'rollout-undo' }}
+        run: |
+          ssh cp "kubectl rollout undo deployment/$DEPLOYMENT -n $NAMESPACE"
+          ssh cp "kubectl rollout status deployment/$DEPLOYMENT -n $NAMESPACE --timeout=6m"
+
+      - name: Chẩn đoán lại sau khi sửa
+        if: ${{ inputs.action != 'diagnose' }}
+        run: |
+          echo "===== PODS (sau sửa) ====="
+          ssh cp "kubectl get pods -n $NAMESPACE -o wide"
+          echo "===== HEALTH ====="
+          curl -s -m 20 -o /dev/null -w "blog http=%{http_code}\n" https://www.tradadata.com/api/health || true
+
+      - name: Dọn khoá SSH
+        if: always()
+        run: rm -f ~/.ssh/ci_key
