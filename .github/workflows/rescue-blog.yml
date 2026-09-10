@@ -160,10 +160,18 @@ jobs:
         env:
           CREDS: ${{ secrets.BLOG_GOOGLE_DRIVE_CREDENTIALS }}
           INDEXNOW: ${{ secrets.BLOG_INDEXNOW_KEY }}
+          # Tuỳ chọn: chỉ khai khi cần thay refresh token Google Drive (token cũ hết
+          # hạn / bị thu hồi). Không khai thì bước này không đụng tới khoá đang có.
+          REFRESH: ${{ secrets.BLOG_GOOGLE_OAUTH_REFRESH_TOKEN }}
         run: |
           if [ -z "$CREDS" ] || [ -z "$INDEXNOW" ]; then
             echo "::error::Thiếu BLOG_GOOGLE_DRIVE_CREDENTIALS hoặc BLOG_INDEXNOW_KEY — khai ở ke-truyen > Settings > Secrets and variables > Actions."
             exit 1
+          fi
+          if [ -n "$REFRESH" ]; then
+            echo "Có BLOG_GOOGLE_OAUTH_REFRESH_TOKEN ⇒ sẽ ghi thêm GOOGLE_OAUTH_REFRESH_TOKEN."
+          else
+            echo "Không có BLOG_GOOGLE_OAUTH_REFRESH_TOKEN ⇒ giữ nguyên khoá refresh token hiện tại."
           fi
           # Dựng patch NGAY TẠI RUNNER rồi đẩy qua stdin. KHÔNG echo, và KHÔNG đưa giá trị
           # lên dòng lệnh — args của lệnh remote hiện trong `ps` của control plane.
@@ -175,8 +183,9 @@ jobs:
           # service account KHÁC (Sheet chỉ share cho SA đó). Ghi đè lên nó là làm Sheet
           # log chết im lặng. Route index đọc biến riêng này trước, chỉ fallback về khoá
           # Drive khi không khai.
-          jq -n --arg a "$CREDS" --arg b "$INDEXNOW" \
-            '{stringData: {GOOGLE_INDEXING_CREDENTIALS: $a, INDEXNOW_KEY: $b}}' \
+          jq -n --arg a "$CREDS" --arg b "$INDEXNOW" --arg c "$REFRESH" \
+            '{stringData: ({GOOGLE_INDEXING_CREDENTIALS: $a, INDEXNOW_KEY: $b}
+                           + (if $c == "" then {} else {GOOGLE_OAUTH_REFRESH_TOKEN: $c} end))}' \
             | ssh cp "cat > /tmp/blog-env-patch.json && kubectl -n $NAMESPACE patch secret $BLOG_SECRET --type merge --patch-file /tmp/blog-env-patch.json > /dev/null; rc=\$?; rm -f /tmp/blog-env-patch.json; exit \$rc"
           echo "Đã ghi 2 khoá vào Secret $BLOG_SECRET."
           echo "===== TÊN khoá sau khi ghi ====="
