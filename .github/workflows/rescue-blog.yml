@@ -23,6 +23,8 @@
 #                    vụ upload Drive + log Google Sheet bằng service account khác.
 #   blog-resources — chỉ đọc: hạn mức CPU/RAM, volumeMounts (xem `.next/cache` có
 #                    volume chưa), node đang chạy, và `kubectl top` nếu cụm có.
+#   blog-cpu-4     — nới `limits.cpu` của container blog từ 1 lên 4 core (node có 8).
+#                    Sửa pod template ⇒ RECREATE pod ⇒ cả 2 site down ~1-2 phút.
 #                    CỐ Ý KHÔNG restart: pod chỉ đọc lại Secret khi được tạo lại, nên để
 #                    `deploy-blog` làm MỘT lần recreate lấy cả image mới lẫn env mới —
 #                    1 lần downtime thay vì 2.
@@ -47,6 +49,7 @@ on:
           - blog-env-check
           - blog-env-set
           - blog-resources
+          - blog-cpu-4
 
 concurrency:
   # Group RIÊNG (không phải ke-truyen-deploy-cum) để chạy được NGAY cả khi một run
@@ -221,6 +224,29 @@ jobs:
           echo ""
           echo "===== dùng thực tế (bỏ qua nếu cụm không có metrics-server) ====="
           ssh cp "kubectl top pod -n $NAMESPACE -l app=$DEPLOYMENT --containers 2>/dev/null || echo '  (khong co metrics-server)'"
+
+      - name: Sửa — nâng hạn mức CPU của container blog lên 4 core
+        if: ${{ inputs.action == 'blog-cpu-4' }}
+        # Vì sao: Next Image optimizer encode ảnh bằng sharp/libvips — thư viện ĐA LUỒNG.
+        # Container `blog` đang bị bó `limits.cpu: 1` trong khi node k8snode2 có 8 core.
+        # Đo 10/09/2026: cùng một ảnh hero, máy dev encode 208ms, pod mất 1-5s. Và khi
+        # 3-4 request ảnh đến cùng lúc thì chúng chia nhau đúng 1 core đó.
+        # `requests` giữ nguyên 50m — chỉ nới TRẦN, không giữ chỗ thêm, nên không đẩy
+        # pod nào khỏi node. `ke-truyen` vẫn bị bó ở 500m nên không giành được.
+        #
+        # ⚠️ Sửa `resources` là sửa pod template ⇒ k8s RECREATE pod ⇒ cả blog và
+        # ke-truyen down ~1-2 phút. Muốn một lần downtime thì chạy mode này rồi chạy
+        # deploy-blog ngay sau, hai lần recreate dính vào một khoảng.
+        # Muốn quay lui: chạy lại `rollout-undo`, hoặc patch về `"cpu":"1"`.
+        run: |
+          echo "Trước:"
+          ssh cp "kubectl get deploy $DEPLOYMENT -n $NAMESPACE -o jsonpath='{range .spec.template.spec.containers[*]}{.name}: limits={.resources.limits}{\"\n\"}{end}'"
+          # Strategic merge khớp container theo `name`, nên KHÔNG đụng tới container
+          # ke-truyen và không cần khai lại image.
+          ssh cp "kubectl patch deployment $DEPLOYMENT -n $NAMESPACE --type strategic -p '{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"blog\",\"resources\":{\"requests\":{\"cpu\":\"50m\",\"memory\":\"256Mi\"},\"limits\":{\"cpu\":\"4\",\"memory\":\"1Gi\"}}}]}}}}'"
+          ssh cp "kubectl rollout status deployment/$DEPLOYMENT -n $NAMESPACE --timeout=6m"
+          echo "Sau:"
+          ssh cp "kubectl get deploy $DEPLOYMENT -n $NAMESPACE -o jsonpath='{range .spec.template.spec.containers[*]}{.name}: limits={.resources.limits}{\"\n\"}{end}'"
 
       - name: Chẩn đoán lại sau khi sửa
         if: ${{ inputs.action != 'diagnose' }}
