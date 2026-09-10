@@ -107,6 +107,236 @@ jobs:
           fi
           echo "OK — blog đang phục vụ đúng SHA."
 
+      # Nghiem thu /api/health chi chung minh DUNG COMMIT dang chay — khong
+      # chung minh trang con hoat dong. Da bi dung chuyen do: PR #8 cua repo blog
+      # gop /pricing vao /courses bang `permanentRedirect()` dat trong page
+      # component; Next prerender trang do thanh tinh nen lenh redirect khong
+      # sinh ra Location, de lai mot trang RONG tra 200. Health check van xanh,
+      # deploy van "thanh cong", va /pricing tra trang trang tren production suot
+      # tu do.
+      #
+      # Buoc nay kiem bang thu nguoi dung THAT nhin thay: ma trang thai va mot
+      # dau hieu noi dung phai co mat.
+      #
+      # CO Y khong `continue-on-error`: smoke test do thi run phai do, de nguoi
+      # bam deploy thay ngay va co lenh quay lui trong log.
+      #
+      # Khoi phuc ngay 10/09/2026: ban deploy-blog.yml viet lai hom 09/09 rut con
+      # 112 dong va bo mat buoc nay, nen deploy chi con nghiem thu SHA.
+      - name: Nghiệm thu — smoke test các đường quan trọng
+        run: |
+          BASE=https://www.tradadata.com
+          FAIL=0
+
+          # kiem_ma <duong_dan> <ma_mong_doi> [chuoi_bat_buoc_co_trong_body]
+          kiem_ma() {
+            local path="$1" want="$2" needle="${3:-}"
+            local got body
+            got=$(curl -sS -o /tmp/body.html -w '%{http_code}' -m 30 "$BASE$path" || echo "000")
+            if [ "$got" != "$want" ]; then
+              echo "  THAT BAI  $path  ma=$got (mong doi $want)"
+              FAIL=1
+              return
+            fi
+            if [ -n "$needle" ] && ! grep -qF -- "$needle" /tmp/body.html; then
+              echo "  THAT BAI  $path  ma dung ($got) nhung KHONG thay '$needle' -> trang co the rong"
+              FAIL=1
+              return
+            fi
+            echo "  ok        $path  ma=$got${needle:+  co '$needle'}"
+          }
+
+          # kiem_chuyen_huong <duong_dan> <ma_mong_doi> <location_mong_doi>
+          kiem_chuyen_huong() {
+            local path="$1" want="$2" loc="$3" got hdr
+            hdr=$(curl -sS -D - -o /dev/null -m 30 "$BASE$path" || true)
+            got=$(printf '%s' "$hdr" | sed -n 's/^HTTP\/[0-9.]* \([0-9]*\).*/\1/p' | head -1)
+            if [ "$got" != "$want" ]; then
+              echo "  THAT BAI  $path  ma=$got (mong doi $want) — redirect khong hoat dong"
+              FAIL=1
+              return
+            fi
+            if ! printf '%s' "$hdr" | grep -qi "^location:.*$loc"; then
+              echo "  THAT BAI  $path  co $got nhung Location khong tro toi $loc"
+              FAIL=1
+              return
+            fi
+            echo "  ok        $path  $got -> $loc"
+          }
+
+          echo "== trang phai co noi dung thuc su =="
+          kiem_ma /                 200 '<article'
+          kiem_ma /blog             200 '<article'
+          kiem_ma /courses          200 'Thêm vào giỏ hàng'
+          kiem_ma /categories       200 'bài viết'
+          kiem_ma /phan-mem-ban-hang 200 'Hàng ký gửi'
+          kiem_ma /about            200 'Trà Đá Data'
+          kiem_ma /api/health       200 '"status":"ok"'
+
+          echo "== chuyen huong phai that su chuyen huong =="
+          kiem_chuyen_huong /pricing 308 /courses
+
+          echo "== duong khong ton tai phai la 404, khong phai 200 rong =="
+          kiem_ma /duong-dan-khong-ton-tai-de-kiem-404 404
+
+          # Trang bai viet vua doi tu DONG sang TINH (tach xem-truoc + gating
+          # Premium ra khoi route cong khai). Do la thay doi de hong am tham:
+          # trang van tra 200 nhung thieu than bai, hoac paywall mo sai chieu.
+          # Lay slug that tu sitemap chu khong hardcode, de bai bi xoa khong lam
+          # smoke test bao dong gia.
+          # Hai duong nay goi `notFound()` trong page. Chung PHAI tra 404 THAT.
+          #
+          # Neu tra 200 (soft 404) thi gan nhu chac chan co ai them lai
+          # `src/app/loading.tsx`, hoac them `loading.tsx` vao segment cha cua
+          # category/tag. Ly do: loading.tsx dat Suspense boundary o tang cao hon
+          # page, nen Next xa HTML shell voi status 200 truoc khi `notFound()` kip
+          # goi — luc do khong sua duoc ma nua. Xem CLAUDE.md, muc ve loading.tsx.
+          #
+          # KHONG them /blog/<slug> va /blog/trang/999 vao day: chung van la soft
+          # 404 co y thuc, vi `blog/loading.tsx` duoc giu lai de con skeleton.
+          echo "== notFound() phai tra 404 THAT, khong phai 200 rong =="
+          kiem_ma /category/khong-ton-tai-de-kiem-404 404
+          kiem_ma /tag/khong-ton-tai-de-kiem-404 404
+
+          echo "== trang bai viet phai co than bai =="
+          SLUG=$(curl -sS -m 30 "$BASE/sitemap.xml" \
+                 | grep -oE '<loc>[^<]*/blog/[^<]*</loc>' \
+                 | sed 's|<loc>||; s|</loc>||' | head -1 | sed "s|$BASE/blog/||")
+          if [ -z "$SLUG" ]; then
+            echo "  THAT BAI  khong lay duoc slug nao tu sitemap"
+            FAIL=1
+          else
+            kiem_ma "/blog/$SLUG" 200 '<article'
+            # `prose` la class boc than bai. Co no nghia la noi dung da render,
+            # khong phai trang chi co vo va hero.
+            kiem_ma "/blog/$SLUG" 200 'prose'
+
+            # Trang tinh thi PHAI cache duoc. Truoc PR nay no tra
+            # `no-store` nen khong tang nao giu duoc, ke ca trinh duyet.
+            HDR=$(curl -sS -D - -o /dev/null -m 30 "$BASE/blog/$SLUG" || true)
+            if printf '%s' "$HDR" | grep -qi '^cache-control:.*no-store'; then
+              echo "  THAT BAI  /blog/$SLUG  van tra no-store -> route bi ep render DONG tro lai"
+              echo "            (thuong la do co ai them auth()/cookies()/searchParams vao page)"
+              FAIL=1
+            else
+              echo "  ok        /blog/$SLUG  khong con no-store"
+            fi
+
+            echo "== xem truoc ban nhap phai kin voi nguoi la =="
+            # KHONG kiem ma 404 o day, du do moi la thu dung ve nghia.
+            #
+            # Ly do (do duoc 08/09/2026, dung `next dev` cuc bo de loai tru nginx):
+            # `src/app/loading.tsx` o GOC dat mot Suspense boundary o tang cao nhat
+            # cua MOI route, nen Next xa HTML shell voi status 200 ngay lap tuc.
+            # Den luc `notFound()` duoc goi thi dong status da gui di roi, Next chi
+            # con cach nhet chi thi vao trong stream. Body cua mot route redirect
+            # thu nghiem chua nguyen van "REDIRECT;replace;/;307;" trong mot phan
+            # hoi 200 — cung mot co che.
+            #
+            # Vi vay MOI `notFound()` tren site nay deu tra 200 (soft 404), khong
+            # rieng route nay: /blog/<slug-khong-ton-tai>, /blog/trang/999,
+            # /category/<khong-ton-tai>, /tag/<khong-ton-tai> — da do, ca 5 deu 200.
+            # Day cung la thu da lam PR #8 hong /pricing thanh trang trang 200.
+            #
+            # Nen o day kiem DUNG HAI TINH CHAT co y nghia bao mat/SEO:
+            #   1. phan hoi KHONG chua than bai  -> khong lo ban nhap
+            #   2. phan hoi CO noindex           -> khong vao chi muc tim kiem
+            XT=$(curl -sS -m 30 "$BASE/blog/$SLUG/xem-truoc" || true)
+            if printf '%s' "$XT" | grep -qF 'prose'; then
+              echo "  THAT BAI  /blog/$SLUG/xem-truoc  co than bai -> LO BAN NHAP cho nguoi la"
+              FAIL=1
+            else
+              echo "  ok        /blog/$SLUG/xem-truoc  khong co than bai"
+            fi
+            if printf '%s' "$XT" | grep -qiF 'noindex'; then
+              echo "  ok        /blog/$SLUG/xem-truoc  co noindex"
+            else
+              echo "  THAT BAI  /blog/$SLUG/xem-truoc  thieu noindex -> ban nhap co the bi index"
+              FAIL=1
+            fi
+
+            echo "== API noi dung Premium phai chan nguoi chua dang nhap =="
+            # 401 = chan dung. 200 o day la RO NOI DUNG TRA PHI.
+            kiem_ma "/api/posts/$SLUG/noi-dung-premium" 401
+          fi
+
+          # Font chinh hien tai la Be Vietnam Pro — font TINH, moi weight mot file
+          # cho moi dai Unicode. Site dung 4 weight (400/500/600/700) x 2 dai
+          # (latin + tieng Viet) = 8 the preload, 71 KB.
+          #
+          # Nguong 8 chu khong phai 2: truoc day font chinh la Inter (bien the,
+          # 1 file phu ca dai 400-700 nen chi 2 the). Doi sang font tinh la so the
+          # tang theo so weight — day la ban chat cua font tinh, khong phai loi.
+          #
+          # Con >8 the nghia la co ai them weight (moi weight = +2 the, ~+18 KB)
+          # hoac bo `preload: false` cua JetBrains Mono. Ca hai deu dang de y:
+          # font nam trong duong toi han, khac han anh tai lazy.
+          echo "== so font duoc preload =="
+          SO_FONT=$(curl -sS -m 30 "$BASE/blog" \
+                    | grep -oE '<link rel="preload" href="[^"]*woff2"' | grep -c . || true)
+          if [ "$SO_FONT" -le 8 ]; then
+            echo "  ok        /blog  $SO_FONT the preload font (<= 8)"
+          else
+            echo "  THAT BAI  /blog  $SO_FONT the preload font — mong doi toi da 8"
+            echo "            co the co ai them weight vao Be_Vietnam_Pro trong src/app/layout.tsx,"
+            echo "            hoac bo preload:false cua JetBrains_Mono"
+            FAIL=1
+          fi
+
+          # Than bai viet PHAI dung font chinh, khong duoc roi ve font he thong.
+          # Da tung suyt hong dung cho nay (08/09/2026): `.prose` trong globals.css
+          # hardcode 'Inter' thay vi var(--font-sans), nen khi doi font chinh sang
+          # Be Vietnam Pro thi chu bai viet — chu quan trong nhat cua site — tro toi
+          # mot font khong con duoc tai.
+          #
+          # Kiem bang KHANG DINH DUONG (phai co var(--font-sans)) chu khong phai
+          # phu dinh (khong co 'Inter'): phu dinh se xanh ca khi `.prose` mat han
+          # khai bao font, ma do cung la hong.
+          #
+          # Doc TAT CA file CSS, khong chi file dau. Ban dau viet `head -1` nen no
+          # doc sai file va bao xanh trong khi production dang hardcode 'Inter'.
+          echo "== than bai viet phai dung font chinh =="
+          curl -sS -m 30 "$BASE/blog" | grep -oE '/_next/static/css/[^"]*\.css' | sort -u > /tmp/css.txt
+          : > /tmp/all.css
+          while read -r c; do
+            [ -z "$c" ] || curl -sS -m 30 "$BASE$c" >> /tmp/all.css
+          done < /tmp/css.txt
+
+          SO_CSS=$(grep -c . /tmp/css.txt || true)
+          if [ "$SO_CSS" = "0" ]; then
+            echo "  THAT BAI  khong tim thay file CSS nao"
+            FAIL=1
+          elif grep -qE '\.prose\{[^}]*font-family:var\(--font-sans\)' /tmp/all.css; then
+            echo "  ok        .prose dung var(--font-sans)  (doc $SO_CSS file CSS)"
+          else
+            echo "  THAT BAI  .prose KHONG dung var(--font-sans) -> than bai co the roi ve font he thong"
+            printf '            .prose dang khai: '
+            grep -oE '\.prose\{[^}]{0,120}' /tmp/all.css | head -1 || echo '(khong thay .prose)'
+            FAIL=1
+          fi
+
+          echo "== apex phai ve www =="
+          APEX=$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' -m 30 https://tradadata.com/ || echo "000")
+          case "$APEX" in
+            30*"://www.tradadata.com"*) echo "  ok        apex  $APEX" ;;
+            *) echo "  THAT BAI  apex  $APEX (mong doi 30x ve www)"; FAIL=1 ;;
+          esac
+
+          echo "== site dung chung pod phai con song =="
+          KT=$(curl -sS -o /dev/null -w '%{http_code}' -m 30 https://truyen.tradadata.com/ || echo "000")
+          case "$KT" in
+            200|30*) echo "  ok        truyen.tradadata.com  ma=$KT" ;;
+            *) echo "  THAT BAI  truyen.tradadata.com  ma=$KT"; FAIL=1 ;;
+          esac
+
+          echo
+          if [ "$FAIL" != "0" ]; then
+            echo "SMOKE TEST THAT BAI — code moi da chay nhung co duong bi hong."
+            echo "Quay lui: kubectl rollout undo deployment/$DEPLOYMENT -n $NAMESPACE"
+            exit 1
+          fi
+          echo "SMOKE TEST OK — moi duong quan trong tra dung ma va co noi dung."
+
       - name: Dọn khoá SSH
         if: always()
         run: rm -f ~/.ssh/ci_key
