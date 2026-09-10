@@ -17,8 +17,10 @@
 #   rollout-undo   — quay Deployment về revision trước đó, rồi chờ rollout.
 #   blog-env-check — chỉ đọc: container `blog` nạp env từ Secret nào, và Secret
 #                    `tradadata-blog-secret` đang có những TÊN khoá gì (không giá trị).
-#   blog-env-set   — ghi GOOGLE_DRIVE_CREDENTIALS + INDEXNOW_KEY vào Secret đó, lấy từ
+#   blog-env-set   — ghi GOOGLE_INDEXING_CREDENTIALS + INDEXNOW_KEY vào Secret đó, lấy từ
 #                    secret repo BLOG_GOOGLE_DRIVE_CREDENTIALS / BLOG_INDEXNOW_KEY.
+#                    KHÔNG bao giờ ghi vào GOOGLE_DRIVE_CREDENTIALS — khoá đó đang phục
+#                    vụ upload Drive + log Google Sheet bằng service account khác.
 #                    CỐ Ý KHÔNG restart: pod chỉ đọc lại Secret khi được tạo lại, nên để
 #                    `deploy-blog` làm MỘT lần recreate lấy cả image mới lẫn env mới —
 #                    1 lần downtime thay vì 2.
@@ -153,7 +155,7 @@ jobs:
           # Lấy JSON về runner rồi `jq keys` — chỉ in tên khoá, giá trị không bao giờ ra log.
           ssh cp "kubectl get secret $BLOG_SECRET -n $NAMESPACE -o json" | jq -r '.data | keys[]'
 
-      - name: Sửa — ghi GOOGLE_DRIVE_CREDENTIALS + INDEXNOW_KEY vào Secret blog
+      - name: Sửa — ghi GOOGLE_INDEXING_CREDENTIALS + INDEXNOW_KEY vào Secret blog
         if: ${{ inputs.action == 'blog-env-set' }}
         env:
           CREDS: ${{ secrets.BLOG_GOOGLE_DRIVE_CREDENTIALS }}
@@ -167,8 +169,14 @@ jobs:
           # lên dòng lệnh — args của lệnh remote hiện trong `ps` của control plane.
           # `--type merge` chỉ thêm/ghi đè 2 khoá này; các khoá khác trong Secret
           # (EMAIL_USER, EMAIL_PASS, CRON_SECRET...) giữ nguyên.
+          #
+          # ⚠️ Ghi vào GOOGLE_INDEXING_CREDENTIALS, KHÔNG phải GOOGLE_DRIVE_CREDENTIALS.
+          # Khoá Drive đang phục vụ upload Google Drive + ghi log Google Sheet bằng một
+          # service account KHÁC (Sheet chỉ share cho SA đó). Ghi đè lên nó là làm Sheet
+          # log chết im lặng. Route index đọc biến riêng này trước, chỉ fallback về khoá
+          # Drive khi không khai.
           jq -n --arg a "$CREDS" --arg b "$INDEXNOW" \
-            '{stringData: {GOOGLE_DRIVE_CREDENTIALS: $a, INDEXNOW_KEY: $b}}' \
+            '{stringData: {GOOGLE_INDEXING_CREDENTIALS: $a, INDEXNOW_KEY: $b}}' \
             | ssh cp "cat > /tmp/blog-env-patch.json && kubectl -n $NAMESPACE patch secret $BLOG_SECRET --type merge --patch-file /tmp/blog-env-patch.json > /dev/null; rc=\$?; rm -f /tmp/blog-env-patch.json; exit \$rc"
           echo "Đã ghi 2 khoá vào Secret $BLOG_SECRET."
           echo "===== TÊN khoá sau khi ghi ====="
