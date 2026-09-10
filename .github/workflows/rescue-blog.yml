@@ -235,10 +235,23 @@ jobs:
         # pod nào khỏi node. `ke-truyen` vẫn bị bó ở 500m nên không giành được.
         #
         # ⚠️ Sửa `resources` là sửa pod template ⇒ k8s RECREATE pod ⇒ cả blog và
-        # ke-truyen down ~1-2 phút. Muốn một lần downtime thì chạy mode này rồi chạy
-        # deploy-blog ngay sau, hai lần recreate dính vào một khoảng.
+        # ke-truyen down ~1-2 phút.
         # Muốn quay lui: chạy lại `rollout-undo`, hoặc patch về `"cpu":"1"`.
+        #
+        # ⚠️ ĐỪNG chạy song song với deploy-blog. Workflow này dùng concurrency group
+        # RIÊNG (`bizflow-rescue`) — cố ý, để cứu được cụm khi một run deploy đang treo
+        # — nên GitHub KHÔNG chặn hai run cùng lúc. Ngày 10/09/2026 chạy hai lệnh liền
+        # nhau: bản vá này recreate pod đúng lúc smoke test của deploy-blog đang đo,
+        # 8 đường trả 502, run deploy đỏ và bước làm ấm cache bị skip. Site không hỏng,
+        # nhưng mất một run và phải làm ấm tay.
+        # Vì vậy bước dưới TỰ CHẶN nếu đang có rollout dở. Thứ tự đúng: chạy mode này,
+        # chờ xanh, RỒI mới chạy deploy-blog.
         run: |
+          echo "Kiểm xem có rollout nào đang dở không (đừng chen vào deploy-blog)..."
+          if ! ssh cp "kubectl rollout status deployment/$DEPLOYMENT -n $NAMESPACE --timeout=20s"; then
+            echo "::error::Đang có rollout dở trên deployment/$DEPLOYMENT. Chờ nó xong rồi chạy lại — chen vào là pod recreate giữa lúc deploy đang nghiệm thu."
+            exit 1
+          fi
           echo "Trước:"
           ssh cp "kubectl get deploy $DEPLOYMENT -n $NAMESPACE -o jsonpath='{range .spec.template.spec.containers[*]}{.name}: limits={.resources.limits}{\"\n\"}{end}'"
           # Strategic merge khớp container theo `name`, nên KHÔNG đụng tới container
