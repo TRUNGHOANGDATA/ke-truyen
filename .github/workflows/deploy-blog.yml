@@ -337,6 +337,31 @@ jobs:
           fi
           echo "SMOKE TEST OK — moi duong quan trong tra dung ma va co noi dung."
 
+      - name: Làm ấm cache ảnh (để người đọc đầu tiên không phải chờ encode)
+        # Vì sao cần: `.next/cache` nằm TRONG container ⇒ mỗi lần recreate pod là cache
+        # ảnh mất sạch. Ảnh cover là bản gốc ~500KB từ Google Drive (Drive KHÔNG resize
+        # theo tham số), nên lần xem đầu pod phải tải về rồi tự encode WebP.
+        # Đo trên cụm 10/09/2026, cache lạnh: /blog có 108 biến thể ảnh, 82 cái lạnh,
+        # tổng 222s encode — dồn hết vào những người đọc đầu tiên. Ấm rồi còn 0,186s.
+        # /courses nặng hơn: ~5s mỗi ảnh.
+        # Bước này trả trước khoản đó, và nằm SAU rollout nên KHÔNG cộng vào downtime.
+        # Cố ý không để nó làm đỏ run: ảnh chậm không phải lý do coi deploy là thất bại.
+        continue-on-error: true
+        run: |
+          TONG=0
+          for P in / /blog /courses /phan-mem-ban-hang; do
+            URLS=$(curl -sS -m 30 "https://www.tradadata.com$P" \
+              | grep -oE '/_next/image\?url=[^" ]+&amp;w=[0-9]+&amp;q=[0-9]+' \
+              | sed 's/&amp;/\&/g' | sort -u || true)
+            SO=$(printf '%s\n' "$URLS" | grep -c . || true)
+            echo "$P: $SO bien the anh"
+            TONG=$((TONG + SO))
+            printf '%s\n' "$URLS" | grep . \
+              | sed 's|^|https://www.tradadata.com|' \
+              | xargs -r -P 4 -I{} curl -s -o /dev/null -m 60 -H 'Accept: image/webp,*/*' {} || true
+          done
+          echo "Da lam am $TONG bien the anh."
+
       - name: Dọn khoá SSH
         if: always()
         run: rm -f ~/.ssh/ci_key
