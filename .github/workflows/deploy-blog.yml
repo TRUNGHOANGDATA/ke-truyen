@@ -348,19 +348,40 @@ jobs:
         # Cố ý không để nó làm đỏ run: ảnh chậm không phải lý do coi deploy là thất bại.
         continue-on-error: true
         run: |
-          TONG=0
+          BASE=https://www.tradadata.com
+          HTML=$(mktemp); LIST=$(mktemp)
+
+          # Trang danh sách + landing.
           for P in / /blog /courses /phan-mem-ban-hang; do
-            URLS=$(curl -sS -m 30 "https://www.tradadata.com$P" \
-              | grep -oE '/_next/image\?url=[^" ]+&amp;w=[0-9]+&amp;q=[0-9]+' \
-              | sed 's/&amp;/\&/g' | sort -u || true)
-            SO=$(printf '%s\n' "$URLS" | grep -c . || true)
-            echo "$P: $SO bien the anh"
-            TONG=$((TONG + SO))
-            printf '%s\n' "$URLS" | grep . \
-              | sed 's|^|https://www.tradadata.com|' \
-              | xargs -r -P 4 -I{} curl -s -o /dev/null -m 60 -H 'Accept: image/webp,*/*' {} || true
+            curl -sS -m 30 "$BASE$P" >> "$HTML" || true
           done
-          echo "Da lam am $TONG bien the anh."
+
+          # Và 12 bài mới nhất — đúng những bài người đọc bấm vào từ trang /blog.
+          # Phải làm ấm cả trang bài viết, không chỉ trang danh sách: ảnh hero ở
+          # trang bài dùng BẬC KHÁC (1200) với ảnh cover ở danh sách (640/828),
+          # nên làm ấm /blog không hề làm ấm giúp trang bài.
+          # `awk '!seen'` chứ không `sort -u`: phải giữ THỨ TỰ mới nhất trước.
+          SLUGS=$(curl -sS -m 30 "$BASE/blog" \
+            | grep -oE 'href="/blog/[a-z0-9-]+"' \
+            | sed 's|href="/blog/||; s|"||' \
+            | grep -vE '^(trang)$' | awk '!seen[$0]++' | head -12 || true)
+          for S in $SLUGS; do
+            curl -sS -m 30 "$BASE/blog/$S" >> "$HTML" || true
+          done
+
+          # Gom rồi bỏ trùng MỘT LẦN: thumbnail bài liên quan lặp lại rất nhiều
+          # giữa các trang, làm ấm trùng là bắt pod encode lại việc đã xong.
+          grep -oE '/_next/image\?url=[^" ]+&amp;w=[0-9]+&amp;q=[0-9]+' "$HTML" \
+            | sed 's/&amp;/\&/g' | sort -u | sed "s|^|$BASE|" > "$LIST" || true
+
+          echo "$(printf '%s\n' "$SLUGS" | grep -c . || true) bài + 4 trang danh sách"
+          echo "$(grep -c . "$LIST" || true) biến thể ảnh cần làm ấm (đã bỏ trùng)"
+
+          # -P 3 chứ không 4: pod chỉ 1 replica và đang phục vụ người đọc thật,
+          # đừng để bước làm ấm giành hết CPU của họ.
+          xargs -r -P 3 -I{} curl -s -o /dev/null -m 60 -H 'Accept: image/webp,*/*' {} < "$LIST" || true
+          echo "Xong."
+          rm -f "$HTML" "$LIST"
 
       - name: Dọn khoá SSH
         if: always()

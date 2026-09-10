@@ -21,6 +21,8 @@
 #                    secret repo BLOG_GOOGLE_DRIVE_CREDENTIALS / BLOG_INDEXNOW_KEY.
 #                    KHÔNG bao giờ ghi vào GOOGLE_DRIVE_CREDENTIALS — khoá đó đang phục
 #                    vụ upload Drive + log Google Sheet bằng service account khác.
+#   blog-resources — chỉ đọc: hạn mức CPU/RAM, volumeMounts (xem `.next/cache` có
+#                    volume chưa), node đang chạy, và `kubectl top` nếu cụm có.
 #                    CỐ Ý KHÔNG restart: pod chỉ đọc lại Secret khi được tạo lại, nên để
 #                    `deploy-blog` làm MỘT lần recreate lấy cả image mới lẫn env mới —
 #                    1 lần downtime thay vì 2.
@@ -44,6 +46,7 @@ on:
           - rollout-undo
           - blog-env-check
           - blog-env-set
+          - blog-resources
 
 concurrency:
   # Group RIÊNG (không phải ke-truyen-deploy-cum) để chạy được NGAY cả khi một run
@@ -194,6 +197,30 @@ jobs:
           echo "⚠️ Secret mới KHÔNG tự vào pod đang chạy — pod chỉ đọc lại khi được tạo lại."
           echo "   ĐỪNG restart ở đây. Chạy workflow deploy-blog với SHA mới: một lần"
           echo "   recreate lấy cả image mới lẫn env mới (1 lần downtime, không phải 2)."
+
+      - name: Xem hạn mức CPU/RAM và volume của container blog (chỉ đọc)
+        if: ${{ inputs.action == 'blog-resources' }}
+        # Vì sao cần: Next Image optimizer encode ảnh bằng CPU của pod. Đo
+        # 10/09/2026: cùng một ảnh hero, máy dev encode 208ms mà pod mất 1-5s
+        # ⇒ nghi pod bị bó CPU. Không đoán — đọc `resources` ra xem.
+        # Và xem luôn có volume nào mount vào `.next/cache` chưa: nếu chưa thì
+        # mỗi lần recreate pod là mất sạch cache ảnh, phải encode lại từ đầu.
+        run: |
+          echo "===== resources (requests/limits) từng container ====="
+          ssh cp "kubectl get deploy $DEPLOYMENT -n $NAMESPACE -o jsonpath='{range .spec.template.spec.containers[*]}{.name}: requests={.resources.requests} limits={.resources.limits}{\"\n\"}{end}'"
+          echo ""
+          echo "===== volumeMounts của container blog (tìm .next/cache) ====="
+          ssh cp "kubectl get deploy $DEPLOYMENT -n $NAMESPACE -o jsonpath='{range .spec.template.spec.containers[?(@.name==\"blog\")].volumeMounts[*]}{.name} -> {.mountPath}{\"\n\"}{end}'"
+          echo ""
+          echo "===== volumes khai ở pod ====="
+          ssh cp "kubectl get deploy $DEPLOYMENT -n $NAMESPACE -o jsonpath='{range .spec.template.spec.volumes[*]}{.name}{\"\n\"}{end}'"
+          echo ""
+          echo "===== node đang chạy + CPU của node ====="
+          ssh cp "kubectl get pods -n $NAMESPACE -l app=$DEPLOYMENT -o jsonpath='{range .items[*]}{.metadata.name} node={.spec.nodeName}{\"\n\"}{end}'"
+          ssh cp "kubectl get nodes -o custom-columns=TEN:.metadata.name,CPU:.status.capacity.cpu,RAM:.status.capacity.memory"
+          echo ""
+          echo "===== dùng thực tế (bỏ qua nếu cụm không có metrics-server) ====="
+          ssh cp "kubectl top pod -n $NAMESPACE -l app=$DEPLOYMENT --containers 2>/dev/null || echo '  (khong co metrics-server)'"
 
       - name: Chẩn đoán lại sau khi sửa
         if: ${{ inputs.action != 'diagnose' }}
