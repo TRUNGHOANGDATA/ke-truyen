@@ -11,10 +11,17 @@
 #    có thể lộ giá trị env) và không in log ứng dụng.
 #
 # Chạy bằng tay (workflow_dispatch), chọn 1 trong các chế độ:
-#   diagnose      — chỉ đọc: pods, events, trạng thái từng container, ảnh đang khai.
-#   force-restart — xoá cứng pod của deployment để k8s tạo lại (gỡ pod kẹt
-#                   Terminating/Pending), rồi chờ rollout.
-#   rollout-undo  — quay Deployment về revision trước đó, rồi chờ rollout.
+#   diagnose       — chỉ đọc: pods, events, trạng thái từng container, ảnh đang khai.
+#   force-restart  — xoá cứng pod của deployment để k8s tạo lại (gỡ pod kẹt
+#                    Terminating/Pending), rồi chờ rollout.
+#   rollout-undo   — quay Deployment về revision trước đó, rồi chờ rollout.
+#   blog-env-check — chỉ đọc: container `blog` nạp env từ Secret nào, và Secret
+#                    `tradadata-blog-secret` đang có những TÊN khoá gì (không giá trị).
+#   blog-env-set   — ghi GOOGLE_DRIVE_CREDENTIALS + INDEXNOW_KEY vào Secret đó, lấy từ
+#                    secret repo BLOG_GOOGLE_DRIVE_CREDENTIALS / BLOG_INDEXNOW_KEY.
+#                    CỐ Ý KHÔNG restart: pod chỉ đọc lại Secret khi được tạo lại, nên để
+#                    `deploy-blog` làm MỘT lần recreate lấy cả image mới lẫn env mới —
+#                    1 lần downtime thay vì 2.
 #
 # Dùng lại secret SSH sẵn có: SSH_PRIVATE_KEY SSH_KNOWN_HOSTS SSH_USER SSH_GATEWAY K8S_HOST
 
@@ -24,7 +31,7 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: 'diagnose = chỉ xem; fix-pullsecret = làm mới ghcr-secret rồi tạo lại pod; force-restart = xoá pod kẹt tạo lại; rollout-undo = quay về revision trước'
+        description: 'diagnose = chỉ xem; fix-pullsecret = làm mới ghcr-secret rồi tạo lại pod; force-restart = xoá pod kẹt tạo lại; rollout-undo = quay về revision trước; blog-env-check = xem env blog lấy từ Secret nào (chỉ đọc); blog-env-set = ghi creds Google + IndexNow vào Secret blog (không restart)'
         required: true
         type: choice
         default: diagnose
@@ -33,6 +40,8 @@ on:
           - fix-pullsecret
           - force-restart
           - rollout-undo
+          - blog-env-check
+          - blog-env-set
 
 concurrency:
   # Group RIÊNG (không phải ke-truyen-deploy-cum) để chạy được NGAY cả khi một run
@@ -46,6 +55,7 @@ jobs:
     env:
       NAMESPACE: bizflow
       DEPLOYMENT: tradadata
+      BLOG_SECRET: tradadata-blog-secret
     steps:
       - name: Chuẩn bị SSH (ProxyJump qua gateway public vào LAN)
         run: |
@@ -127,6 +137,46 @@ jobs:
         run: |
           ssh cp "kubectl rollout undo deployment/$DEPLOYMENT -n $NAMESPACE"
           ssh cp "kubectl rollout status deployment/$DEPLOYMENT -n $NAMESPACE --timeout=6m"
+
+      - name: Xem env của container blog (chỉ đọc — CHỈ in TÊN, không in giá trị)
+        if: ${{ inputs.action == 'blog-env-check' || inputs.action == 'blog-env-set' }}
+        run: |
+          echo "===== envFrom: Secret/ConfigMap nào được nạp CẢ KHỐI vào container blog ====="
+          echo "(có dòng tradadata-blog-secret ở đây ⇒ thêm khoá vào Secret là container tự có)"
+          ssh cp "kubectl get deploy $DEPLOYMENT -n $NAMESPACE -o jsonpath='{range .spec.template.spec.containers[?(@.name==\"blog\")].envFrom[*]}secretRef={.secretRef.name} configMapRef={.configMapRef.name}{\"\n\"}{end}'"
+          echo ""
+          echo "===== env khai LẺ bằng secretKeyRef (tên biến <- tên Secret/khoá) ====="
+          echo "(nếu env khai kiểu này thì thêm khoá vào Secret là CHƯA đủ — phải sửa cả Deployment)"
+          ssh cp "kubectl get deploy $DEPLOYMENT -n $NAMESPACE -o jsonpath='{range .spec.template.spec.containers[?(@.name==\"blog\")].env[*]}{.name} <- {.valueFrom.secretKeyRef.name}/{.valueFrom.secretKeyRef.key}{\"\n\"}{end}'"
+          echo ""
+          echo "===== TÊN các khoá đang có trong Secret $BLOG_SECRET ====="
+          # Lấy JSON về runner rồi `jq keys` — chỉ in tên khoá, giá trị không bao giờ ra log.
+          ssh cp "kubectl get secret $BLOG_SECRET -n $NAMESPACE -o json" | jq -r '.data | keys[]'
+
+      - name: Sửa — ghi GOOGLE_DRIVE_CREDENTIALS + INDEXNOW_KEY vào Secret blog
+        if: ${{ inputs.action == 'blog-env-set' }}
+        env:
+          CREDS: ${{ secrets.BLOG_GOOGLE_DRIVE_CREDENTIALS }}
+          INDEXNOW: ${{ secrets.BLOG_INDEXNOW_KEY }}
+        run: |
+          if [ -z "$CREDS" ] || [ -z "$INDEXNOW" ]; then
+            echo "::error::Thiếu BLOG_GOOGLE_DRIVE_CREDENTIALS hoặc BLOG_INDEXNOW_KEY — khai ở ke-truyen > Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          # Dựng patch NGAY TẠI RUNNER rồi đẩy qua stdin. KHÔNG echo, và KHÔNG đưa giá trị
+          # lên dòng lệnh — args của lệnh remote hiện trong `ps` của control plane.
+          # `--type merge` chỉ thêm/ghi đè 2 khoá này; các khoá khác trong Secret
+          # (EMAIL_USER, EMAIL_PASS, CRON_SECRET...) giữ nguyên.
+          jq -n --arg a "$CREDS" --arg b "$INDEXNOW" \
+            '{stringData: {GOOGLE_DRIVE_CREDENTIALS: $a, INDEXNOW_KEY: $b}}' \
+            | ssh cp "cat > /tmp/blog-env-patch.json && kubectl -n $NAMESPACE patch secret $BLOG_SECRET --type merge --patch-file /tmp/blog-env-patch.json > /dev/null; rc=\$?; rm -f /tmp/blog-env-patch.json; exit \$rc"
+          echo "Đã ghi 2 khoá vào Secret $BLOG_SECRET."
+          echo "===== TÊN khoá sau khi ghi ====="
+          ssh cp "kubectl get secret $BLOG_SECRET -n $NAMESPACE -o json" | jq -r '.data | keys[]'
+          echo ""
+          echo "⚠️ Secret mới KHÔNG tự vào pod đang chạy — pod chỉ đọc lại khi được tạo lại."
+          echo "   ĐỪNG restart ở đây. Chạy workflow deploy-blog với SHA mới: một lần"
+          echo "   recreate lấy cả image mới lẫn env mới (1 lần downtime, không phải 2)."
 
       - name: Chẩn đoán lại sau khi sửa
         if: ${{ inputs.action != 'diagnose' }}
