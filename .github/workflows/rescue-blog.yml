@@ -28,6 +28,10 @@
 #                    CỐ Ý KHÔNG restart: pod chỉ đọc lại Secret khi được tạo lại, nên để
 #                    `deploy-blog` làm MỘT lần recreate lấy cả image mới lẫn env mới —
 #                    1 lần downtime thay vì 2.
+#   apply-cronjobs — `kubectl apply` file k8s/cronjobs.yaml lấy TRỰC TIẾP từ repo
+#                    blog (public) tại ref `blog_ref` (mặc định main). Chỉ tạo/cập
+#                    nhật CronJob, KHÔNG đụng Deployment ⇒ KHÔNG downtime. Idempotent.
+#                    Dùng khi thêm/sửa lịch chạy nền (vd cron flush-views đếm lượt xem).
 #
 # Dùng lại secret SSH sẵn có: SSH_PRIVATE_KEY SSH_KNOWN_HOSTS SSH_USER SSH_GATEWAY K8S_HOST
 
@@ -37,7 +41,7 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: 'diagnose = chỉ xem; fix-pullsecret = làm mới ghcr-secret rồi tạo lại pod; force-restart = xoá pod kẹt tạo lại; rollout-undo = quay về revision trước; blog-env-check = xem env blog lấy từ Secret nào (chỉ đọc); blog-env-set = ghi creds Google + IndexNow vào Secret blog (không restart)'
+        description: 'diagnose = chỉ xem; fix-pullsecret = làm mới ghcr-secret rồi tạo lại pod; force-restart = xoá pod kẹt tạo lại; rollout-undo = quay về revision trước; blog-env-check = xem env blog lấy từ Secret nào (chỉ đọc); blog-env-set = ghi creds Google + IndexNow vào Secret blog (không restart); apply-cronjobs = kubectl apply k8s/cronjobs.yaml của repo blog (không downtime)'
         required: true
         type: choice
         default: diagnose
@@ -50,6 +54,12 @@ on:
           - blog-env-set
           - blog-resources
           - blog-cpu-4
+          - apply-cronjobs
+      blog_ref:
+        description: 'apply-cronjobs: ref (nhánh hoặc SHA) của repo tradadata-blog để lấy k8s/cronjobs.yaml. Mặc định main.'
+        required: false
+        type: string
+        default: main
 
 concurrency:
   # Group RIÊNG (không phải ke-truyen-deploy-cum) để chạy được NGAY cả khi một run
@@ -145,6 +155,25 @@ jobs:
         run: |
           ssh cp "kubectl rollout undo deployment/$DEPLOYMENT -n $NAMESPACE"
           ssh cp "kubectl rollout status deployment/$DEPLOYMENT -n $NAMESPACE --timeout=6m"
+
+      - name: Sửa — apply cronjobs của repo blog (không downtime)
+        if: ${{ inputs.action == 'apply-cronjobs' }}
+        env:
+          BLOG_REF: ${{ inputs.blog_ref }}
+        run: |
+          # Lấy manifest TRỰC TIẾP từ repo blog (public) rồi đẩy qua stdin -> kubectl.
+          # Chỉ tạo/cập nhật CronJob (idempotent), KHÔNG đụng Deployment nên KHÔNG
+          # có pod nào bị recreate ⇒ không downtime.
+          RAW="https://raw.githubusercontent.com/TRUNGHOANGDATA/tradadata-blog/${BLOG_REF}/k8s/cronjobs.yaml"
+          echo "Lấy manifest: $RAW"
+          curl -fsSL "$RAW" -o /tmp/cronjobs.yaml
+          echo "===== CronJob khai trong manifest ====="
+          grep -E '^\s+name:\s+tradadata-blog' /tmp/cronjobs.yaml || true
+          echo "===== apply ====="
+          ssh cp "kubectl apply -n $NAMESPACE -f -" < /tmp/cronjobs.yaml
+          rm -f /tmp/cronjobs.yaml
+          echo "===== CronJob sau khi apply ====="
+          ssh cp "kubectl get cronjob -n $NAMESPACE"
 
       - name: Xem env của container blog (chỉ đọc — CHỈ in TÊN, không in giá trị)
         if: ${{ inputs.action == 'blog-env-check' || inputs.action == 'blog-env-set' }}
