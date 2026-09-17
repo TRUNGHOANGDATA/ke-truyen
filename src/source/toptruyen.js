@@ -188,23 +188,42 @@ export function createTopTruyenSource({
       const statusText = $(SEL.status).first().text().trim();
       const authorText = $(SEL.author).first().text().trim();
 
-      // Mục lục: bỏ "chương" quảng cáo trỏ sang truyện khác (chỉ giữ chương cùng
-      // <name> với truyện đang xem).
-      const chapters = [];
-      const seen = new Set();
+      // Mục lục có chèn vài "chương" quảng cáo trỏ sang TRUYỆN KHÁC (name khác).
+      // Lọc theo NHÓM name PHỔ BIẾN NHẤT (chính là bộ thật) thay vì so với slug —
+      // vì site định tuyến theo id nên name trên URL có thể khác slug đã lưu (vd
+      // slug còn mang tiền tố kho bổ sung 'ttz~'): so với slug sẽ loại nhầm sạch chương.
+      const rows = [];
       $(SEL.chapterRow).each((_, a) => {
         const href = String($(a).attr('href') || '');
         const cm = href.match(/\/truyen-tranh\/([a-z0-9-]+)\/chapter-[^/?#]+/i);
-        if (!cm || cm[1] !== comicName) return;                 // row quảng cáo -> bỏ
+        if (!cm) return;
         const num = $(a).attr('data-chapter') || chapterLabel($(a).text());
-        if (!num || seen.has(num)) return;
-        seen.add(num);
-        chapters.push({ name: String(num), title: '', apiUrl: abs(base, href), updatedAt: null, order: 0 });
+        if (!num) return;
+        rows.push({ name: cm[1], num: String(num), href });
       });
+      const freq = {};
+      for (const r of rows) freq[r.name] = (freq[r.name] || 0) + 1;
+      const canonical = Object.keys(freq).sort((a, b) => freq[b] - freq[a])[0];
+      const chapters = [];
+      const seen = new Set();
+      for (const r of rows) {
+        if (r.name !== canonical) continue;                     // row quảng cáo (name thiểu số) -> bỏ
+        if (seen.has(r.num)) continue;
+        seen.add(r.num);
+        chapters.push({ name: r.num, title: '', apiUrl: abs(base, r.href), updatedAt: null, order: 0 });
+      }
       chapters.reverse();                                        // trang liệt kê mới-trước
       chapters.forEach((c, i) => { c.order = i; });
 
       const $cov = $(SEL.cover).first();
+
+      // Slug lạ (của nguồn khác) khiến site trả về TRANG DANH SÁCH / trang "404!"
+      // (vẫn HTTP 200) thay vì trang truyện. Trang truyện thật luôn có bìa
+      // `img.image-comic`; vắng bìa mà lại 0 chương = không phải trang truyện ->
+      // báo lỗi gọn thay vì dựng một "truyện" rỗng mang tên trang danh sách.
+      if (!chapters.length && !$cov.length) {
+        throw new Error(`Không đọc được ở nguồn này (slug thuộc nguồn khác): ${slug}`);
+      }
       return {
         slug,
         name: scrubBrands($(SEL.title).first().text().trim()),

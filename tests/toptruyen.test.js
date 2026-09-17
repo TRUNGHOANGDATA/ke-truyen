@@ -126,6 +126,18 @@ test('detail() bỏ chương quảng cáo trỏ sang truyện khác, mục lục
   assert.ok(d.chapters[0].apiUrl.includes('/truyen-tranh/yeu-than-ky/chapter-1/'));
 });
 
+test('detail() vẫn ra mục lục khi slug/name lệch với URL chương (vd slug kèm tiền tố)', async () => {
+  // Slug còn mang tiền tố kho bổ sung; site vẫn ra đúng truyện (định tuyến theo id)
+  // nhưng name trên link chương là 'yeu-than-ky' -> lọc theo nhóm phổ biến, không so slug.
+  const s = createTopTruyenSource({
+    politeDelayMs: 0, retryDelayMs: 0,
+    fetchFn: async () => ({ ok: true, status: 200, async text() { return DETAIL; } }),
+  });
+  const d = await s.detail('ttz~yeu-than-ky~673');
+  assert.deepEqual(d.chapters.map(c => c.name), ['1', '704', '705']);   // vẫn bỏ chương quảng cáo
+  assert.ok(d.chapters[0].apiUrl.includes('/truyen-tranh/yeu-than-ky/chapter-1/'));
+});
+
 test('chapter() trả ảnh theo thứ tự, bỏ banner, xử lý // và giữ query', async () => {
   const { images } = await src({ '/chapter-705/': CHAP })
     .chapter(`${B}/truyen-tranh/yeu-than-ky/chapter-705/3598612`);
