@@ -11,8 +11,13 @@
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36';
 
-/** Dấu vân tay khung web -> adapter tái dùng được. */
+/**
+ * Dấu vân tay khung web -> adapter tái dùng được. `id` cũng là tên KHUNG dùng cho
+ * source-manager.makeAdapter (khi bấm "Thêm làm nguồn"). Xếp TopTruyen trước
+ * NetTruyen vì trang đọc của nó cũng có `.page-chapter` (khớp regex NetTruyen).
+ */
 export const THEMES = [
+  { id: 'toptruyen', label: 'Khung TopTruyen', adapter: 'toptruyen.js', re: /item-manga|title-manga|image-comic|list-image-detail|overview-comic/i },
   { id: 'nettruyen', label: 'Khung NetTruyen', adapter: 'nettruyen.js', re: /class="items"|id="nt_listchapter"|title-detail|page-chapter/i },
   { id: 'truyenqq', label: 'Khung TruyenQQ', adapter: 'truyenqq.js', re: /list_grid|book_avatar|chapter_content|lst_chapter/i },
   { id: 'madara', label: 'WordPress Madara', adapter: null, re: /wp-manga|madara|chapter-readingnav/i },
@@ -48,8 +53,9 @@ export function createSiteProber({ fetchFn = fetch, timeoutMs = 10000, now = () 
       const ms = now() - t0;
       const theme = THEMES.find(t => t.re.test(html)) || null;
       // Có link truyện = trang thật, không phải trang đỗ tên miền / chuyển hướng.
+      // Slug theo sau có thể là dấu " (TruyenQQ/NetTruyen) hoặc /<id> (TopTruyen).
       const comicLinks = [...new Set(
-        [...html.matchAll(/href="[^"]*\/(?:truyen-tranh|truyen|manga)\/([a-z0-9-]{3,})"/gi)].map(m => m[1]),
+        [...html.matchAll(/href="[^"]*\/(?:truyen-tranh|truyen|manga)\/([a-z0-9-]{3,})(?=["/])/gi)].map(m => m[1]),
       )];
       return {
         input: base,

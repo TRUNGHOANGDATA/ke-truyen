@@ -247,3 +247,72 @@ test('trang /settings có nút Chỉ dùng TruyenQQ', async () => {
   assert.match(res.text, /Chỉ dùng TruyenQQ/);
   assert.match(res.text, /id="onlyQQ"/);
 });
+
+/* ---------- Registry: đo tốc độ + thêm/gỡ nguồn ---------- */
+
+const speedProber = (sink = []) => ({
+  async probeAll(list) {
+    sink.push(list);
+    return list.map((u, i) => ({ input: u, ok: true, status: 200, ms: 100 + i * 10, theme: 'nettruyen', adapter: 'nettruyen.js', comicCount: 5 }));
+  },
+});
+
+test('trang /settings dựng ô chọn nguồn từ registry (có TopTruyen) + nút đo tốc độ', async () => {
+  const a = request.agent(app());
+  await login(a);
+  const res = await a.get('/settings');
+  assert.match(res.text, /id="source"/);
+  assert.match(res.text, /TopTruyen/, 'registry phải có nguồn TopTruyen mặc định');
+  assert.match(res.text, /Đo tốc độ các nguồn/);
+});
+
+test('POST /settings/test-sources trả ms cho từng nguồn trong registry', async () => {
+  const sink = [];
+  const a = request.agent(app({ prober: speedProber(sink) }));
+  await login(a);
+  const res = await a.post('/settings/test-sources').send({});
+  assert.equal(res.status, 200);
+  // registry = TruyenQQ + 2 NetTruyen + TopTruyen = 4 nguồn
+  assert.equal(res.body.results.length, 4);
+  assert.equal(sink[0].length, 4, 'phải đo base của cả 4 nguồn');
+  assert.ok(res.body.results.every(r => typeof r.ms === 'number'));
+  assert.ok(res.body.results.find(r => r.id === 'truyenqq').active, 'đánh dấu nguồn đang dùng');
+});
+
+test('POST /settings/add-source thêm nguồn mới, sau đó chọn được', async () => {
+  const a = request.agent(app());
+  await login(a);
+  const add = await a.post('/settings/add-source').send({ base: 'https://www.komoi.net', framework: 'toptruyen', label: 'Kho Mới' });
+  assert.equal(add.status, 200);
+  assert.equal(add.body.site.framework, 'toptruyen');
+  assert.ok(add.body.registry.some(s => s.id === add.body.site.id));
+  // đổi sang nguồn vừa thêm
+  const set = await a.post('/settings/source').send({ source: add.body.site.id });
+  assert.equal(set.status, 200);
+});
+
+test('POST /settings/add-source từ chối khung chưa hỗ trợ', async () => {
+  const a = request.agent(app());
+  await login(a);
+  const res = await a.post('/settings/add-source').send({ base: 'https://x.example', framework: 'madara' });
+  assert.equal(res.status, 400);
+  assert.match(res.body.error, /Khung chưa hỗ trợ/);
+});
+
+test('POST /settings/add-source chặn địa chỉ nội bộ (SSRF)', async () => {
+  const a = request.agent(app());
+  await login(a);
+  const res = await a.post('/settings/add-source').send({ base: 'http://127.0.0.1:3000', framework: 'nettruyen' });
+  assert.equal(res.status, 400);
+});
+
+test('POST /settings/remove-source gỡ nguồn tự thêm, cài sẵn thì báo lỗi', async () => {
+  const a = request.agent(app());
+  await login(a);
+  const add = await a.post('/settings/add-source').send({ base: 'https://tam.example', framework: 'nettruyen', label: 'Tạm' });
+  const rm = await a.post('/settings/remove-source').send({ id: add.body.site.id });
+  assert.equal(rm.status, 200);
+  assert.ok(!rm.body.registry.some(s => s.id === add.body.site.id));
+  const rm2 = await a.post('/settings/remove-source').send({ id: 'toptruyen' });
+  assert.equal(rm2.status, 400);
+});

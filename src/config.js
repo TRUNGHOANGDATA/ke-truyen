@@ -16,6 +16,31 @@ function parseSites(raw) {
   return out.length ? out : null;
 }
 
+/**
+ * Như parseSites nhưng có thêm cột KHUNG (framework) để chọn đúng adapter:
+ * "id|Nhãn|https://a.com|pre~|framework[|apiBase]".  framework: truyenqq | nettruyen | toptruyen.
+ */
+function parseComicSites(raw) {
+  if (!raw) return null;
+  const out = raw.split(',').map(s => s.trim()).filter(Boolean).map(entry => {
+    const [id, label, base, prefix, framework, apiBase] = entry.split('|').map(s => (s || '').trim());
+    if (!id || !base || !prefix) return null;
+    return {
+      id, label: label || id, base: base.replace(/\/+$/, ''), prefix,
+      framework: framework || 'nettruyen', ...(apiBase ? { apiBase } : {}),
+    };
+  }).filter(Boolean);
+  return out.length ? out : null;
+}
+
+// Kho bổ sung mặc định (khung NetTruyen): mỗi site là một kho RIÊNG.
+const NETTRUYEN_SITES = parseSites(process.env.NETTRUYEN_SITES) || [
+  // KHÔNG dùng nettruyen.id (prefix ot~): CDN images.truyenonline.cc chặn tải từ
+  // máy chủ (đo thật: dội 8 ảnh rớt 7, giãn nhịp 2.5s vẫn 0/5). Hai kho dưới CDN khoẻ.
+  { id: 'nettruyenar', label: 'NetTruyen', base: 'https://nettruyenar.com', prefix: 'nar~' },
+  { id: 'nettruyenx', label: 'NetTruyen 2', base: 'https://nettruyenx.net', prefix: 'nx~' },
+];
+
 export const config = {
   PORT: Number(process.env.PORT || 3000),
   DB_PATH: process.env.DB_PATH || './data/app.db',
@@ -42,15 +67,21 @@ export const config = {
    * Tiền tố 'ot~' của site đầu giữ nguyên vì thư viện cũ đã lưu theo nó.
    * Ghi đè bằng .env: NETTRUYEN_SITES=id|Nhãn|https://a.com|pre~,id2|...
    */
-  NETTRUYEN_SITES: parseSites(process.env.NETTRUYEN_SITES) || [
-    // KHÔNG dùng nettruyen.id (prefix ot~): CDN images.truyenonline.cc chặn tải từ
-    // máy chủ (đo thật: dội 8 ảnh rớt 7, giãn nhịp 2.5s vẫn 0/5). Hai kho dưới CDN khoẻ.
-    { id: 'nettruyenar', label: 'NetTruyen', base: 'https://nettruyenar.com', prefix: 'nar~' },
-    { id: 'nettruyenx', label: 'NetTruyen 2', base: 'https://nettruyenx.net', prefix: 'nx~' },
+  NETTRUYEN_SITES,
+  /**
+   * REGISTRY nguồn bổ sung/chọn được — mỗi mục kèm KHUNG để dựng đúng adapter.
+   * TruyenQQ là nguồn chính có sẵn (domain tự dò) nên KHÔNG nằm ở đây; danh sách
+   * này là các nguồn phụ có thể (a) bổ sung khi nguồn chính là TruyenQQ, hoặc
+   * (b) tự chọn làm nguồn chính ở trang Cài đặt.
+   * Ghi đè bằng .env: COMIC_SITES=id|Nhãn|https://a.com|pre~|framework[|apiBase],...
+   */
+  COMIC_SITES: parseComicSites(process.env.COMIC_SITES) || [
+    ...NETTRUYEN_SITES.map(s => ({ ...s, framework: 'nettruyen' })),
+    { id: 'toptruyen', label: 'TopTruyen', base: 'https://www.toptruyenzonee.com', prefix: 'ttz~', framework: 'toptruyen' },
   ],
   // Ứng viên để trang Cài đặt bấm "dò từ máy chủ" (máy ở nhà hay bị chặn, máy chủ thì không).
   PROBE_CANDIDATES: (process.env.PROBE_CANDIDATES ||
-    'https://nettruyen.id,https://nettruyenar.com,https://nettruyenx.net,https://nettruyen.co.com,https://cuutruyen.net,https://blogtruyenmoi.com,https://manhuavn.top,https://lxmanga.net'
+    'https://www.toptruyenzonee.com,https://nettruyen.id,https://nettruyenar.com,https://nettruyenx.net,https://nettruyen.co.com,https://cuutruyen.net,https://blogtruyenmoi.com,https://manhuavn.top,https://lxmanga.net'
   ).split(',').map(s => s.trim().replace(/\/+$/, '')).filter(Boolean),
   // Nguồn truyện chữ (Phase 2): truyenfull, crawl HTML
   TRUYENFULL_BASE: process.env.TRUYENFULL_BASE || "https://truyenfull.live",
@@ -67,6 +98,8 @@ export const IMAGE_HOSTS = [
   'img.otruyenapi.com', 'otruyencdn.com', 'sv1.otruyencdn.com',
   'nettruyen-api.clubc.org', 'images.truyenonline.cc', 'truyenonline.cc', 'nettruyen.id',
   'cloud-zzz.com', 'kptackpte.com', 'nettruyenar.com', 'nettruyenx.net',   // CDN nar~/nx~
+  // TopTruyen (ttz~): CDN ảnh anhvip.xyz (nhiều subdomain s2/s15…) + proxy wp.com
+  'anhvip.xyz', 'wp.com', 'toptruyenzonee.com',
   // TruyenQQ (bìa + ảnh chương)
   'truyenvua.com', 'hinhhinh.com', 'tintruyen.net', 'truyenqqko.com', 'hinhtruyen.com',
   // Truyện chữ (chỉ ảnh bìa; nhiều host: CDN riêng, 8cache, ảnh Google Drive)

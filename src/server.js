@@ -15,7 +15,9 @@ app.listen(config.PORT, () => console.log(`listening on :${config.PORT}`));
 // vì CDN chết) thì không nguồn nào đọc được nữa -> xoá khỏi thư viện cho gọn.
 // Chỉ xoá cái không thuộc kho nào còn khai báo, nên an toàn chạy mỗi lần khởi động.
 try {
-  const kept = [...(config.NETTRUYEN_SITES || []).map(s => s.prefix), 'tf~'];
+  // Mọi tiền tố đang biết (gồm nguồn cài sẵn + nguồn tự thêm) + 'tf~' (truyện chữ).
+  const known = app.locals.services?.manager?.knownPrefixes?.() || [];
+  const kept = [...known, 'tf~'];
   const n = app.locals.services?.library?.purgeOrphans?.(kept) || 0;
   if (n) console.log(`[don] go ${n} bo mo coi (nguon da bo)`);
 } catch (e) { console.error('[don] loi', e); }

@@ -188,3 +188,99 @@ test('tắt bổ sung thì comicSources chỉ còn nguồn chính', () => {
   mgr.setSupplement(false);
   assert.deepEqual(mgr.comicSources().map(s => s.label), ['TruyenQQ']);
 });
+
+// --- registry đa khung: chọn nguồn phụ làm chính + tự thêm nguồn ---
+
+const REG_SITES = [
+  { id: 'nettruyenar', label: 'NetTruyen', base: 'https://nar.com', prefix: 'nar~', framework: 'nettruyen' },
+  { id: 'toptruyen', label: 'TopTruyen', base: 'https://top.com', prefix: 'ttz~', framework: 'toptruyen' },
+];
+
+function setupReg(overrides = {}) {
+  const db = openDb(':memory:');
+  createSchema(db);
+  const settings = createSettings(db);
+  const seen = { tqq: [], net: [], top: [] };
+  const mgr = createSourceManager({
+    db, settings,
+    config: { TRUYENQQ_MIRRORS: ['https://a.com'], COMIC_SITES: REG_SITES },
+    wrap: (_db, raw) => raw,
+    makeResolver: () => ({ current: () => 'https://a.com', setCurrent() {}, reprobe: async () => 'https://a.com' }),
+    makeTruyenQQ: ({ base }) => ({ id: 'truyenqq', base, setBase(b) { this.base = b; },
+      async home() { return { items: [] }; }, async search() { return { items: [{ name: 'QQ', slug: 'qq' }] }; },
+      async detail(slug) { return { slug, via: 'qq' }; } }),
+    makeSupplement: (o) => { seen.net.push(o); return {
+      getBase: () => o.base, async home() { return { items: [] }; },
+      async search() { return { items: [{ name: 'Net', slug: 'net' }] }; }, async detail(slug) { return { slug, via: 'net' }; } }; },
+    makeTopTruyen: (o) => { seen.top.push(o); return {
+      getBase: () => o.base, async home() { return { items: [] }; },
+      async search() { return { items: [{ name: 'Top', slug: 'top' }] }; }, async detail(slug) { return { slug, via: 'top' }; } }; },
+    ...overrides,
+  });
+  return { db, settings, mgr, seen };
+}
+
+test('site khung toptruyen được dựng bằng makeTopTruyen, đúng base', () => {
+  const { seen } = setupReg();
+  assert.equal(seen.top.length, 1);
+  assert.equal(seen.top[0].base, 'https://top.com');
+});
+
+test('setSource sang nguồn phụ (toptruyen) làm chính đứng riêng, slug không tiền tố', async () => {
+  const { mgr, settings } = setupReg();
+  mgr.setSource('toptruyen');
+  assert.equal(settings.get('source'), 'toptruyen');
+  const { items } = await mgr.source.search('x');
+  assert.deepEqual(items.map(i => i.slug), ['top']);          // đứng riêng, không gộp
+  assert.equal((await mgr.source.detail('top')).via, 'top');
+});
+
+test('listRegistry liệt kê TruyenQQ + mọi nguồn phụ, đánh dấu nguồn đang chính', () => {
+  const { mgr } = setupReg();
+  const reg = mgr.listRegistry();
+  assert.deepEqual(reg.map(s => s.id), ['truyenqq', 'nettruyenar', 'toptruyen']);
+  assert.equal(reg.find(s => s.active).id, 'truyenqq');
+  mgr.setSource('toptruyen');
+  assert.equal(mgr.listRegistry().find(s => s.active).id, 'toptruyen');
+});
+
+test('knownPrefixes gồm mọi nguồn phụ (để dọn bộ mồ côi)', () => {
+  const { mgr } = setupReg();
+  assert.deepEqual(mgr.knownPrefixes().sort(), ['nar~', 'ttz~']);
+});
+
+test('addSite lưu nguồn mới vào registry và chọn được làm chính', async () => {
+  const { mgr } = setupReg();
+  const site = mgr.addSite({ label: 'Kho Mới', base: 'https://www.komoi.net', framework: 'toptruyen' });
+  assert.ok(mgr.listRegistry().some(s => s.id === site.id), 'registry phải có nguồn mới');
+  assert.ok(site.prefix.endsWith('~'));
+  mgr.setSource(site.id);
+  assert.equal((await mgr.source.detail('x')).via, 'top');    // dùng đúng khung toptruyen
+});
+
+test('addSite từ chối khung chưa hỗ trợ và địa chỉ nội bộ (SSRF)', () => {
+  const { mgr } = setupReg();
+  assert.throws(() => mgr.addSite({ base: 'https://x.com', framework: 'madara' }), /Khung chưa hỗ trợ/);
+  assert.throws(() => mgr.addSite({ base: 'http://127.0.0.1', framework: 'nettruyen' }), /không hợp lệ/);
+});
+
+test('addSite bền qua lần dựng manager mới (đọc lại từ settings)', () => {
+  const { db, settings, mgr } = setupReg();
+  const site = mgr.addSite({ label: 'Bền', base: 'https://ben.com', framework: 'nettruyen' });
+  const mgr2 = createSourceManager({
+    db, settings, config: { TRUYENQQ_MIRRORS: ['https://a.com'], COMIC_SITES: REG_SITES },
+    wrap: (_db, raw) => raw,
+    makeResolver: () => ({ current: () => 'https://a.com', setCurrent() {}, reprobe: async () => 'https://a.com' }),
+    makeTruyenQQ: ({ base }) => ({ base, setBase() {}, async home() { return { items: [] }; } }),
+    makeSupplement: () => ({ async home() { return { items: [] }; } }),
+  });
+  assert.ok(mgr2.listRegistry().some(s => s.id === site.id), 'nguồn tự thêm phải còn sau khi dựng lại');
+});
+
+test('removeSite gỡ nguồn tự thêm, không gỡ được nguồn cài sẵn', () => {
+  const { mgr } = setupReg();
+  const site = mgr.addSite({ label: 'Tạm', base: 'https://tam.com', framework: 'nettruyen' });
+  mgr.removeSite(site.id);
+  assert.ok(!mgr.listRegistry().some(s => s.id === site.id));
+  assert.throws(() => mgr.removeSite('toptruyen'), /tự thêm/);
+});

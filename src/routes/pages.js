@@ -177,6 +177,7 @@ export function mountPages(app) {
     res.render('settings', {
       title: 'Cài đặt', active: '',
       source: settings.get('source', 'truyenqq'),
+      registry: manager.listRegistry(),
       domain: manager.resolver.current(),
       mirrors: config.TRUYENQQ_MIRRORS,
       supplement: manager.supplementOn(),
@@ -185,11 +186,51 @@ export function mountPages(app) {
     });
   });
 
-  // Đổi nguồn truyện (truyenqq | otruyen)
+  // Đổi nguồn CHÍNH (id bất kỳ trong registry, hoặc alias 'otruyen')
   app.post('/settings/source', (req, res) => {
     try {
       const name = svc().manager.setSource(String(req.body.source || ''));
       res.json({ ok: true, source: name });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+  });
+
+  /**
+   * Đo TỐC ĐỘ thật của từng nguồn trong registry TỪ MÁY CHỦ (bấm nút mới chạy).
+   * Máy chủ tải thử trang gốc của mỗi nguồn -> báo ms + sống/chết để tự lựa.
+   */
+  app.post('/settings/test-sources', async (req, res) => {
+    const { manager, prober } = svc();
+    try {
+      const sites = manager.listRegistry();
+      const results = await prober.probeAll(sites.map(s => s.base));
+      res.json({
+        ok: true,
+        results: sites.map((s, i) => ({
+          id: s.id, label: s.label, framework: s.framework, active: s.active,
+          ok: !!results[i]?.ok, ms: results[i]?.ms ?? null,
+          comicCount: results[i]?.comicCount ?? 0, error: results[i]?.error || null,
+        })),
+      });
+    } catch (e) { res.status(502).json({ error: e.message }); }
+  });
+
+  /**
+   * Thêm một nguồn mới (sau khi "Dò nguồn từ máy chủ" nhận ra khung có adapter).
+   * Chỉ nhận khung đã hỗ trợ; safeTarget chặn địa chỉ nội bộ (SSRF) trong addSite.
+   */
+  app.post('/settings/add-source', (req, res) => {
+    const { base, label, prefix, framework, apiBase } = req.body || {};
+    try {
+      const site = svc().manager.addSite({ base: String(base || ''), label, prefix, framework, apiBase });
+      res.json({ ok: true, site, registry: svc().manager.listRegistry() });
+    } catch (e) { res.status(400).json({ error: e.message }); }
+  });
+
+  // Gỡ một nguồn người dùng đã thêm
+  app.post('/settings/remove-source', (req, res) => {
+    try {
+      const id = svc().manager.removeSite(String(req.body.id || ''));
+      res.json({ ok: true, id, registry: svc().manager.listRegistry() });
     } catch (e) { res.status(400).json({ error: e.message }); }
   });
 

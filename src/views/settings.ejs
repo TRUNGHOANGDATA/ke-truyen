@@ -10,12 +10,20 @@
   <div class="boxhead"><h2>Nguồn truyện</h2></div>
   <div style="padding:14px; display:flex; flex-direction:column; gap:14px; max-width:520px">
     <label style="display:flex; flex-direction:column; gap:6px">
-      <span>Nguồn đang dùng</span>
+      <span>Nguồn chính đang dùng</span>
       <select id="source" class="field">
-        <option value="truyenqq" <%= source==='truyenqq'?'selected':'' %>>TruyenQQ (crawl, cập nhật từng phút)</option>
-        <option value="otruyen" <%= source==='otruyen'?'selected':'' %>>NetTruyen (crawl, kho bổ sung)</option>
+        <% (registry || []).forEach(s => { %>
+          <option value="<%= s.id %>" <%= s.active ? 'selected' : '' %>><%= s.label %> · <%= s.framework %></option>
+        <% }) %>
       </select>
+      <small style="color:#888">TruyenQQ làm nguồn chính thì các nguồn còn lại tự bổ sung những bộ nó không có.
+        Chọn nguồn khác thì nguồn đó đứng riêng. Bấm “Đo tốc độ” để biết nguồn nào máy chủ vào nhanh mà tự lựa.</small>
     </label>
+
+    <div>
+      <button class="ghost" id="testSrc" type="button" style="justify-content:center">⏱ Đo tốc độ các nguồn</button>
+      <div id="srcSpeed" style="margin-top:8px"></div>
+    </div>
 
     <label style="display:flex; gap:9px; align-items:flex-start">
       <input id="sup" type="checkbox" <%= supplement ? "checked" : "" %> style="margin-top:3px; flex:0 0 auto">
@@ -112,6 +120,36 @@
     } catch (e) { srcOut.textContent = 'Lỗi: ' + e.message; }
   });
 
+  // Đo tốc độ THẬT từng nguồn (máy chủ tải thử) -> bảng có nút "Dùng" để tự lựa.
+  const testSrc = document.getElementById('testSrc');
+  const srcSpeed = document.getElementById('srcSpeed');
+  testSrc.addEventListener('click', async () => {
+    testSrc.disabled = true;
+    srcSpeed.innerHTML = '<div class="sysbox">Máy chủ đang đo… (tối đa ~10 giây mỗi nguồn)</div>';
+    try {
+      const { results = [] } = await api('/settings/test-sources', { method: 'POST', body: '{}' });
+      results.sort((a, b) => (b.ok - a.ok) || ((a.ms || 9e9) - (b.ms || 9e9)));
+      srcSpeed.innerHTML = '<table class="probe"><thead><tr><th>Nguồn</th><th>Tốc độ</th><th>Trạng thái</th><th></th></tr></thead><tbody>'
+        + results.map(r => {
+            const verdict = r.ok
+              ? '<b style="color:#1a7f37">Sống</b>' + (r.comicCount ? ' · ' + r.comicCount + ' link' : '')
+              : '<span style="color:#b42318">' + esc(r.error || 'không vào được') + '</span>';
+            const speed = r.ms == null ? '—' : (r.ms + 'ms' + (r.ok && r.ms < 1500 ? ' ⚡' : ''));
+            const pick = '<button class="ghost pick-src" data-id="' + esc(r.id) + '" type="button" style="padding:2px 10px">'
+              + (r.active ? 'Đang dùng' : 'Dùng') + '</button>';
+            return '<tr><td><b>' + esc(r.label) + '</b><br><small style="color:#888">' + esc(r.framework) + '</small></td><td>'
+              + speed + '</td><td>' + verdict + '</td><td>' + pick + '</td></tr>';
+          }).join('')
+        + '</tbody></table>';
+      // Bấm "Dùng" -> chọn trong ô select rồi lưu luôn.
+      srcSpeed.querySelectorAll('.pick-src').forEach(btn => btn.addEventListener('click', async () => {
+        document.getElementById('source').value = btn.dataset.id;
+        document.getElementById('saveSrc').click();
+      }));
+    } catch (e) { srcSpeed.innerHTML = '<div class="sysbox">Lỗi: ' + esc(e.message) + '</div>'; }
+    finally { testSrc.disabled = false; }
+  });
+
   document.getElementById('sup').addEventListener('change', async (e) => {
     const on = e.target.checked;
     srcOut.textContent = on ? 'Đang bật bổ sung…' : 'Đang tắt bổ sung…';
@@ -166,7 +204,7 @@
       const urls = document.getElementById('probeUrls').value.split(/[\s,]+/).filter(Boolean);
       const { results = [] } = await api('/settings/probe', { method: 'POST', body: JSON.stringify({ urls }) });
       results.sort((a, b) => (b.ok - a.ok) || ((a.ms || 9e9) - (b.ms || 9e9)));
-      probeOut.innerHTML = '<table class="probe"><thead><tr><th>Trang</th><th>Kết quả</th><th>Tốc độ</th><th>Khung web</th></tr></thead><tbody>'
+      probeOut.innerHTML = '<table class="probe"><thead><tr><th>Trang</th><th>Kết quả</th><th>Tốc độ</th><th>Khung web</th><th></th></tr></thead><tbody>'
         + results.map(r => {
             const host = esc(String(r.input || '').replace(/^https?:\/\//, ''));
             const verdict = r.ok
@@ -176,10 +214,27 @@
               ? '<b>' + esc(r.themeLabel) + '</b><br><small style="color:#888">dùng lại ' + esc(r.adapter) + '</small>'
               : (r.themeLabel ? esc(r.themeLabel) + '<br><small style="color:#888">phải viết parser mới</small>'
                               : '<small style="color:#888">—</small>');
+            // Chỉ thêm được nguồn sống + khung có adapter (r.theme = tên khung).
+            const add = (r.ok && r.adapter && r.theme)
+              ? '<button class="btn add-src" type="button" style="padding:2px 10px"'
+                + ' data-base="' + esc(r.finalUrl || r.input) + '" data-fw="' + esc(r.theme) + '"'
+                + ' data-label="' + esc(host.split('/')[0]) + '">➕ Thêm làm nguồn</button>'
+              : '';
             return '<tr><td>' + host + (r.finalUrl ? '<br><small style="color:#888">→ ' + esc(r.finalUrl) + '</small>' : '')
-              + '</td><td>' + verdict + '</td><td>' + (r.ms ? r.ms + 'ms' : '—') + '</td><td>' + theme + '</td></tr>';
+              + '</td><td>' + verdict + '</td><td>' + (r.ms ? r.ms + 'ms' : '—') + '</td><td>' + theme + '</td><td>' + add + '</td></tr>';
           }).join('')
         + '</tbody></table>';
+      // Bấm "Thêm làm nguồn" -> lưu vào registry rồi tải lại để ô chọn nguồn có nó.
+      probeOut.querySelectorAll('.add-src').forEach(btn => btn.addEventListener('click', async () => {
+        btn.disabled = true; btn.textContent = 'Đang thêm…';
+        try {
+          const r = await api('/settings/add-source', { method: 'POST', body: JSON.stringify({
+            base: btn.dataset.base, framework: btn.dataset.fw, label: btn.dataset.label }) });
+          btn.textContent = '✓ Đã thêm: ' + r.site.label;
+          srcOut.textContent = 'Đã thêm nguồn “' + r.site.label + '”. Tải lại trang để chọn làm nguồn chính.';
+          setTimeout(() => location.reload(), 1200);
+        } catch (e) { btn.disabled = false; btn.textContent = '➕ Thêm làm nguồn'; srcOut.textContent = 'Lỗi thêm nguồn: ' + e.message; }
+      }));
     } catch (e) { probeOut.innerHTML = '<div class="sysbox">Lỗi: ' + esc(e.message) + '</div>'; }
     finally { probeBtn.disabled = false; }
   });
@@ -203,11 +258,11 @@
         '<div class="sysbox">' + esc(r.comic || '') + (r.chapter ? ' · chương ' + esc(r.chapter) : '')
           + (r.imageCount ? ' · ' + r.imageCount + ' ảnh' : '')
           + (r.allowed === false ? '<br><b>Host ảnh này chưa được proxy cho qua.</b>' : '')
-          + '<br>' + esc(r.verdict || '')
-          + (r.burst ? '<br><br><b>Thử tải ' + r.burst.tried + ' ảnh cùng lúc:</b> '
-              + r.burst.ok + ' được / ' + r.burst.failed + ' rớt (' + r.burst.ms + 'ms)'
-              + (r.burst.codes && r.burst.codes.length ? ' · ' + esc(r.burst.codes.join(', ')) : '')
-              + '<br>' + esc(r.burst.verdict) : '')
+          + '<br>' + esc(r.verdict || '')
+          + (r.burst ? '<br><br><b>Thử tải ' + r.burst.tried + ' ảnh cùng lúc:</b> '
+              + r.burst.ok + ' được / ' + r.burst.failed + ' rớt (' + r.burst.ms + 'ms)'
+              + (r.burst.codes && r.burst.codes.length ? ' · ' + esc(r.burst.codes.join(', ')) : '')
+              + '<br>' + esc(r.burst.verdict) : '')
           + '</div>'
         + (rows ? '<table class="probe"><thead><tr><th>Host</th><th>Referer đã thử</th><th>Kết quả</th><th>Thời gian</th></tr></thead><tbody>'
             + rows + '</tbody></table>' : '');
