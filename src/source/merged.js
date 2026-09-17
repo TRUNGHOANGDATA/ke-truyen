@@ -24,6 +24,12 @@ const SUP_HOSTS = /(?:^|\.)(nettruyen\.id|otruyencdn\.com|otruyenapi\.com)$/;
 const SUP_TIMEOUT = 6000;
 /** Tổng thời gian tối đa cho CẢ chuỗi kho dự phòng của một lời gọi duyệt/tìm. */
 const SUP_BUDGET = 8000;
+/**
+ * Kho vừa TIMEOUT/LỖI thì cho "nghỉ" một lúc — nếu không, một kho chết sẽ ăn hết
+ * timeout (~6s) trên TỪNG dải thể loại của trang chủ (~13 dải) làm treo cả trang.
+ * Nghỉ xong tự thử lại (kho sống lại thì lần sau lại dùng).
+ */
+const SUP_COOLDOWN_MS = 60000;
 
 const hostReOf = (src) => {
   try {
@@ -59,27 +65,38 @@ export function withSupplement(primary, secondaries, {
   const isTagged = (s) => typeof s === 'string' && sups.some(x => s.startsWith(x.prefix));
   const supFor = (s) => sups.find(x => typeof s === 'string' && s.startsWith(x.prefix)) || null;
 
-  /** Gọi một kho, lỗi/quá hạn thì trả null (bỏ qua kho đó). */
+  // Kho đang "nghỉ" sau khi timeout/lỗi: prefix -> thời điểm được thử lại.
+  const cooldownUntil = new Map();
+
+  /**
+   * Gọi một kho. Trả { res, failed }:
+   *  - failed=true khi TIMEOUT hoặc NÉM LỖI (kho chết) -> cho nghỉ;
+   *  - failed=false khi kho trả lời (res có thể rỗng item -> vẫn coi là sống).
+   */
   const trySup = async (fn, ms = SUP_TIMEOUT) => {
     try {
-      return await Promise.race([
-        fn(),
-        new Promise(resolve => setTimeout(() => resolve(null), ms)),
+      const res = await Promise.race([
+        Promise.resolve().then(fn),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('sup-timeout')), ms)),
       ]);
-    } catch { return null; }
+      return { res, failed: false };
+    } catch { return { res: null, failed: true }; }
   };
 
   /**
    * Thử lần lượt các kho tới khi có kho trả về kết quả CÓ ITEM (tự chuyển dự
    * phòng khi kho ưu tiên chết). Chia sẻ một hạn tổng để không kéo dài vô hạn.
+   * Kho vừa chết được cho nghỉ SUP_COOLDOWN_MS để không ăn timeout ở mỗi thể loại.
    */
   async function firstAlive(call) {
     const deadline = Date.now() + SUP_BUDGET;
     let fallback = null;
     for (const sup of sups) {
+      if ((cooldownUntil.get(sup.prefix) || 0) > Date.now()) continue;   // đang nghỉ -> bỏ qua
       const left = deadline - Date.now();
       if (left < 500 && fallback !== null) break;
-      const res = await trySup(() => call(sup), Math.max(1500, Math.min(SUP_TIMEOUT, left)));
+      const { res, failed } = await trySup(() => call(sup), Math.max(1500, Math.min(SUP_TIMEOUT, left)));
+      if (failed) { cooldownUntil.set(sup.prefix, Date.now() + SUP_COOLDOWN_MS); continue; }
       if (res?.items?.length) return { sup, res };
       if (res && !fallback) fallback = { sup, res };
     }

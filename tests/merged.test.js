@@ -183,6 +183,19 @@ test('supplementPrefixes liệt kê tiền tố của mọi kho', async () => {
   assert.deepEqual(s.supplementPrefixes(), ['ot~', 'nar~']);
 });
 
+test('kho vừa chết được cho nghỉ: lần sau bỏ qua, không thử lại (khỏi ăn timeout mỗi thể loại)', async () => {
+  let calls = 0;
+  const s = withSupplement(fakeQQ([{ name: 'A', slug: 'a' }]), [
+    supEntry('mot', 'ot~', 'mot.com', { async search() { calls++; throw new Error('kho 1 chết'); } }),
+    supEntry('hai', 'nar~', 'hai.com'),
+  ]);
+  const r1 = await s.search('x');
+  const r2 = await s.search('x');
+  assert.equal(calls, 1, 'kho chết chỉ bị gọi 1 lần rồi cho nghỉ');
+  assert.deepEqual(r1.items.map(i => i.slug), ['a', 'nar~bo-hai']);   // lần đầu vẫn chuyển dự phòng
+  assert.deepEqual(r2.items.map(i => i.slug), ['a', 'nar~bo-hai']);   // lần sau bỏ qua kho chết, vẫn dùng kho sống
+});
+
 test('mọi kho đều chết thì trả nguyên kết quả nguồn chính', async () => {
   const boom = { async search() { throw new Error('chết'); } };
   const s = withSupplement(fakeQQ([{ name: 'A', slug: 'a' }]), [

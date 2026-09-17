@@ -15,6 +15,12 @@ export function relTime(iso) {
 export function mountPages(app) {
   const svc = () => app.locals.services;
 
+  // Đổi nguồn / bật-tắt bổ sung / thêm-gỡ nguồn / đổi domain đều XOÁ api_cache.
+  // Warm lại ngay ở NỀN (không chặn request) để lần duyệt kế không phải chờ tải
+  // nguội ~13 dải thể loại. cached.js gộp request trùng key nên không tải đúp với
+  // request foreground của người dùng.
+  const kickWarm = () => { try { Promise.resolve(app.locals.warmHome?.()).catch(() => {}); } catch { /* chưa sẵn */ } };
+
   // Thể loại hiện ở trang chủ, khai báo theo TÊN rồi tự map sang slug của nguồn
   // đang dùng (TruyenQQ dùng slug kèm id như "action-26", OTruyen dùng "action").
   // 'as' = nhãn hiển thị nếu muốn khác tên gốc.
@@ -190,6 +196,7 @@ export function mountPages(app) {
   app.post('/settings/source', (req, res) => {
     try {
       const name = svc().manager.setSource(String(req.body.source || ''));
+      kickWarm();
       res.json({ ok: true, source: name });
     } catch (e) { res.status(400).json({ error: e.message }); }
   });
@@ -222,6 +229,7 @@ export function mountPages(app) {
     const { base, label, prefix, framework, apiBase } = req.body || {};
     try {
       const site = svc().manager.addSite({ base: String(base || ''), label, prefix, framework, apiBase });
+      kickWarm();
       res.json({ ok: true, site, registry: svc().manager.listRegistry() });
     } catch (e) { res.status(400).json({ error: e.message }); }
   });
@@ -230,6 +238,7 @@ export function mountPages(app) {
   app.post('/settings/remove-source', (req, res) => {
     try {
       const id = svc().manager.removeSite(String(req.body.id || ''));
+      kickWarm();
       res.json({ ok: true, id, registry: svc().manager.listRegistry() });
     } catch (e) { res.status(400).json({ error: e.message }); }
   });
@@ -238,7 +247,9 @@ export function mountPages(app) {
   app.post("/settings/supplement", (req, res) => {
     const raw = req.body.on;
     const on = raw === true || raw === 1 || raw === "1" || raw === "true" || raw === "on";
-    res.json({ ok: true, supplement: svc().manager.setSupplement(on) });
+    const r = svc().manager.setSupplement(on);
+    kickWarm();
+    res.json({ ok: true, supplement: r });
   });
 
   /**
@@ -254,6 +265,7 @@ export function mountPages(app) {
       const prefixes = manager.comicSources().map(s => s.prefix).filter(Boolean);
       const removed = library.purgeByPrefixes(prefixes);
       manager.setSupplement(false);        // từ giờ duyệt/tìm chỉ ra bộ TruyenQQ
+      kickWarm();
       res.json({ ok: true, removed });
     } catch (e) { res.status(502).json({ error: e.message }); }
   });
@@ -267,6 +279,7 @@ export function mountPages(app) {
     const alive = await manager.resolver.check(base);
     if (!alive) return res.status(400).json({ error: 'Domain không phản hồi hoặc không phải trang TruyenQQ' });
     const saved = manager.applyDomain(base);
+    kickWarm();
     res.json({ ok: true, domain: saved });
   });
 
@@ -309,6 +322,7 @@ export function mountPages(app) {
   app.post('/settings/reprobe', async (req, res) => {
     try {
       const domain = await svc().manager.reprobe();
+      kickWarm();
       res.json({ ok: true, domain });
     } catch (e) { res.status(502).json({ error: e.message }); }
   });
